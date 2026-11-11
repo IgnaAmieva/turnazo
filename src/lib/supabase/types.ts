@@ -240,6 +240,25 @@ export type Database = {
         Args: { p_court_id: string; p_from: string; p_to: string }
         Returns: { period: unknown }[]
       }
+      create_booking: {
+        Args: {
+          p_court_id: string
+          p_venue_id: string
+          p_start: string
+          p_end: string
+          p_customer_name: string
+          p_customer_phone: string
+        }
+        Returns: Json
+      }
+      cancel_booking_by_token: {
+        Args: { p_cancel_token: string }
+        Returns: Json
+      }
+      get_booking_by_token: {
+        Args: { p_cancel_token: string }
+        Returns: Json
+      }
     }
     Enums: {
       booking_kind: "booking" | "block"
