@@ -7,7 +7,12 @@
       "mcp__claude_ai_Supabase__get_cost",
       "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-pnpm --no-git)",
       "Bash(mv SPEC.md /tmp/SPEC.md)",
-      "Bash(mv /tmp/SPEC.md SPEC.md)"
+      "Bash(mv /tmp/SPEC.md SPEC.md)",
+      "Bash(pnpm add:*)",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(pnpm test:*)",
+      "Bash(mv:*)"
     ]
   }
 }
