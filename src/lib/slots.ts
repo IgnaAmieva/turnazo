@@ -135,11 +135,17 @@ export function generateSlots(params: {
   const slotMs = slotMinutes * 60 * 1000;
 
   for (const hour of hours) {
-    const open  = mendozaToUtc(date, hour.open_time);
-    const close = mendozaToUtc(date, hour.close_time);
+    const open     = mendozaToUtc(date, hour.open_time);
+    const closeRaw = mendozaToUtc(date, hour.close_time);
+    // Si close_time <= open_time (horario cruza medianoche, ej. 23:00-00:30),
+    // sumamos 24h al cierre para que la aritmética sea correcta.
+    const closeMs =
+      closeRaw.getTime() <= open.getTime()
+        ? closeRaw.getTime() + 24 * 60 * 60 * 1000
+        : closeRaw.getTime();
 
     let cursor = open.getTime();
-    while (cursor + slotMs <= close.getTime()) {
+    while (cursor + slotMs <= closeMs) {
       const start = new Date(cursor);
       const end   = new Date(cursor + slotMs);
 
@@ -148,11 +154,16 @@ export function generateSlots(params: {
         (b) => start < b.end && end > b.start
       );
 
-      // Buscar precio aplicable: la primera franja que contenga start
+      // Buscar precio aplicable: la primera franja que contenga start.
+      // Mismo manejo de medianoche: si to_time <= from_time, sumamos 24h.
       const matchPrice = prices.find((p) => {
-        const from = mendozaToUtc(date, p.from_time);
-        const to   = mendozaToUtc(date, p.to_time);
-        return start >= from && start < to;
+        const from   = mendozaToUtc(date, p.from_time);
+        const toRaw  = mendozaToUtc(date, p.to_time);
+        const toMs   =
+          toRaw.getTime() <= from.getTime()
+            ? toRaw.getTime() + 24 * 60 * 60 * 1000
+            : toRaw.getTime();
+        return start.getTime() >= from.getTime() && start.getTime() < toMs;
       });
 
       slots.push({ start, end, available, price: matchPrice?.price ?? null });

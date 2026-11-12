@@ -212,3 +212,55 @@ export async function getCourtAvailability(
   if (error) throw error;
   return (data ?? []) as { period: string }[];
 }
+
+// ---------------------------------------------------------------------------
+// Venue counts (para home page y página de deportes)
+// ---------------------------------------------------------------------------
+
+/** Localidades con conteo de venues aprobados */
+export async function getLocalitiesWithVenueCount() {
+  const supabase = await createClient();
+
+  const [{ data: localities }, { data: venueRows }] = await Promise.all([
+    supabase.from("localities").select("id, name, slug").order("name"),
+    supabase.from("venues").select("locality_id").eq("status", "approved"),
+  ]);
+
+  const countMap = new Map<string, number>();
+  for (const v of venueRows ?? []) {
+    countMap.set(v.locality_id, (countMap.get(v.locality_id) ?? 0) + 1);
+  }
+
+  return (localities ?? []).map((l) => ({
+    ...l,
+    venueCount: countMap.get(l.id) ?? 0,
+  }));
+}
+
+/** Deportes con conteo de venues aprobados en una localidad */
+export async function getSportsWithVenueCount(localityId: string) {
+  const supabase = await createClient();
+
+  const [{ data: sports }, { data: venueRows }] = await Promise.all([
+    supabase.from("sports").select("id, name, slug, default_slot_minutes").order("name"),
+    supabase
+      .from("venues")
+      .select("id, courts!inner(sport_id)")
+      .eq("locality_id", localityId)
+      .eq("status", "approved"),
+  ]);
+
+  // Contar venues únicos por deporte
+  const countMap = new Map<string, Set<string>>();
+  for (const v of venueRows ?? []) {
+    for (const c of (v.courts as { sport_id: string }[]) ?? []) {
+      if (!countMap.has(c.sport_id)) countMap.set(c.sport_id, new Set());
+      countMap.get(c.sport_id)!.add(v.id);
+    }
+  }
+
+  return (sports ?? []).map((s) => ({
+    ...s,
+    venueCount: countMap.get(s.id)?.size ?? 0,
+  }));
+}

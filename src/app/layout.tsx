@@ -20,16 +20,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${geist.variable} h-full`}>
+    <html lang="es" className={`${geist.variable} h-full`} style={{ colorScheme: 'light' }}>
       <body className="min-h-full bg-gray-50 font-[family-name:var(--font-geist)] antialiased">
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-          <div className="max-w-5xl mx-auto px-4 h-14 flex items-center">
-            <a href="/" className="text-green-700 font-bold text-lg tracking-tight">
-              {APP_NAME}
-            </a>
-          </div>
-        </header>
-        <main className="max-w-5xl mx-auto px-4 py-6">{children}</main>
+        {children}
       </body>
     </html>
   );

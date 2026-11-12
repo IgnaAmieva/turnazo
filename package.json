@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "dotenv -e .env.local -- vitest run",
     "test:watch": "dotenv -e .env.local -- vitest",
-    "test:coverage": "dotenv -e .env.local -- vitest run --coverage"
+    "test:coverage": "dotenv -e .env.local -- vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -23,6 +25,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^22.20.5",

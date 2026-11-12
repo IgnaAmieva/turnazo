@@ -1,0 +1,19 @@
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import PanelNav from './_nav';
+
+export default async function PanelLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) redirect('/login');
+
+  return (
+    <div className="flex min-h-screen bg-gray-50">
+      <PanelNav email={user.email ?? ''} />
+      <main className="flex-1 overflow-auto p-6">
+        {children}
+      </main>
+    </div>
+  );
+}

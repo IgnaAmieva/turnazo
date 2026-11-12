@@ -205,3 +205,66 @@ describe("generateSlots — múltiples tramos horarios", () => {
     expect(slots[2].start < slots[3].start).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// generateSlots — medianoche (migration 008)
+// ---------------------------------------------------------------------------
+
+describe("generateSlots — cruce de medianoche", () => {
+  it("genera 1 slot de 90 min para horario 23:00-00:30", () => {
+    // 23:00-00:30 = 90 min → exactamente 1 slot
+    const hours = [{ weekday: 4, open_time: "23:00:00", close_time: "00:30:00" }];
+    const slots = generateSlots({
+      date: BASE_DATE,
+      hours,
+      slotMinutes: 90,
+      booked: [],
+      prices: [],
+    });
+    expect(slots).toHaveLength(1);
+    // 23:00 Mendoza 2026-11-12 = 02:00 UTC 2026-11-13
+    expect(slots[0].start.toISOString()).toBe("2026-11-13T02:00:00.000Z");
+    // 00:30 Mendoza 2026-11-13 = 03:30 UTC 2026-11-13
+    expect(slots[0].end.toISOString()).toBe("2026-11-13T03:30:00.000Z");
+    expect(slots[0].available).toBe(true);
+  });
+
+  it("genera 4 slots de 60 min para horario 22:00-02:00 con precio 22:00-02:00", () => {
+    // 22:00-02:00 = 240 min → 4 slots de 60 min
+    const hours  = [{ weekday: 4, open_time: "22:00:00", close_time: "02:00:00" }];
+    const prices = [{ weekday: 4, from_time: "22:00:00", to_time: "02:00:00", price: 9000 }];
+    const slots = generateSlots({
+      date: BASE_DATE,
+      hours,
+      slotMinutes: 60,
+      booked: [],
+      prices,
+    });
+    expect(slots).toHaveLength(4);
+    // Todos deben tener precio 9000
+    expect(slots.every((s) => s.price === 9000)).toBe(true);
+    // Primer slot: 22:00 Mendoza = 01:00 UTC del día siguiente
+    expect(slots[0].start.toISOString()).toBe("2026-11-13T01:00:00.000Z");
+    // Último slot: 01:00 Mendoza 2026-11-13 = 04:00 UTC 2026-11-13
+    expect(slots[3].start.toISOString()).toBe("2026-11-13T04:00:00.000Z");
+  });
+
+  it("asigna precio correcto para franja 18:00-00:00 en slot de 23:00", () => {
+    // Precio: 18:00-00:00 (medianoche exacta como cierre)
+    const hours  = [{ weekday: 4, open_time: "14:00:00", close_time: "00:00:00" }];
+    const prices = [{ weekday: 4, from_time: "18:00:00", to_time: "00:00:00", price: 8000 }];
+    const slots = generateSlots({
+      date: BASE_DATE,
+      hours,
+      slotMinutes: 60,
+      booked: [],
+      prices,
+    });
+    // Verificar que el slot de 23:00 tiene precio 8000
+    const slot23 = slots.find(
+      (s) => s.start.getTime() === mendozaToUtc(BASE_DATE, "23:00:00").getTime()
+    );
+    expect(slot23).toBeDefined();
+    expect(slot23!.price).toBe(8000);
+  });
+});

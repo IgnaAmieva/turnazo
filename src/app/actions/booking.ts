@@ -10,8 +10,8 @@ import { z } from 'zod';
 // ---------------------------------------------------------------------------
 
 const BookingSchema = z.object({
-  court_id:        z.string().uuid(),
-  venue_id:        z.string().uuid(),
+  court_id:        z.string().guid(),
+  venue_id:        z.string().guid(),
   start:           z.string().min(1),
   end:             z.string().min(1),
   customer_name:   z.string().trim().min(2).max(100),
@@ -42,15 +42,23 @@ export type BookingActionState = {
   fieldErrors?: Record<string, string[]>;
 };
 
+export type BoundBookingParams = {
+  court_id: string;
+  venue_id: string;
+  start: string;
+  end: string;
+};
+
 export async function createBookingAction(
+  bound: BoundBookingParams,
   _prevState: BookingActionState,
   formData: FormData
 ): Promise<BookingActionState> {
   const raw = {
-    court_id:       formData.get('court_id'),
-    venue_id:       formData.get('venue_id'),
-    start:          formData.get('start'),
-    end:            formData.get('end'),
+    court_id:       bound.court_id,
+    venue_id:       bound.venue_id,
+    start:          bound.start,
+    end:            bound.end,
     customer_name:  formData.get('customer_name'),
     customer_phone: formData.get('customer_phone'),
   };
@@ -103,10 +111,11 @@ export type CancelActionState = {
 };
 
 export async function cancelBookingAction(
+  token: string,
   _prevState: unknown,
-  formData: FormData
+  _formData: FormData
 ): Promise<CancelActionState> {
-  const cancelToken = formData.get('cancel_token') as string | null;
+  const cancelToken = token;
 
   if (!cancelToken) {
     return { error: 'Token inválido.' };

@@ -21,7 +21,30 @@
       "Bash(pnpm tsc:*)",
       "Bash(git add:*)",
       "Bash(git commit -m ':*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npx vitest:*)",
+      "Bash(DOTENV_CONFIG_PATH=.env.local npx vitest run tests/integration/booking.test.ts --reporter=tap)",
+      "Bash(node -e \"const pkg=require\\('./package.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(pkg.dependencies||{}\\)\\)\\)\")",
+      "Bash(node -e \"const pkg=require\\('./package.json'\\); console.log\\(pkg.dependencies['@supabase/supabase-js'], pkg.devDependencies\\)\")",
+      "Bash(node -e \"const pkg=require\\('./package.json'\\); console.log\\(JSON.stringify\\(pkg.scripts, null, 2\\)\\)\")",
+      "Bash(mkdir -p \"C:/turnazo/src/app/\\(public\\)/[locality]/[sport]/[venue]/reservar\")",
+      "Bash(mkdir -p \"C:/turnazo/src/app/\\(public\\)/turnos/[token]\")",
+      "Bash(rm \"C:/turnazo/src/app/[locality]/page.tsx\")",
+      "Bash(rm \"C:/turnazo/src/app/[locality]/[sport]/page.tsx\")",
+      "Bash(rm \"C:/turnazo/src/app/[locality]/[sport]/[venue]/page.tsx\")",
+      "Bash(rm \"C:/turnazo/src/app/[locality]/[sport]/[venue]/reservar/page.tsx\")",
+      "Bash(rm \"C:/turnazo/src/app/[locality]/[sport]/[venue]/reservar/booking-form.tsx\")",
+      "Bash(pnpm exec:*)",
+      "Bash(mkdir -p \"C:\\\\turnazo\\\\src\\\\app\\\\panel\\\\complejos\\\\[id]\\\\canchas\\\\nuevo\")",
+      "Bash(mkdir -p \"C:\\\\turnazo\\\\src\\\\app\\\\panel\\\\complejos\\\\[id]\\\\canchas\\\\[cid]\")",
+      "Bash(npm install:*)",
+      "mcp__claude_ai_Supabase__query_logs",
+      "Bash(pnpm test:e2e:*)",
+      "Bash(curl -s \"http://localhost:3001/tunuyan/padel/b1c2d3e4-0000-0000-0000-000000000001/reservar?cancha=c3d4e5f6-0000-0000-0000-000000000001&fecha=2026-11-16&inicio=2026-11-16T13%3A00%3A00.000Z&fin=2026-11-16T14%3A30%3A00.000Z\")",
+      "Bash(curl -s -X POST \"http://localhost:3001/tunuyan/padel/b2c3d4e5-0000-0000-0000-000000000001/reservar?cancha=c3d4e5f6-0000-0000-0000-000000000001&fecha=2026-11-16&inicio=2026-11-16T13%3A00%3A00.000Z&fin=2026-11-16T14%3A30%3A00.000Z\" -H \"Next-Action: test\" -d \"\")",
+      "Bash(grep -r \"uuid\" /c/turnazo/node_modules/.pnpm/zod@4*/node_modules/zod/dist/esm/v4/core/regexes.js)",
+      "Bash(node:*)",
+      "Bash(npx playwright:*)"
     ]
   }
 }

@@ -43,6 +43,11 @@ let midnightCourtId:     string;   // pádel 90 min, 23:00-00:30
 let midnightCloseCourtId: string;  // fútbol 60 min, 14:00-00:00
 let noPriceCourtId:      string;   // pádel 90 min, 08:00-22:00, sin precios
 
+// Courts para los tests de migración 008
+let court008AId:         string;   // pádel 90 min, 08:00-02:00, precio 08:00-02:00 $7000
+let court008BId:         string;   // pádel 60 min, 14:00-00:00, precio 18:00-00:00 $8000
+let court008CId:         string;   // pádel 60 min, 22:00-02:00, precio 22:00-02:00 $9000
+
 // cancelToken persiste entre tests de un mismo describe
 let cancelToken: string;
 
@@ -57,6 +62,26 @@ function futureSlot() {
   const dateStr = d.toISOString().slice(0, 10);
   const start   = new Date(`${dateStr}T11:00:00Z`);
   const end     = new Date(start.getTime() + 90 * 60 * 1000);
+  return { start, end };
+}
+
+/** Slot a las 00:30 Mendoza (= 03:30 UTC del mismo día UTC). */
+function slotAt0030(daysFromNow: number, slotMinutes = 90) {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + daysFromNow);
+  const start = new Date(d.getTime() + (3 * 60 + 30) * 60 * 1000); // 03:30 UTC = 00:30 Mendoza
+  const end   = new Date(start.getTime() + slotMinutes * 60 * 1000);
+  return { start, end };
+}
+
+/** Slot a las 01:00 Mendoza (= 04:00 UTC del mismo día UTC). */
+function slotAt0100(daysFromNow: number, slotMinutes = 60) {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + daysFromNow);
+  const start = new Date(d.getTime() + 4 * 3600 * 1000); // 04:00 UTC = 01:00 Mendoza
+  const end   = new Date(start.getTime() + slotMinutes * 60 * 1000);
   return { start, end };
 }
 
@@ -170,6 +195,30 @@ beforeAll(async () => {
   noPriceCourtId = npc!.id;
   await db.from('court_hours').insert(hours7(noPriceCourtId, '08:00:00', '22:00:00'));
   // No se insertan court_prices
+
+  // ── 008-A: pádel 90 min, 08:00-02:00, precio día completo $7000 ─
+  const { data: c008a } = await db.from('courts')
+    .insert({ venue_id: venueId, sport_id: sportId, name: 'Cancha 008-A', slot_minutes: 90, active: true })
+    .select('id').single();
+  court008AId = c008a!.id;
+  await db.from('court_hours').insert(hours7(court008AId, '08:00:00', '02:00:00'));
+  await db.from('court_prices').insert(prices7(court008AId, '08:00:00', '02:00:00', 7000));
+
+  // ── 008-B: pádel 60 min, 14:00-00:00, precio 18:00-00:00 $8000 ─
+  const { data: c008b } = await db.from('courts')
+    .insert({ venue_id: venueId, sport_id: sportId, name: 'Cancha 008-B', slot_minutes: 60, active: true })
+    .select('id').single();
+  court008BId = c008b!.id;
+  await db.from('court_hours').insert(hours7(court008BId, '14:00:00', '00:00:00'));
+  await db.from('court_prices').insert(prices7(court008BId, '18:00:00', '00:00:00', 8000));
+
+  // ── 008-C: pádel 60 min, 22:00-02:00, precio 22:00-02:00 $9000 ─
+  const { data: c008c } = await db.from('courts')
+    .insert({ venue_id: venueId, sport_id: sportId, name: 'Cancha 008-C', slot_minutes: 60, active: true })
+    .select('id').single();
+  court008CId = c008c!.id;
+  await db.from('court_hours').insert(hours7(court008CId, '22:00:00', '02:00:00'));
+  await db.from('court_prices').insert(prices7(court008CId, '22:00:00', '02:00:00', 9000));
 
 }, 30_000);
 
@@ -419,6 +468,73 @@ describe('create_booking v2 (migration 007)', () => {
 
     expect(error).toBeNull();
     expect((data as Record<string, unknown>).error).toBe('price_not_set');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests de migration 008 — madrugada y precios que cruzan medianoche
+// ---------------------------------------------------------------------------
+
+describe('create_booking v3 (migration 008)', () => {
+
+  // ── 008-A: turno 00:30 con horario 08:00-02:00 (prev-day fallback) ──
+  it('008-A: turno a las 00:30 Mendoza con horario 08:00-02:00 retorna booking', async () => {
+    const { start, end } = slotAt0030(11, 90);
+
+    const { data, error } = await anonClient.rpc('create_booking', {
+      p_court_id:       court008AId,
+      p_venue_id:       venueId,
+      p_start:          start.toISOString(),
+      p_end:            end.toISOString(),
+      p_customer_name:  'Madrugada A',
+      p_customer_phone: '2622800001',
+    });
+
+    expect(error).toBeNull();
+    const result = data as Record<string, unknown>;
+    expect(result.error).toBeUndefined();
+    expect(result.cancel_token).toBeTruthy();
+    expect(result.price_total).toBe(7000);
+  });
+
+  // ── 008-B: turno 23:00 con precio 18:00-00:00 ───────────────────
+  it('008-B: turno a las 23:00 con precio 18:00-00:00 retorna precio correcto', async () => {
+    const { start, end } = slotAt23(12, 60);
+
+    const { data, error } = await anonClient.rpc('create_booking', {
+      p_court_id:       court008BId,
+      p_venue_id:       venueId,
+      p_start:          start.toISOString(),
+      p_end:            end.toISOString(),
+      p_customer_name:  'Madrugada B',
+      p_customer_phone: '2622800002',
+    });
+
+    expect(error).toBeNull();
+    const result = data as Record<string, unknown>;
+    expect(result.error).toBeUndefined();
+    expect(result.cancel_token).toBeTruthy();
+    expect(result.price_total).toBe(8000);
+  });
+
+  // ── 008-C: turno 01:00 con horario y precio 22:00-02:00 ─────────
+  it('008-C: turno a las 01:00 con horario y precio 22:00-02:00 retorna booking', async () => {
+    const { start, end } = slotAt0100(13, 60);
+
+    const { data, error } = await anonClient.rpc('create_booking', {
+      p_court_id:       court008CId,
+      p_venue_id:       venueId,
+      p_start:          start.toISOString(),
+      p_end:            end.toISOString(),
+      p_customer_name:  'Madrugada C',
+      p_customer_phone: '2622800003',
+    });
+
+    expect(error).toBeNull();
+    const result = data as Record<string, unknown>;
+    expect(result.error).toBeUndefined();
+    expect(result.cancel_token).toBeTruthy();
+    expect(result.price_total).toBe(9000);
   });
 });
 

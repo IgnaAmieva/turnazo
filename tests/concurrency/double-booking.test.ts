@@ -60,11 +60,7 @@ beforeAll(async () => {
   if (userErr || !userData.user) throw new Error("No se pudo crear usuario de prueba: " + userErr?.message);
   testUserId = userData.user.id;
 
-  // 2. Crear perfil (owner)
-  const { error: profileErr } = await db
-    .from("profiles")
-    .insert({ id: testUserId, role: "owner" });
-  if (profileErr) throw new Error("No se pudo crear perfil: " + profileErr.message);
+  // 2. Perfil creado automáticamente por trigger handle_new_user (migration 009)
 
   // 3. Locality y Sport del seed
   const { data: loc } = await db.from("localities").select("id").eq("slug", "tunuyan").single();
