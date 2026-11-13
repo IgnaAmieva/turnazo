@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-12
+Última actualización: 2026-11-13
 
 ---
 
@@ -77,7 +77,7 @@
 | 015 | `015_push_hardening.sql` | REVOKE en push_send_cron, pg_net → extensions schema, Vault URL/secret, create_booking v5 (sin cancel_token en outbox payload) |
 | 016 | `016_outbox_discard.sql` | Status `discarded` en notification_outbox; policy `notif_outbox_owner_delete` (solo para cleanup de tests) |
 
-**Próxima migración:** `017_...sql`
+**Próxima migración:** `017_phase6_mp.sql` (borrador guardado, aún no aplicada)
 
 ---
 
@@ -122,6 +122,39 @@ Definida en SPEC §9 y §14.
 ---
 
 ## Fase 5: Push + PWA — CERRADA (ver arriba)
+
+---
+
+## Fase 6 — Mercado Pago (EN CURSO)
+
+Definida en SPEC §7 y §14. Ver plan detallado en `docs/FASE6-PLAN.md`.
+
+**Estado:** planificación completada, sin código escrito todavía.
+
+**App de Mercado Pago:** creada (Checkout Pro, API de Orders, ambiente de prueba/sandbox).
+
+**Migración 017:** borrador guardado en `supabase/migrations/017_phase6_mp.sql`.
+⚠️ **NO APLICADA** — tiene correcciones pendientes antes de poder aplicarse.
+
+**Variables de entorno pendientes de agregar (Vercel + .env.local):**
+
+| Variable | Descripción |
+|---|---|
+| `MP_CLIENT_ID` | ID de la app MP |
+| `MP_CLIENT_SECRET` | Secret de la app MP |
+| `MP_REDIRECT_URI` | URL de callback OAuth |
+| `MP_WEBHOOK_SECRET` | Secret para firmas HMAC de webhooks |
+| `MP_TOKEN_ENCRYPTION_KEY` | 32 bytes hex — clave AES-256-GCM |
+| `PLATFORM_FEE_PERCENT` | Porcentaje de comisión (ej. `0.05`) |
+
+**Bloques del plan:**
+1. OAuth por dueño (AES-256-GCM, HMAC state, disconnect check, column REVOKE) — ⬜ pendiente
+2. UI configuración de cobro (ya en schema) — ⬜ pendiente
+3. Flujo de pago jugador (create_booking_hold, initiatePayment) — ⬜ pendiente
+4. Expiración de holds (pg_cron, expire_stale_holds, inline filter) — ⬜ pendiente
+5. Webhook (firma, idempotencia, 4 casos, outbox) — ⬜ pendiente
+6. Cancelaciones y reembolsos — ⬜ pendiente
+7. Tests (sandbox, mocks, E2E redirect) — ⬜ pendiente
 
 ---
 
