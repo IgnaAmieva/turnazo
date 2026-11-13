@@ -14,7 +14,7 @@ import { notFound } from "next/navigation";
 
 type Props = {
   params: Promise<{ locality: string; sport: string; venue: string }>;
-  searchParams: Promise<{ fecha?: string }>;
+  searchParams: Promise<{ fecha?: string; _now?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -26,10 +26,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function VenuePage({ params, searchParams }: Props) {
   const { locality: lSlug, sport: sSlug, venue: venueId } = await params;
-  const { fecha } = await searchParams;
+  const { fecha, _now } = await searchParams;
 
   const today = todayInMendoza();
   const date = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : today;
+
+  // Dev-only: allow overriding current time via ?_now= for E2E tests.
+  const nowUtc =
+    process.env.NODE_ENV !== "production" && _now
+      ? new Date(_now)
+      : undefined;
 
   const [locality, sport, venue] = await Promise.all([
     getLocalityBySlug(lSlug),
@@ -109,6 +115,7 @@ export default async function VenuePage({ params, searchParams }: Props) {
                 venueId={venueId}
                 localitySlug={lSlug}
                 sportSlug={sSlug}
+                nowUtc={nowUtc}
               />
 
               <AvailabilityWatcher courtId={court.id} date={date} />

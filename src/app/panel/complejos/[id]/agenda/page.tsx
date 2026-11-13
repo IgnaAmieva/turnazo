@@ -42,6 +42,7 @@ export default async function AgendaPage({ params, searchParams }: Props) {
         venueName={data.venueName}
         whatsappTemplate={data.whatsappTemplate}
         date={date}
+        todayMendoza={todayInMendoza()}
         courts={data.courts}
         bookings={data.bookings}
         onCancel={cancelBookingPanelAction}

@@ -48,10 +48,10 @@ test("home page shows localities with venue counts", async ({ page }) => {
   await assertNoError(page);
   expect(errors).toHaveLength(0);
 
-  // Tunuyán should appear as a link (has 1 venue)
+  // Tunuyán should appear as a link (has venues)
   await expect(page.getByRole("link", { name: /tunuy/i })).toBeVisible();
-  // Should show venue count
-  await expect(page.getByText("1 complejo")).toBeVisible();
+  // Should show venue count (2 complejos in test DB)
+  await expect(page.getByText("2 complejos")).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------
@@ -210,6 +210,43 @@ test("/turnos/invalid-token shows not-found message", async ({ page }) => {
   await assertNoError(page);
   expect(errors).toHaveLength(0);
   await expect(page.getByText(/turno no encontrado/i)).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// Slot filtering: past slots hidden when ?_now= is provided
+// ---------------------------------------------------------------------------
+test("past slots are hidden and future slots visible with _now override", async ({ page }) => {
+  const errors = collectPageErrors(page);
+  // Use next Monday at least 7 days ahead (court opens 08:00–23:00, 90-min slots)
+  const fecha = nextWeekday(1, 7);
+  // 18:31 UTC = 15:31 Mendoza → slots before 15:30 (Mendoza) are hidden, 17:00+ are visible
+  const nowParam = encodeURIComponent(`${fecha}T18:31:00.000Z`);
+  await page.goto(`${VENUE_PATH}?fecha=${fecha}&_now=${nowParam}`);
+  await page.waitForLoadState("networkidle");
+
+  // 08:00 slot (11:00 UTC) is in the past → should not appear
+  // Use first() to handle 2 courts (each showing slots)
+  await expect(page.getByText("08:00", { exact: true }).first()).not.toBeVisible();
+  // 17:00 slot (20:00 UTC) is in the future → should appear
+  await expect(page.getByText("17:00", { exact: true }).first()).toBeVisible();
+  expect(errors).toHaveLength(0);
+});
+
+test("shows 'No quedan turnos para hoy' when all slots are past", async ({ page }) => {
+  const errors = collectPageErrors(page);
+  const fecha = nextWeekday(1, 7);
+  // Last slot starts at 21:30 Mendoza = fecha+1 T00:30Z
+  // Using fecha+1 T01:00Z (22:00 Mendoza on fecha) → all 90-min slots from 08:00 are past
+  const fechaDate = new Date(fecha + "T12:00:00Z");
+  fechaDate.setUTCDate(fechaDate.getUTCDate() + 1);
+  const nextDay = fechaDate.toISOString().slice(0, 10);
+  const nowParam = encodeURIComponent(`${nextDay}T01:00:00.000Z`);
+  await page.goto(`${VENUE_PATH}?fecha=${fecha}&_now=${nowParam}`);
+  await page.waitForLoadState("networkidle");
+
+  // 2 courts → 2 messages; use first()
+  await expect(page.getByText(/no quedan turnos para hoy/i).first()).toBeVisible();
+  expect(errors).toHaveLength(0);
 });
 
 // ---------------------------------------------------------------------------

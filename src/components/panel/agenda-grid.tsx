@@ -112,6 +112,7 @@ type Props = {
   venueName:        string;
   whatsappTemplate: string | null;
   date:             string;
+  todayMendoza:     string;
   courts:           AgendaCourt[];
   bookings:         AgendaBooking[];
   onCancel:         PanelAction;
@@ -126,7 +127,7 @@ type Props = {
 // ---------------------------------------------------------------------------
 
 export default function AgendaGrid({
-  venueId, whatsappTemplate, date, courts, bookings,
+  venueId, whatsappTemplate, date, todayMendoza, courts, bookings,
   onCancel, onMarkPaid, onMarkNoShow, onBlockPhone, onCreateBlock,
 }: Props) {
   const router = useRouter();
@@ -149,6 +150,8 @@ export default function AgendaGrid({
     timeZone: "America/Argentina/Mendoza",
     weekday: "long", day: "numeric", month: "long",
   }).format(new Date(date + "T12:00:00Z"));
+
+  const isPastDate = date < todayMendoza;
 
   // Weekday (0=Sun … 6=Sat) in Mendoza
   const weekday = new Date(date + "T12:00:00Z").getUTCDay();
@@ -246,6 +249,7 @@ export default function AgendaGrid({
               ticks={ticks}
               gridHeightPx={gridHeightPx}
               startMin={startMin}
+              isPastDate={isPastDate}
               onCancel={onCancel}
               onMarkPaid={onMarkPaid}
               onMarkNoShow={onMarkNoShow}
@@ -266,7 +270,7 @@ export default function AgendaGrid({
 
 function CourtColumn({
   court, date, venueId, whatsappTemplate, bookings, ticks, gridHeightPx, startMin,
-  onCancel, onMarkPaid, onMarkNoShow, onBlockPhone, onCreateBlock, onRefresh,
+  isPastDate, onCancel, onMarkPaid, onMarkNoShow, onBlockPhone, onCreateBlock, onRefresh,
 }: {
   court: AgendaCourt;
   date: string;
@@ -276,6 +280,7 @@ function CourtColumn({
   ticks: { label: string; topPx: number; isHour: boolean }[];
   gridHeightPx: number;
   startMin: number;
+  isPastDate: boolean;
   onCancel: PanelAction;
   onMarkPaid: PanelAction;
   onMarkNoShow: PanelAction;
@@ -290,13 +295,15 @@ function CourtColumn({
       {/* Header */}
       <div className="h-9 border-b border-gray-200 flex items-center justify-between px-2.5 bg-gray-50 sticky top-0 z-10">
         <span className="text-xs font-semibold text-gray-700 truncate">{court.name}</span>
-        <button
-          onClick={() => setShowBlockForm((v) => !v)}
-          title="Agregar bloqueo"
-          className="text-xs text-gray-400 hover:text-gray-700 ml-1 shrink-0 font-bold"
-        >
-          {showBlockForm ? "✕" : "+"}
-        </button>
+        {!isPastDate && (
+          <button
+            onClick={() => setShowBlockForm((v) => !v)}
+            title="Agregar bloqueo"
+            className="text-xs text-gray-400 hover:text-gray-700 ml-1 shrink-0 font-bold"
+          >
+            {showBlockForm ? "✕" : "+"}
+          </button>
+        )}
       </div>
 
       {showBlockForm && (

@@ -117,11 +117,13 @@ export interface CourtPrice {
 /**
  * Genera todas las franjas horarias de una cancha para una fecha dada.
  *
- * @param date       - Fecha en Mendoza "YYYY-MM-DD"
- * @param hours      - Tramos de apertura de la cancha (filtrados por weekday externamente)
+ * @param date        - Fecha en Mendoza "YYYY-MM-DD"
+ * @param hours       - Tramos de apertura de la cancha (filtrados por weekday externamente)
  * @param slotMinutes - Duración de cada turno en minutos
- * @param booked     - Períodos ya reservados/bloqueados
- * @param prices     - Precios por franja (filtrados por weekday externamente)
+ * @param booked      - Períodos ya reservados/bloqueados
+ * @param prices      - Precios por franja (filtrados por weekday externamente)
+ * @param cutoff      - Si se provee, omite slots cuyo inicio < cutoff (hora actual en UTC
+ *                      para ocultar turnos pasados en la vista pública del día de hoy)
  */
 export function generateSlots(params: {
   date: string;
@@ -129,8 +131,9 @@ export function generateSlots(params: {
   slotMinutes: number;
   booked: BookedPeriod[];
   prices: CourtPrice[];
+  cutoff?: Date;
 }): TimeSlot[] {
-  const { date, hours, slotMinutes, booked, prices } = params;
+  const { date, hours, slotMinutes, booked, prices, cutoff } = params;
   const slots: TimeSlot[] = [];
   const slotMs = slotMinutes * 60 * 1000;
 
@@ -165,6 +168,12 @@ export function generateSlots(params: {
             : toRaw.getTime();
         return start.getTime() >= from.getTime() && start.getTime() < toMs;
       });
+
+      // Omitir turnos cuyo inicio ya pasó (vista pública del día actual)
+      if (cutoff && start < cutoff) {
+        cursor += slotMs;
+        continue;
+      }
 
       slots.push({ start, end, available, price: matchPrice?.price ?? null });
       cursor += slotMs;
