@@ -124,10 +124,9 @@ export async function sendPendingNotifications(
   const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count: discardedOld } = await supabase
     .from("notification_outbox")
-    .update({ status: "discarded", updated_at: now })
+    .update({ status: "discarded", updated_at: now }, { count: "exact" })
     .eq("status", "pending")
-    .lt("created_at", cutoff24h)
-    .select("id", { count: "exact", head: true });
+    .lt("created_at", cutoff24h);
 
   // 1. Leer filas pendientes (máx 50 por corrida)
   const { data: rows, error } = await supabase
