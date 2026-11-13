@@ -4,6 +4,7 @@
 -- (The table already has audit_log_owner_read for SELECT.)
 -- ============================================================
 
+DROP POLICY IF EXISTS "audit_log_owner_insert" ON public.audit_log;
 CREATE POLICY "audit_log_owner_insert" ON public.audit_log
   FOR INSERT
   WITH CHECK (

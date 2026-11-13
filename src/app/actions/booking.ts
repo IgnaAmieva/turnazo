@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { triggerPushSend } from '@/lib/push';
 
 // ---------------------------------------------------------------------------
 // Schema de validación
@@ -98,6 +99,8 @@ export async function createBookingAction(
   }
 
   const cancelToken = res.cancel_token as string;
+  // El RPC ya insertó en notification_outbox; disparar envío inmediato (best-effort)
+  void triggerPushSend();
   redirect('/turnos/' + cancelToken);
 }
 
@@ -140,6 +143,8 @@ export async function cancelBookingAction(
     return { error: 'Error al cancelar el turno.' };
   }
 
+  // El RPC ya insertó en notification_outbox; disparar envío (best-effort)
+  void triggerPushSend();
   revalidatePath('/turnos/' + cancelToken);
   return { success: true };
 }

@@ -10,18 +10,21 @@ import {
   VENUE_ID,
   nextWeekday,
   deleteTestBookings,
+  deleteTestOutboxRows,
 } from "./helpers";
 
 // ---------------------------------------------------------------------------
-// Login helper
+// Login helper (no-op when storageState already has auth)
 // ---------------------------------------------------------------------------
 async function loginAsOwner(page: import("@playwright/test").Page) {
-  await page.goto("/login");
+  await page.goto("/panel/complejos");
   await page.waitForLoadState("networkidle");
-  await page.fill('[name="email"]', OWNER_EMAIL);
-  await page.fill('[name="password"]', OWNER_PASSWORD);
-  await page.getByRole("button", { name: /entrar/i }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+  if (page.url().includes("/login")) {
+    await page.fill('[name="email"]', OWNER_EMAIL);
+    await page.fill('[name="password"]', OWNER_PASSWORD);
+    await page.getByRole("button", { name: /entrar/i }).click();
+    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 25_000 });
+  }
 }
 
 // Use a future weekday so bookings won't conflict with today's data
@@ -33,6 +36,7 @@ const AGENDA_DATE = nextWeekday(3, 7); // Wednesday at least 7 days ahead
 // ---------------------------------------------------------------------------
 test.afterAll(async ({ request }) => {
   await deleteTestBookings(request, ["E2E block*"]);
+  await deleteTestOutboxRows(request);
 });
 
 // ---------------------------------------------------------------------------

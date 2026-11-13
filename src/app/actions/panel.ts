@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { triggerPushSend } from "@/lib/push";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -19,14 +20,15 @@ export type PanelActionState = {
 // ---------------------------------------------------------------------------
 
 const VenueSchema = z.object({
-  name:          z.string().min(2, "Mínimo 2 caracteres").max(80),
-  phone:         z.string().min(8, "Mínimo 8 dígitos").max(15),
-  address:       z.string().min(5, "Mínimo 5 caracteres").max(200),
-  locality_id:   z.string().uuid("Seleccioná una localidad"),
-  lat:           z.coerce.number().min(-90).max(90),
-  lng:           z.coerce.number().min(-180).max(180),
-  payment_alias: z.string().max(100).optional(),
-  payment_link:  z.string().max(500).optional(),
+  name:               z.string().min(2, "Mínimo 2 caracteres").max(80),
+  phone:              z.string().min(8, "Mínimo 8 dígitos").max(15),
+  address:            z.string().min(5, "Mínimo 5 caracteres").max(200),
+  locality_id:        z.string().uuid("Seleccioná una localidad"),
+  lat:                z.coerce.number().min(-90).max(90),
+  lng:                z.coerce.number().min(-180).max(180),
+  payment_alias:      z.string().max(100).optional(),
+  payment_link:       z.string().max(500).optional(),
+  whatsapp_template:  z.string().max(500).optional(),
 });
 
 export async function createVenueAction(
@@ -41,21 +43,22 @@ export async function createVenueAction(
   const parsed = VenueSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-  const { name, phone, address, locality_id, lat, lng, payment_alias, payment_link } = parsed.data;
+  const { name, phone, address, locality_id, lat, lng, payment_alias, payment_link, whatsapp_template } = parsed.data;
 
   const { data: venue, error } = await supabase
     .from("venues")
     .insert({
-      owner_id:      user.id,
+      owner_id:           user.id,
       name,
-      phone:         phone.replace(/\D/g, ""),
+      phone:              phone.replace(/\D/g, ""),
       address,
       locality_id,
       lat,
       lng,
-      payment_alias: payment_alias || null,
-      payment_link:  payment_link  || null,
-      status:        "pending",
+      payment_alias:      payment_alias      || null,
+      payment_link:       payment_link       || null,
+      whatsapp_template:  whatsapp_template  || null,
+      status:             "pending",
     })
     .select("id")
     .single();
@@ -89,19 +92,20 @@ export async function updateVenueAction(
   const parsed = VenueSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-  const { name, phone, address, locality_id, lat, lng, payment_alias, payment_link } = parsed.data;
+  const { name, phone, address, locality_id, lat, lng, payment_alias, payment_link, whatsapp_template } = parsed.data;
 
   const { error } = await supabase
     .from("venues")
     .update({
       name,
-      phone:         phone.replace(/\D/g, ""),
+      phone:              phone.replace(/\D/g, ""),
       address,
       locality_id,
       lat,
       lng,
-      payment_alias: payment_alias || null,
-      payment_link:  payment_link  || null,
+      payment_alias:      payment_alias      || null,
+      payment_link:       payment_link       || null,
+      whatsapp_template:  whatsapp_template  || null,
     })
     .eq("id", venueId)
     .eq("owner_id", user.id);
@@ -426,6 +430,26 @@ export async function cancelBookingPanelAction(
   });
   if (cancelAuditErr) return { error: "Error en auditoría: " + cancelAuditErr.message };
 
+  // Notificación outbox para el dueño (best-effort: no bloquea si falla)
+  const { data: bk } = await supabase
+    .from("bookings")
+    .select("customer_name, customer_phone, period")
+    .eq("id", bookingId)
+    .single();
+  if (bk) {
+    await supabase.from("notification_outbox").insert({
+      venue_id: venueId,
+      type:     "booking_cancelled",
+      payload:  {
+        booking_id:     bookingId,
+        customer_name:  bk.customer_name,
+        customer_phone: bk.customer_phone,
+        start:          (bk.period as string).replace(/[\[(]/, "").split(",")[0].trim().replace(/"/g, ""),
+      },
+    });
+    void triggerPushSend();
+  }
+
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
   if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);
   return null;
@@ -461,6 +485,27 @@ export async function markPaidAction(
     new_data:   { price_total: priceTotal },
   });
   if (paidAuditErr) return { error: "Error en auditoría: " + paidAuditErr.message };
+
+  // Notificación outbox para el dueño (best-effort)
+  const { data: paidBk } = await supabase
+    .from("bookings")
+    .select("customer_name, customer_phone, period")
+    .eq("id", bookingId)
+    .single();
+  if (paidBk) {
+    await supabase.from("notification_outbox").insert({
+      venue_id: venueId,
+      type:     "payment_received",
+      payload:  {
+        booking_id:     bookingId,
+        customer_name:  paidBk.customer_name,
+        customer_phone: paidBk.customer_phone,
+        start:          (paidBk.period as string).replace(/[\[(]/, "").split(",")[0].trim().replace(/"/g, ""),
+        price_total:    priceTotal,
+      },
+    });
+    void triggerPushSend();
+  }
 
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
   if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);
@@ -603,5 +648,50 @@ export async function createManualBlockAction(
 
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
   if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Blocked phones: unblock
+// ---------------------------------------------------------------------------
+
+export async function unblockPhoneAction(
+  _prevState: PanelActionState,
+  formData: FormData
+): Promise<PanelActionState> {
+  const phone   = formData.get("phone")    as string;
+  const venueId = formData.get("venue_id") as string;
+  if (!phone || !venueId) return { error: "Datos incompletos" };
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const { data: v } = await supabase
+    .from("venues")
+    .select("id")
+    .eq("id", venueId)
+    .eq("owner_id", user.id)
+    .single();
+  if (!v) return { error: "No autorizado" };
+
+  const { error } = await supabase
+    .from("blocked_phones")
+    .delete()
+    .eq("venue_id", venueId)
+    .eq("phone", phone);
+  if (error) return { error: error.message };
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
+    venue_id:   venueId,
+    entity:     "blocked_phone",
+    entity_id:  venueId,
+    action:     "delete",
+    new_data:   { phone },
+  });
+  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+
+  revalidatePath(`/panel/complejos/${venueId}/bloqueados`);
   return null;
 }

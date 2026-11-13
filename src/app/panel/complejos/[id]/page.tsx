@@ -30,6 +30,28 @@ export default async function EditarComplejoPage({
         <h1 className="text-xl font-semibold text-gray-900 truncate">{venue.name}</h1>
       </div>
 
+      {/* Quick links */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        <Link
+          href={`/panel/complejos/${id}/canchas`}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:border-green-400 hover:text-green-700 transition-colors"
+        >
+          Canchas
+        </Link>
+        <Link
+          href={`/panel/complejos/${id}/agenda`}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:border-green-400 hover:text-green-700 transition-colors"
+        >
+          Agenda
+        </Link>
+        <Link
+          href={`/panel/complejos/${id}/bloqueados`}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:border-green-400 hover:text-green-700 transition-colors"
+        >
+          Teléfonos bloqueados
+        </Link>
+      </div>
+
       <div className="bg-white rounded-2xl border border-gray-200 p-6">
         <VenueForm
           action={boundAction}

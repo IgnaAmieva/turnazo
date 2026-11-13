@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { logoutAction } from '@/app/actions/auth';
+import PushSubscribeButton from '@/components/panel/push-subscribe-button';
 
 const NAV_ITEMS = [
   { href: '/panel/agenda',    label: 'Agenda' },
@@ -40,7 +41,8 @@ export default function PanelNav({ email }: { email: string }) {
 
       <div className="px-4 py-4 border-t border-gray-100">
         <p className="text-xs text-gray-400 truncate mb-2">{email}</p>
-        <form action={logoutAction}>
+        <PushSubscribeButton />
+        <form action={logoutAction} className="mt-2">
           <button type="submit"
             className="w-full text-left text-sm text-gray-500 hover:text-red-600 transition-colors px-1">
             Cerrar sesión

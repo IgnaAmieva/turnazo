@@ -111,6 +111,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (courtId)   await db.from("bookings").delete().eq("court_id", courtId);
+  if (venueId)   await db.from("notification_outbox").delete().eq("venue_id", venueId);
   if (courtId)   await db.from("courts").delete().eq("id", courtId);
   if (venueId)   await db.from("venues").delete().eq("id", venueId);
   if (testUserId) await db.auth.admin.deleteUser(testUserId);

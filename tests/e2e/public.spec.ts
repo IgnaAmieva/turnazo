@@ -14,10 +14,12 @@ import {
   SPORT,
   VENUE_PATH,
   deleteTestBookings,
+  deleteTestOutboxRows,
 } from "./helpers";
 
 test.afterAll(async ({ request }) => {
   await deleteTestBookings(request, ["Test E2E"]);
+  await deleteTestOutboxRows(request);
 });
 
 // ---------------------------------------------------------------------------

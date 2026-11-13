@@ -218,6 +218,34 @@ export async function getAgendaData(venueId: string, date: string): Promise<Agen
   };
 }
 
+// ---------------------------------------------------------------------------
+// Teléfonos bloqueados
+// ---------------------------------------------------------------------------
+
+export async function getBlockedPhones(venueId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Verify ownership before returning data
+  const { data: venue } = await supabase
+    .from("venues")
+    .select("id")
+    .eq("id", venueId)
+    .eq("owner_id", user.id)
+    .single();
+  if (!venue) return [];
+
+  const { data, error } = await supabase
+    .from("blocked_phones")
+    .select("id, phone, created_at")
+    .eq("venue_id", venueId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as { id: string; phone: string; created_at: string }[];
+}
+
 // Todas las canchas del complejo con sus horarios y precios (para "copiar desde otra cancha")
 export async function getVenueCourtsWithSchedules(venueId: string, excludeCourtId?: string) {
   const supabase = await createClient();

@@ -14,26 +14,35 @@ import {
 } from "./helpers";
 
 // ---------------------------------------------------------------------------
-// Login helper
+// Login helper (no-op when storageState already has auth)
 // ---------------------------------------------------------------------------
 async function loginAsOwner(page: import("@playwright/test").Page) {
-  await page.goto("/login");
+  await page.goto("/panel/complejos");
   await page.waitForLoadState("networkidle");
-  await page.fill('[name="email"]', OWNER_EMAIL);
-  await page.fill('[name="password"]', OWNER_PASSWORD);
-  await page.getByRole("button", { name: /entrar/i }).click();
-  // Wait for redirect away from /login
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+  if (page.url().includes("/login")) {
+    await page.fill('[name="email"]', OWNER_EMAIL);
+    await page.fill('[name="password"]', OWNER_PASSWORD);
+    await page.getByRole("button", { name: /entrar/i }).click();
+    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 25_000 });
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Unauthenticated access → redirect to login
+// Uses a fresh context with explicitly cleared storageState (no cookies, no
+// localStorage) to simulate an unauthenticated user hitting /panel.
 // ---------------------------------------------------------------------------
-test("panel redirects unauthenticated users to /login", async ({ page }) => {
-  await page.goto("/panel");
-  // Next.js App Router redirect may be a client-side navigation; wait for it
-  await page.waitForURL(/\/login/, { timeout: 10_000 });
+test("panel redirects unauthenticated users to /login", async ({ browser }) => {
+  // Explicitly empty storageState ensures no Supabase session cookies are sent
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  });
+  const page = await context.newPage();
+  // Navigate directly to the panel; middleware must redirect to /login
+  await page.goto("http://localhost:3001/panel/complejos");
+  await page.waitForURL(/\/login/, { timeout: 15_000 });
   expect(page.url()).toContain("/login");
+  await context.close();
 });
 
 // ---------------------------------------------------------------------------

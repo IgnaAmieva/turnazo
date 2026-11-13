@@ -96,6 +96,29 @@ export async function deleteTestBookings(
 }
 
 /**
+ * Delete notification_outbox rows for the fixture venue.
+ * Uses the owner token — requires the notif_outbox_owner_delete policy (migration 016).
+ * Call in afterAll alongside deleteTestBookings to keep the table clean.
+ */
+export async function deleteTestOutboxRows(
+  request: import("@playwright/test").APIRequestContext,
+): Promise<void> {
+  const token = await getOwnerToken(request);
+  if (!token) return;
+  await request.delete(
+    `${SUPABASE_URL}/rest/v1/notification_outbox?venue_id=eq.${VENUE_ID}`,
+    {
+      headers: {
+        apikey:        SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Prefer:        "return=minimal",
+      },
+    }
+  );
+}
+
+/**
  * Delete blocked_phones entries for the given phones.
  */
 export async function unblockTestPhones(

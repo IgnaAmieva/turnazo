@@ -227,8 +227,11 @@ beforeAll(async () => {
 // ---------------------------------------------------------------------------
 
 afterAll(async () => {
-  if (venueId)     await db.from('bookings').delete().eq('venue_id', venueId);
-  if (venueId)     await db.from('venues').delete().eq('id', venueId);
+  if (venueId) await db.from('bookings').delete().eq('venue_id', venueId);
+  // notification_outbox rows cascade-delete when venue is deleted (ON DELETE CASCADE),
+  // but we delete explicitly first to be safe.
+  if (venueId) await db.from('notification_outbox').delete().eq('venue_id', venueId);
+  if (venueId) await db.from('venues').delete().eq('id', venueId);
   if (ownerUserId) await db.auth.admin.deleteUser(ownerUserId);
 }, 30_000);
 

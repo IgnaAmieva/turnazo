@@ -23,7 +23,7 @@
 - Página `/turnos/[token]`: muestra el turno y permite cancelar.
 - Migraciones 006–008 aplicadas.
 
-### Fase 4 — Panel de dueños (Bloques 1, 3 y 2)
+### Fase 4 — Panel de dueños (Bloques 1, 3 y 2 + deuda)
 
 **Bloque 1 — Auth:**
 - Login/logout (`src/app/actions/auth.ts`).
@@ -48,6 +48,12 @@
 - Todas las acciones escriben en `audit_log` (10 acciones cubiertas en total).
 - Migración 013 aplicada (audit_log INSERT policy para owners).
 
+**Deuda de Fase 4 — cerrada:**
+- Editor de WhatsApp template en la página de edición del complejo, con vista previa live de las variables (`{nombre}`, `{cancha}`, `{dia}`, `{hora}`, `{total}`). `whatsapp_template` se persiste en `venues` via `updateVenueAction` y `createVenueAction`.
+- Página `/panel/complejos/[id]/bloqueados`: lista de teléfonos bloqueados con botón "Desbloquear" por fila. `unblockPhoneAction` elimina de `blocked_phones` y escribe en `audit_log` (action: `delete`, entity: `blocked_phone`).
+- Link rápido "Teléfonos bloqueados" en la página de edición del complejo.
+- `blockPhonePanelAction` ya escribía en `audit_log` (action: `create`, entity: `blocked_phone`) — confirmado por test `audit.spec.ts:159`.
+
 ---
 
 ## Migraciones aplicadas (en orden)
@@ -67,8 +73,11 @@
 | 011 | `011_fix_auth_role_permissions.sql` | GRANT EXECUTE en `auth_role()` a anon + authenticated |
 | 012 | `012_security_and_hours.sql` | Revoke handle_new_user a PUBLIC; drop constraint `open_before_close` |
 | 013 | `013_audit_log_owner_insert.sql` | Policy `audit_log_owner_insert`: owners pueden INSERT en audit_log para su venue |
+| 014 | `014_push_subscriptions.sql` | Tabla `push_subscriptions` + `notification_outbox` + cron `push_send_cron` |
+| 015 | `015_push_hardening.sql` | REVOKE en push_send_cron, pg_net → extensions schema, Vault URL/secret, create_booking v5 (sin cancel_token en outbox payload) |
+| 016 | `016_outbox_discard.sql` | Status `discarded` en notification_outbox; policy `notif_outbox_owner_delete` (solo para cleanup de tests) |
 
-**Próxima migración:** `014_...sql`
+**Próxima migración:** `017_...sql`
 
 ---
 
@@ -77,38 +86,39 @@
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
 | Unitarios | Vitest | 65 | ✓ verde |
-| E2E | Playwright | 28 | ✓ verde |
+| E2E | Playwright | 37 | ✓ verde |
 
 Archivos E2E:
 - `public.spec.ts` — flujo público (booking + cancelación)
 - `panel.spec.ts` — CRUD panel + audit_log de court_hours
 - `agenda.spec.ts` — agenda day view, bloques manuales
 - `audit.spec.ts` — 5 tests de audit_log (cancel, mark_paid, mark_no_show, block_phone, create_block)
+- `settings.spec.ts` — 5 tests de WhatsApp template editor y teléfonos bloqueados
+- `push.spec.ts` — 4 tests de push subscribe button y guía iPhone PWA
 
 ---
 
-## Pendiente / deuda conocida
+## Fase 5 — Push al dueño + PWA instalable ✓
 
-- El campo `whatsapp_template` existe en el modelo pero no hay UI para editarlo desde el panel (el dueño no puede cargarlo aún).
-- No hay página para desbloquear teléfonos desde el panel.
-- No hay vista de historial de `audit_log` desde el panel.
-- El registro de dueños crea el perfil pero no hay flujo de aprobación de venues desde un panel de superadmin.
-- No hay notificaciones (email/WhatsApp) automáticas al cliente al confirmar o cancelar.
+Definida en SPEC §9 y §14.
+
+**Completado:**
+- `notification_outbox` table + RLS (service role reads/updates, owner delete via migration 016).
+- `push_subscriptions` table + RLS.
+- Service worker `/public/sw.js`, Web App Manifest `/public/manifest.json`.
+- `PushSubscribeButton` component en panel nav (usa `navigator.permissions.query` para compatibilidad con Playwright).
+- `PwaInstallGuide` — banner para iOS Safari no-standalone (dismissible vía localStorage).
+- `ServiceWorkerRegistrar` — registra `/sw.js` al montar el panel layout.
+- Route handler `/api/push/send` + `src/lib/push.ts`: lógica de reintentos, descarte de rows >24h u orphan booking_id.
+- `markPaidAction` inserta en `notification_outbox` (tipo `payment_received`) y dispara send.
+- `create_booking` RPC v4→v5 inserta `booking_created` en outbox; `cancel_booking` inserta `booking_cancelled`.
+- Playwright: `workers: 1`, `storageState` global (login 1 sola vez vía `setup/auth.setup.ts`).
+- Cleanup E2E: `deleteTestOutboxRows` en afterAll de todos los spec files.
+- Stale/orphan row discard antes de enviar.
+
+**Deuda para Fase 8:**
+- `notif_outbox_owner_delete` policy (migration 016) existe **solo para limpieza de tests E2E**. En producción la limpieza de outbox debe hacerse con service role key (desde la propia route handler o un cron), no con el token del owner. Reemplazar antes de lanzar.
 
 ---
 
-## Próximo paso — Fase 5
-
-La Fase 5 no está definida aún. Opciones lógicas (a priorizar con el usuario):
-
-**A) Panel de superadmin** — aprobar/rechazar venues, ver todas las reservas, gestionar dueños.
-
-**B) Notificaciones** — email o WhatsApp automático al confirmar/cancelar (requiere Resend, Twilio o similar).
-
-**C) Seña / pago parcial** — `deposit_required = true` en venues, flujo de seña con Mercado Pago.
-
-**D) Mejoras de agenda** — vista semanal, exportar a calendario, reservas recurrentes.
-
-**E) UI faltante en panel** — editor de `whatsapp_template`, lista de teléfonos bloqueados, historial de audit_log.
-
-> Antes de empezar Fase 5: confirmar con el usuario qué bloque es el próximo y definir la spec completa antes de escribir código.
+## Fase 5: Push + PWA — CERRADA (ver arriba)

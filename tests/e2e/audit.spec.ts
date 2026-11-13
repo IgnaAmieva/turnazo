@@ -16,6 +16,7 @@ import {
   getOwnerToken,
   createTestBooking,
   deleteTestBookings,
+  deleteTestOutboxRows,
   unblockTestPhones,
 } from "./helpers";
 
@@ -37,12 +38,14 @@ const TEST_PHONES = Object.values(SLOTS).map((s) => s.phone);
 // ---------------------------------------------------------------------------
 
 async function loginAsOwner(page: import("@playwright/test").Page) {
-  await page.goto("/login");
+  await page.goto("/panel/complejos");
   await page.waitForLoadState("networkidle");
-  await page.fill('[name="email"]', OWNER_EMAIL);
-  await page.fill('[name="password"]', OWNER_PASSWORD);
-  await page.getByRole("button", { name: /entrar/i }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+  if (page.url().includes("/login")) {
+    await page.fill('[name="email"]', OWNER_EMAIL);
+    await page.fill('[name="password"]', OWNER_PASSWORD);
+    await page.getByRole("button", { name: /entrar/i }).click();
+    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 25_000 });
+  }
 }
 
 async function countAuditRows(
@@ -71,6 +74,7 @@ async function countAuditRows(
 
 test.beforeAll(async ({ request }) => {
   // Remove any leftovers from previous runs before creating fresh bookings
+  await deleteTestOutboxRows(request);
   await deleteTestBookings(request, ["Audit Test*"]);
   await unblockTestPhones(request, TEST_PHONES);
 
@@ -82,6 +86,7 @@ test.beforeAll(async ({ request }) => {
 
 test.afterAll(async ({ request }) => {
   await deleteTestBookings(request, ["Audit Test*"]);
+  await deleteTestOutboxRows(request);
   await unblockTestPhones(request, TEST_PHONES);
 });
 
