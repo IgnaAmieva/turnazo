@@ -1,8 +1,11 @@
 /**
- * E2E tests for push notification UX:
- *   1. "Activar notificaciones" button visible in panel nav after login
- *   2. Subscribe flow: button grants permission and transitions to "activadas"
- *   3. iPhone PWA install guide appears on iOS Safari (not standalone)
+ * E2E tests for push notification UX and /api/push/send auth:
+ *   1. POST /api/push/send without secret → 401
+ *   2. POST /api/push/send with wrong secret → 401
+ *   3. "Activar notificaciones" button visible in panel nav after login
+ *   4. Subscribe flow: button grants permission and transitions to "activadas"
+ *   5. iPhone PWA install guide appears on iOS Safari (not standalone)
+ *   6. iPhone install guide does NOT appear after dismissal
  */
 import { test, expect } from "@playwright/test";
 import { OWNER_EMAIL, OWNER_PASSWORD } from "./helpers";
@@ -23,7 +26,27 @@ async function loginAsOwner(page: import("@playwright/test").Page) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Subscribe button visible (needs notification permission granted)
+// 1 & 2. /api/push/send — auth guard (no browser needed, uses request fixture)
+// ---------------------------------------------------------------------------
+
+test("POST /api/push/send without x-push-secret returns 401", async ({ request }) => {
+  const res = await request.post("http://localhost:3001/api/push/send");
+  expect(res.status()).toBe(401);
+  const body = await res.json() as { error?: string };
+  expect(body.error).toBe("Unauthorized");
+});
+
+test("POST /api/push/send with wrong x-push-secret returns 401", async ({ request }) => {
+  const res = await request.post("http://localhost:3001/api/push/send", {
+    headers: { "x-push-secret": "wrong-secret" },
+  });
+  expect(res.status()).toBe(401);
+  const body = await res.json() as { error?: string };
+  expect(body.error).toBe("Unauthorized");
+});
+
+// ---------------------------------------------------------------------------
+// 3. Subscribe button visible (needs notification permission granted)
 // ---------------------------------------------------------------------------
 test("panel nav shows 'Activar notificaciones' button", async ({ browser }) => {
   // Default Playwright context has notifications denied; grant them so the button shows.
@@ -47,7 +70,7 @@ test("panel nav shows 'Activar notificaciones' button", async ({ browser }) => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. Subscribe flow with granted permissions
+// 4. Subscribe flow with granted permissions
 // ---------------------------------------------------------------------------
 test("subscribe flow: button activates push and transitions state", async ({ browser }) => {
   const context = await browser.newContext({
@@ -84,7 +107,7 @@ test("subscribe flow: button activates push and transitions state", async ({ bro
 });
 
 // ---------------------------------------------------------------------------
-// 3. iPhone PWA install guide
+// 5. iPhone PWA install guide
 // ---------------------------------------------------------------------------
 test("iPhone install guide appears on iOS Safari (not standalone)", async ({ browser }) => {
   const context = await browser.newContext({
@@ -118,7 +141,7 @@ test("iPhone install guide appears on iOS Safari (not standalone)", async ({ bro
 });
 
 // ---------------------------------------------------------------------------
-// 4. iPhone install guide does NOT appear after dismissal
+// 6. iPhone install guide does NOT appear after dismissal
 // ---------------------------------------------------------------------------
 test("iPhone install guide stays hidden after being dismissed", async ({ browser }) => {
   const context = await browser.newContext({

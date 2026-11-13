@@ -19,10 +19,12 @@ export const runtime = "nodejs"; // web-push requiere Node.js, no Edge
 
 export async function POST(req: NextRequest) {
   // ── Autenticación por secreto compartido ──────────────────────
-  const secret = process.env.PUSH_SECRET;
+  // El cron (migration 015) lee 'push_secret' de Vault y lo envía
+  // en el header x-push-secret. La variable de entorno PUSH_SEND_SECRET
+  // debe tener el mismo valor en Vercel.
+  const secret = process.env.PUSH_SEND_SECRET;
   if (!secret) {
-    // En desarrollo sin PUSH_SECRET configurado, rechazar igual
-    return NextResponse.json({ error: "PUSH_SECRET not configured" }, { status: 500 });
+    return NextResponse.json({ error: "PUSH_SEND_SECRET not configured" }, { status: 500 });
   }
   const headerSecret = req.headers.get("x-push-secret");
   if (!headerSecret || headerSecret !== secret) {

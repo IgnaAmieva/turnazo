@@ -86,7 +86,7 @@
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
 | Unitarios | Vitest | 65 | ✓ verde |
-| E2E | Playwright | 37 | ✓ verde |
+| E2E | Playwright | 40 | ✓ verde |
 
 Archivos E2E:
 - `public.spec.ts` — flujo público (booking + cancelación)
@@ -94,7 +94,7 @@ Archivos E2E:
 - `agenda.spec.ts` — agenda day view, bloques manuales
 - `audit.spec.ts` — 5 tests de audit_log (cancel, mark_paid, mark_no_show, block_phone, create_block)
 - `settings.spec.ts` — 5 tests de WhatsApp template editor y teléfonos bloqueados
-- `push.spec.ts` — 4 tests de push subscribe button y guía iPhone PWA
+- `push.spec.ts` — 6 tests: 2 de auth guard (401), subscribe button, guía iPhone PWA
 
 ---
 
@@ -122,3 +122,48 @@ Definida en SPEC §9 y §14.
 ---
 
 ## Fase 5: Push + PWA — CERRADA (ver arriba)
+
+---
+
+## Deploy en Vercel (pre-Fase 6)
+
+### Región
+- Supabase project: `sa-east-1` (São Paulo) — detectado por CF-RAY `-EZE`.
+- Vercel functions: configurar región `gru1` (São Paulo) en `vercel.json` para minimizar latencia DB.
+
+### Variables de entorno en Vercel
+
+| Variable | Entornos |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Production + Preview |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production + Preview |
+| `SUPABASE_SERVICE_ROLE_KEY` | Production (server only) |
+| `NEXT_PUBLIC_APP_URL` | Production (URL final del deploy) |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Production + Preview |
+| `VAPID_PUBLIC_KEY` | Production (server only) |
+| `VAPID_PRIVATE_KEY` | Production (server only) |
+| `VAPID_SUBJECT` | Production (server only) |
+| `PUSH_SEND_SECRET` | Production (debe coincidir con Vault `push_secret`) |
+| `PLATFORM_FEE_PERCENT` | Production |
+
+### Supabase Auth — URL Configuration
+Agregar (no reemplazar) en Dashboard → Authentication → URL Configuration:
+- Site URL: `https://<dominio-final>`
+- Redirect URLs: `https://<dominio-final>/**`
+
+### Vault — cron push (después del primer deploy)
+```sql
+SELECT vault.create_secret('https://<dominio-final>/api/push/send', 'push_send_url');
+SELECT vault.create_secret('<mismo-valor-que-PUSH_SEND_SECRET>', 'push_secret');
+```
+
+### ⛔ Bloqueantes antes del primer dueño real
+
+1. **Base compartida con tests** — el proyecto Supabase actual tiene datos de prueba
+   (complejo, canchas, usuario `dueno@turnazo.test`, reservas de E2E). No es apta para
+   producción real. Antes de onboardear el primer dueño: crear un segundo proyecto
+   Supabase limpio para tests y dejar el actual solo para producción (sin seed ni fixtures).
+
+2. **No correr E2E contra la URL publicada** — los tests crean y cancelan bookings reales,
+   borran outbox rows y bloquean teléfonos. Solo correr `pnpm test:e2e` contra
+   `localhost:3001`.
