@@ -1,16 +1,28 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { type BookingActionState } from '@/app/actions/booking';
+
+export type PaymentOption = {
+  value: 'deposit' | 'full' | 'venue';
+  label: string;
+  detail: string;
+  /** Monto orientativo (el real lo calcula la base); null si no hay precio */
+  amount: number | null;
+};
 
 type Props = {
   action: (prevState: BookingActionState, formData: FormData) => Promise<BookingActionState>;
+  options: PaymentOption[];
 };
 
 const initialState: BookingActionState = {};
 
-export default function BookingForm({ action }: Props) {
+export default function BookingForm({ action, options }: Props) {
   const [state, formAction, isPending] = useActionState(action, initialState);
+  const [selected, setSelected] = useState<PaymentOption['value']>(options[0]?.value ?? 'venue');
+
+  const paysOnline = selected !== 'venue';
 
   return (
     <form action={formAction} className="space-y-5">
@@ -75,6 +87,45 @@ export default function BookingForm({ action }: Props) {
         )}
       </div>
 
+      {/* Forma de pago */}
+      <fieldset>
+        <legend className="block text-sm font-medium text-gray-700 mb-1.5">
+          Forma de pago
+        </legend>
+        <div className="space-y-2">
+          {options.map((opt) => {
+            const checked = selected === opt.value;
+            return (
+              <label
+                key={opt.value}
+                className={`flex items-start gap-3 rounded-2xl border px-4 py-3 cursor-pointer
+                  ${checked ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-white'}
+                  ${isPending ? 'opacity-50' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="payment_option"
+                  value={opt.value}
+                  checked={checked}
+                  onChange={() => setSelected(opt.value)}
+                  disabled={isPending}
+                  className="mt-1 accent-green-600"
+                />
+                <span className="flex-1">
+                  <span className="flex justify-between gap-2 text-sm font-medium text-gray-900">
+                    <span>{opt.label}</span>
+                    {opt.amount !== null && (
+                      <span>${opt.amount.toLocaleString('es-AR')}</span>
+                    )}
+                  </span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{opt.detail}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+
       {/* Botón */}
       <button
         type="submit"
@@ -83,11 +134,15 @@ export default function BookingForm({ action }: Props) {
           shadow-sm hover:bg-green-700 active:bg-green-800 transition-colors
           disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {isPending ? 'Reservando…' : 'Confirmar reserva'}
+        {isPending
+          ? (paysOnline ? 'Preparando el pago…' : 'Reservando…')
+          : (paysOnline ? 'Ir a pagar con Mercado Pago' : 'Confirmar reserva')}
       </button>
 
       <p className="text-xs text-gray-400 text-center">
-        Al confirmar aceptás las condiciones del complejo.
+        {paysOnline
+          ? 'Tenés 10 minutos para completar el pago. Si no se paga, el turno se libera solo.'
+          : 'Al confirmar aceptás las condiciones del complejo.'}
       </p>
     </form>
   );

@@ -8,8 +8,9 @@ import {
   getVenueWithCourts,
 } from '@/lib/supabase/queries';
 import { formatTimeMendoza, formatDateMendoza, weekdayInMendoza } from '@/lib/slots';
-import BookingForm from './booking-form';
+import BookingForm, { type PaymentOption } from './booking-form';
 import { createBookingAction, type BookingActionState } from '@/app/actions/booking';
+import { startPaymentAction } from '@/app/actions/payment';
 
 type Props = {
   params: Promise<{ locality: string; sport: string; venue: string }>;
@@ -62,6 +63,40 @@ export default async function ReservarPage({ params, searchParams }: Props) {
 
   const displayPrice = priceEntry?.price ?? null;
 
+  // Opciones de pago habilitadas por el complejo. Los montos que se muestran
+  // son orientativos: el monto real lo calcula create_booking_hold en la base.
+  const paymentOptions: PaymentOption[] = [];
+  if (venue.deposit_required) {
+    let depositAmount: number | null = null;
+    if (displayPrice !== null && venue.deposit_value !== null) {
+      depositAmount = venue.deposit_type === 'percent'
+        ? Math.round(displayPrice * venue.deposit_value / 100)
+        : Math.min(venue.deposit_value, displayPrice);
+    }
+    paymentOptions.push({
+      value: 'deposit',
+      label: 'Pagar la seña online',
+      detail: 'El resto lo pagás en el lugar.',
+      amount: depositAmount,
+    });
+  }
+  if (venue.allow_full_payment) {
+    paymentOptions.push({
+      value: 'full',
+      label: 'Pagar el total online',
+      detail: 'Pagás todo ahora con Mercado Pago.',
+      amount: displayPrice,
+    });
+  }
+  if (venue.allow_pay_at_venue) {
+    paymentOptions.push({
+      value: 'venue',
+      label: 'Pagar en el lugar',
+      detail: 'Reservás ahora y pagás cuando vas a jugar.',
+      amount: displayPrice,
+    });
+  }
+
   // Labels de fecha y hora
   const startLabel = formatTimeMendoza(startDate);
   const endLabel   = formatTimeMendoza(endDate);
@@ -72,11 +107,14 @@ export default async function ReservarPage({ params, searchParams }: Props) {
   // Inline server action — captures slot params via closure (Next.js serializes them)
   async function bookingAction(prevState: BookingActionState, formData: FormData) {
     'use server';
-    return createBookingAction(
-      { court_id: cancha!, venue_id: venue!.id, start: inicio!, end: fin! },
-      prevState,
-      formData,
-    );
+    const bound = { court_id: cancha!, venue_id: venue!.id, start: inicio!, end: fin! };
+    const option = formData.get('payment_option');
+    if (option === 'deposit' || option === 'full') {
+      return startPaymentAction({ ...bound, payment_type: option }, prevState, formData);
+    }
+    // "Pagar en el lugar" (o sin opción): reserva sin pago previo. Si el
+    // complejo no lo permite, create_booking lo rechaza en la base.
+    return createBookingAction(bound, prevState, formData);
   }
 
   return (
@@ -130,16 +168,16 @@ export default async function ReservarPage({ params, searchParams }: Props) {
             Volver al complejo
           </Link>
         </div>
-      ) : venue.deposit_required ? (
-        /* Estado: requiere seña */
+      ) : paymentOptions.length === 0 ? (
+        /* No debería pasar (la base exige al menos una forma de pago) */
         <div className="rounded-2xl bg-blue-50 border border-blue-200 p-5">
           <p className="text-blue-800 font-medium">
-            Este complejo requiere seña (disponible próximamente).
+            Este complejo no tiene habilitada ninguna forma de pago por ahora.
           </p>
         </div>
       ) : (
         /* Formulario de reserva */
-        <BookingForm action={bookingAction} />
+        <BookingForm action={bookingAction} options={paymentOptions} />
       )}
     </div>
   );
