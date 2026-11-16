@@ -318,8 +318,16 @@ Pendiente para los bloques siguientes:
 | `VAPID_PUBLIC_KEY` | Production (server only) |
 | `VAPID_PRIVATE_KEY` | Production (server only) |
 | `VAPID_SUBJECT` | Production (server only) |
-| `PUSH_SEND_SECRET` | Production (debe coincidir con Vault `push_secret`) |
+| `PUSH_SEND_SECRET` | Production (debe coincidir con Vault `push_secret`; también protege `/api/mp/refund-retry`) |
 | `PLATFORM_FEE_PERCENT` | Production |
+| `MP_CLIENT_ID` | Production — **falta cargar (2026-11-16)** |
+| `MP_CLIENT_SECRET` | Production — **falta cargar** |
+| `MP_REDIRECT_URI` | Production = `https://turnazo-chi.vercel.app/api/mp/oauth/callback` — **falta cargar** |
+| `MP_STATE_SECRET` | Production — **falta cargar** |
+| `MP_TOKEN_ENCRYPTION_KEY` | Production (32 bytes hex) — **falta cargar**; sin ella no se puede conectar ninguna cuenta de MP ni devolver nada |
+| `MP_WEBHOOK_SECRET` | Production — **falta cargar**; hoy `/api/mp/webhook` responde 500 a todo |
+
+Verificado el 2026-11-16 con el deploy de la Fase 6 en Ready: Vercel no tiene ninguna variable `MP_*`. Hasta cargarlas, el Bloque 6 (sandbox) no se puede probar. `.env.example` quedó alineado con los nombres que lee el código.
 
 ### Supabase Auth — URL Configuration
 Agregar (no reemplazar) en Dashboard → Authentication → URL Configuration:
