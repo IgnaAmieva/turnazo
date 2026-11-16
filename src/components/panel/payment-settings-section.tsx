@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import type { PanelActionState } from "@/app/actions/panel";
 
 interface PaymentSettingsSectionProps {
@@ -42,7 +42,18 @@ export function PaymentSettingsSection({ action, mpConnected, settings }: Paymen
         </div>
       )}
 
-      <form action={formAction} className="space-y-4 max-w-2xl">
+      <form
+        // Se envía desde onSubmit y no con `action=`: al terminar una acción
+        // de formulario React 19 hace form.reset(), y los inputs controlados
+        // quedan en el DOM con sus valores por defecto (seña destildada, "%"
+        // y monto vacío) aunque lo guardado y el estado sean correctos.
+        onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          startTransition(() => formAction(formData));
+        }}
+        className="space-y-4 max-w-2xl"
+      >
         {state?.error && (
           <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
             {state.error}

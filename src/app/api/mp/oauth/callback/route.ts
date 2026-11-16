@@ -57,31 +57,42 @@ export async function GET(req: NextRequest) {
     return redirectWithError(req, "not_owner", venueId);
   }
 
-  // Exchange authorization code for tokens
-  const tokenRes = await fetch("https://api.mercadopago.com/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      grant_type:    "authorization_code",
-      client_id:     process.env.MP_CLIENT_ID,
-      client_secret: process.env.MP_CLIENT_SECRET,
-      code,
-      redirect_uri:  process.env.MP_REDIRECT_URI,
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    const errBody = await tokenRes.json().catch(() => ({})) as { error?: string };
-    console.error("[mp/callback] token exchange failed:", tokenRes.status, errBody.error ?? "unknown");
-    return redirectWithError(req, "exchange_failed", venueId);
-  }
-
-  const tokens = await tokenRes.json() as {
+  // Exchange authorization code for tokens. Any failure here (network, MP down,
+  // malformed body) must end in a redirect, never in a raw 500.
+  let tokens: {
     access_token: string;
     refresh_token: string;
     expires_in: number;
     user_id: number;
   };
+  try {
+    const tokenRes = await fetch("https://api.mercadopago.com/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type:    "authorization_code",
+        client_id:     process.env.MP_CLIENT_ID,
+        client_secret: process.env.MP_CLIENT_SECRET,
+        code,
+        redirect_uri:  process.env.MP_REDIRECT_URI,
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      const errBody = await tokenRes.json().catch(() => ({})) as { error?: string };
+      console.error("[mp/callback] token exchange failed:", tokenRes.status, errBody.error ?? "unknown");
+      return redirectWithError(req, "exchange_failed", venueId);
+    }
+
+    tokens = await tokenRes.json();
+    if (!tokens?.access_token || !tokens.refresh_token || !tokens.user_id) {
+      console.error("[mp/callback] token exchange returned an incomplete body");
+      return redirectWithError(req, "exchange_failed", venueId);
+    }
+  } catch (err) {
+    console.error("[mp/callback] token exchange threw:", err instanceof Error ? err.message : "unknown");
+    return redirectWithError(req, "exchange_failed", venueId);
+  }
 
   // Fetch MP user email (best effort)
   let mpEmail: string | null = null;
@@ -97,43 +108,51 @@ export async function GET(req: NextRequest) {
     // Non-blocking
   }
 
-  // Encrypt tokens
-  const accessEnc = encrypt(tokens.access_token);
-  const refreshEnc = encrypt(tokens.refresh_token);
-  const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
+  // Encrypt + save. encrypt() throws if MP_TOKEN_ENCRYPTION_KEY is missing or
+  // malformed, and createAdminClient() throws without the service key: both
+  // must end in mp_error=save_failed, never in a raw 500.
+  try {
+    const accessEnc = encrypt(tokens.access_token);
+    const refreshEnc = encrypt(tokens.refresh_token);
+    const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
-  // Upsert into mp_accounts using service role (bypasses RLS + column ACL)
-  const admin = createAdminClient();
+    // Upsert into mp_accounts using service role (bypasses RLS + column ACL)
+    const admin = createAdminClient();
 
-  const { error } = await admin
-    .from("mp_accounts")
-    .upsert(
-      {
-        venue_id:          venueId,
-        mp_user_id:        String(tokens.user_id),
-        mp_email:          mpEmail,
-        access_token_enc:  accessEnc,
-        refresh_token_enc: refreshEnc,
-        expires_at:        expiresAt,
-        updated_at:        new Date().toISOString(),
-      },
-      { onConflict: "venue_id" }
-    );
+    const { error } = await admin
+      .from("mp_accounts")
+      .upsert(
+        {
+          venue_id:          venueId,
+          mp_user_id:        String(tokens.user_id),
+          mp_email:          mpEmail,
+          access_token_enc:  accessEnc,
+          refresh_token_enc: refreshEnc,
+          expires_at:        expiresAt,
+          updated_at:        new Date().toISOString(),
+        },
+        { onConflict: "venue_id" }
+      );
 
-  if (error) {
-    console.error("[mp/callback] upsert failed:", error.message);
+    if (error) {
+      console.error("[mp/callback] upsert failed:", error.message);
+      return redirectWithError(req, "save_failed", venueId);
+    }
+
+    // Audit log (best-effort)
+    await admin.from("audit_log").insert({
+      profile_id: userId,
+      venue_id:   venueId,
+      entity:     "mp_account",
+      entity_id:  venueId,
+      action:     "create",
+      new_data:   { mp_user_id: String(tokens.user_id), mp_email: mpEmail },
+    });
+  } catch (err) {
+    // Never log the tokens: only the error message.
+    console.error("[mp/callback] save failed:", err instanceof Error ? err.message : "unknown");
     return redirectWithError(req, "save_failed", venueId);
   }
-
-  // Audit log (best-effort)
-  await admin.from("audit_log").insert({
-    profile_id: userId,
-    venue_id:   venueId,
-    entity:     "mp_account",
-    entity_id:  venueId,
-    action:     "create",
-    new_data:   { mp_user_id: String(tokens.user_id), mp_email: mpEmail },
-  });
 
   // Redirect back to venue edit page with success + delete nonce cookie
   const url = new URL(`/panel/complejos/${venueId}`, req.url);

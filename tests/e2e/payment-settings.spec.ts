@@ -261,6 +261,13 @@ test.describe("cobro con Mercado Pago conectado", () => {
     await saveButton(page).click();
     await expect(savedMsg(page)).toBeVisible();
 
+    // Lo guardado sigue en pantalla sin recargar (React 19 resetea el form
+    // al terminar la acción: el componente tiene que volver a mostrarlo).
+    await expect(deposit(page)).toBeChecked();
+    await expect(page.getByLabel("Porcentaje del turno")).toBeChecked();
+    await expect(value(page)).toHaveValue("30");
+    await expect(payAtVenue(page)).not.toBeChecked();
+
     expect(await readSettings(request)).toEqual({
       deposit_required:   true,
       deposit_type:       "percent",
@@ -286,6 +293,9 @@ test.describe("cobro con Mercado Pago conectado", () => {
 
     await saveButton(page).click();
     await expect(savedMsg(page)).toBeVisible();
+    await expect(page.getByLabel("Monto fijo")).toBeChecked();
+    await expect(value(page)).toHaveValue("2500");
+    await expect(fullPay(page)).toBeChecked();
 
     expect(await readSettings(request)).toEqual({
       deposit_required:   true,

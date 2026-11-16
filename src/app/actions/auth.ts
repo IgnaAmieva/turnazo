@@ -75,11 +75,7 @@ export async function registerAction(
   }
 
   if (!data.session) {
-    return {
-      message:
-        'Revisá tu email para confirmar la cuenta. ' +
-        '(Desarrollo: desactivá email confirmation en Supabase Auth settings.)',
-    };
+    return { message: 'Revisá tu email para confirmar la cuenta.' };
   }
 
   revalidatePath('/panel', 'layout');
