@@ -131,6 +131,8 @@ export type VenueWithCourts = {
   payment_alias: string | null;
   payment_link: string | null;
   deposit_required: boolean;
+  deposit_type: "fixed" | "percent" | null;
+  deposit_value: number | null;
   allow_full_payment: boolean;
   allow_pay_at_venue: boolean;
   courts: CourtWithSchedule[];
@@ -159,7 +161,8 @@ export async function getVenueWithCourts(
     .select(
       `id, name, address, lat, lng, phone,
        payment_alias, payment_link,
-       deposit_required, allow_full_payment, allow_pay_at_venue`
+       deposit_required, deposit_type, deposit_value,
+       allow_full_payment, allow_pay_at_venue`
     )
     .eq("id", venueId)
     .eq("status", "approved")

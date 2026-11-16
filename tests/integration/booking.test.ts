@@ -542,6 +542,68 @@ describe('create_booking v3 (migration 008)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Tests de migration 018 — pago en el lugar deshabilitado
+// ---------------------------------------------------------------------------
+// ROJO hasta que el revisor aplique 018_payment_rules.sql: antes de eso
+// create_booking ignora allow_pay_at_venue y crea la reserva igual.
+// ---------------------------------------------------------------------------
+
+describe('create_booking (migration 018)', () => {
+  it('018: sin pago en el lugar retorna pay_at_venue_not_allowed y no crea nada', async () => {
+    // Solo pago total online. Necesita MP conectado (regla del trigger de 018),
+    // así que se inserta una cuenta MP falsa antes de tocar el cobro.
+    const { error: mpErr } = await db.from('mp_accounts').insert({
+      venue_id:          venueId,
+      mp_user_id:        'test-018',
+      mp_email:          'test-018@mp.test',
+      access_token_enc:  'fake:enc:token',
+      refresh_token_enc: 'fake:enc:refresh',
+      expires_at:        new Date(Date.now() + 6 * 3600 * 1000).toISOString(),
+    });
+    expect(mpErr).toBeNull();
+
+    const { error: cfgErr } = await db
+      .from('venues')
+      .update({ allow_full_payment: true, allow_pay_at_venue: false })
+      .eq('id', venueId);
+    expect(cfgErr).toBeNull();
+
+    const { start, end } = slotAt08(14);
+    const { count: before } = await db
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .eq('venue_id', venueId);
+
+    try {
+      const { data, error } = await anonClient.rpc('create_booking', {
+        p_court_id:       courtId,
+        p_venue_id:       venueId,
+        p_start:          start.toISOString(),
+        p_end:            end.toISOString(),
+        p_customer_name:  'Solo Online',
+        p_customer_phone: '2622018018',
+      });
+
+      expect(error).toBeNull();
+      expect((data as Record<string, unknown>).error).toBe('pay_at_venue_not_allowed');
+
+      const { count: after } = await db
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('venue_id', venueId);
+      expect(after).toBe(before);
+    } finally {
+      // Mismo orden que la desconexión real: primero el cobro, después la cuenta MP
+      await db
+        .from('venues')
+        .update({ allow_full_payment: false, allow_pay_at_venue: true })
+        .eq('id', venueId);
+      await db.from('mp_accounts').delete().eq('venue_id', venueId);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // get_booking_by_token
 // ---------------------------------------------------------------------------
 

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { refundPayment } from "@/lib/mp/refunds";
 import { triggerPushSend } from "@/lib/push";
 
 // ---------------------------------------------------------------------------
@@ -125,6 +127,156 @@ export async function updateVenueAction(
   revalidatePath(`/panel/complejos/${venueId}`);
   revalidatePath("/panel/complejos");
   redirect("/panel/complejos");
+}
+
+// ---------------------------------------------------------------------------
+// Venue payment settings (seña, pago total, pago en el lugar)
+// ---------------------------------------------------------------------------
+
+export async function updatePaymentSettingsAction(
+  venueId: string,
+  _state: PanelActionState,
+  formData: FormData
+): Promise<PanelActionState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const { data: venue } = await supabase
+    .from("venues")
+    .select("id")
+    .eq("id", venueId)
+    .eq("owner_id", user.id)
+    .single();
+  if (!venue) return { error: "No autorizado" };
+
+  // Checkboxes: present in the form data = checked.
+  const depositRequired  = formData.get("deposit_required")   !== null;
+  const allowFullPayment = formData.get("allow_full_payment") !== null;
+  // Seña obligatoria implica que no hay pago en el lugar, mande lo que mande el form.
+  const allowPayAtVenue  = depositRequired ? false : formData.get("allow_pay_at_venue") !== null;
+
+  let depositType: "fixed" | "percent" | null = null;
+  let depositValue: number | null = null;
+
+  if (depositRequired) {
+    const rawType = formData.get("deposit_type");
+    if (rawType !== "fixed" && rawType !== "percent") {
+      return { fieldErrors: { deposit_type: ["Elegí seña fija o por porcentaje"] } };
+    }
+    depositType = rawType;
+
+    // deposit_value is numeric(10,2): validate what will actually be stored.
+    const rawValue = String(formData.get("deposit_value") ?? "").trim();
+    const value    = rawValue === "" ? NaN : Math.round(Number(rawValue) * 100) / 100;
+
+    if (depositType === "percent" && !(value >= 1 && value <= 100)) {
+      return { fieldErrors: { deposit_value: ["El porcentaje de seña debe estar entre 1 y 100"] } };
+    }
+    if (depositType === "fixed" && !(value > 0 && value <= 99_999_999)) {
+      return { fieldErrors: { deposit_value: ["El monto de la seña debe ser mayor a 0"] } };
+    }
+    depositValue = value;
+  }
+
+  if (!depositRequired && !allowFullPayment && !allowPayAtVenue) {
+    return { error: "Dejá al menos una forma de pago activa." };
+  }
+
+  // Seña y pago total se cobran por Mercado Pago: sin cuenta conectada no se activan.
+  if (depositRequired || allowFullPayment) {
+    const { data: mpAccount, error: mpError } = await supabase
+      .from("mp_accounts")
+      .select("id")
+      .eq("venue_id", venueId)
+      .maybeSingle();
+    if (mpError) return { error: "No se pudo verificar Mercado Pago: " + mpError.message };
+    if (!mpAccount) {
+      return { error: "Conectá Mercado Pago para activar la seña o el pago total." };
+    }
+  }
+
+  const settings = {
+    deposit_required:   depositRequired,
+    deposit_type:       depositType,
+    deposit_value:      depositValue,
+    allow_full_payment: allowFullPayment,
+    allow_pay_at_venue: allowPayAtVenue,
+  };
+
+  const { error } = await supabase
+    .from("venues")
+    .update(settings)
+    .eq("id", venueId)
+    .eq("owner_id", user.id);
+  if (error) return { error: error.message };
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
+    venue_id:   venueId,
+    entity:     "venue",
+    entity_id:  venueId,
+    action:     "update_payment_settings",
+    new_data:   settings,
+  });
+  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+
+  revalidatePath(`/panel/complejos/${venueId}`);
+  return {};
+}
+
+// ---------------------------------------------------------------------------
+// Venue cancellation policy (cancel_limit_hours, refund_policy)
+// ---------------------------------------------------------------------------
+
+const CancellationPolicySchema = z.object({
+  cancel_limit_hours: z.coerce.number().int("Tiene que ser un número entero de horas")
+    .min(0, "Mínimo 0 horas").max(168, "Máximo 168 horas (7 días)"),
+  refund_policy: z.enum(["full", "none"], { message: "Elegí qué pasa con lo pagado online" }),
+});
+
+export async function updateCancellationPolicyAction(
+  venueId: string,
+  _state: PanelActionState,
+  formData: FormData
+): Promise<PanelActionState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const { data: venue } = await supabase
+    .from("venues")
+    .select("id")
+    .eq("id", venueId)
+    .eq("owner_id", user.id)
+    .single();
+  if (!venue) return { error: "No autorizado" };
+
+  const parsed = CancellationPolicySchema.safeParse({
+    cancel_limit_hours: formData.get("cancel_limit_hours"),
+    refund_policy:      formData.get("refund_policy"),
+  });
+  if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+
+  const { error } = await supabase
+    .from("venues")
+    .update(parsed.data)
+    .eq("id", venueId)
+    .eq("owner_id", user.id);
+  if (error) return { error: error.message };
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
+    venue_id:   venueId,
+    entity:     "venue",
+    entity_id:  venueId,
+    action:     "update_cancellation_policy",
+    new_data:   parsed.data,
+  });
+  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+
+  revalidatePath(`/panel/complejos/${venueId}`);
+  return {};
 }
 
 // ---------------------------------------------------------------------------
@@ -414,11 +566,56 @@ export async function cancelBookingPanelAction(
   const owns = await assertOwnsBooking(supabase, bookingId, venueId);
   if (!owns) return { error: "No autorizado" };
 
-  const { error } = await supabase
+  // Pago online acreditado (si lo hay): cuando cancela el complejo se devuelve
+  // siempre, sin importar el plazo ni la política de devoluciones.
+  const { data: onlinePay } = await supabase
+    .from("payments")
+    .select("mp_order_id, mp_payment_id, amount, type")
+    .eq("booking_id", bookingId)
+    .eq("status", "approved")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const refundDue = !!onlinePay && Number(onlinePay.amount) > 0 && !!onlinePay.mp_order_id;
+
+  // Solo se cancela una reserva confirmada: así dos clicks (o dos pestañas)
+  // no disparan dos devoluciones.
+  const { data: cancelled, error } = await supabase
     .from("bookings")
     .update({ status: "cancelled" })
-    .eq("id", bookingId);
+    .eq("id", bookingId)
+    .eq("status", "confirmed")
+    .select("customer_name, customer_phone, period, amount_paid");
   if (error) return { error: error.message };
+  const bk = cancelled?.[0];
+  if (!bk) return { error: "La reserva ya no está confirmada" };
+
+  // Devolución (misma función idempotente que el webhook y el jugador). Antes
+  // se marca el pago 'refund_pending' para que, si esto se cae, el cron lo tome.
+  let refundStatus: "none" | "refunded" | "pending" = "none";
+  if (refundDue && onlinePay) {
+    const admin = createAdminClient();
+    const { data: payRow } = await admin
+      .from("payments").select("raw").eq("mp_payment_id", onlinePay.mp_payment_id).maybeSingle();
+    const prevRaw = (payRow?.raw && typeof payRow.raw === "object" && !Array.isArray(payRow.raw) ? payRow.raw : {}) as Record<string, unknown>;
+    await admin
+      .from("payments")
+      .update({ status: "refund_pending", raw: { ...prevRaw, reason: "owner_cancelled" } as never })
+      .eq("mp_payment_id", onlinePay.mp_payment_id)
+      .eq("status", "approved");
+    const refund = await refundPayment(admin, {
+      bookingId,
+      venueId,
+      orderId:     onlinePay.mp_order_id!,
+      paymentId:   onlinePay.mp_payment_id,
+      amount:      Number(onlinePay.amount),
+      paymentType: onlinePay.type === "full" ? "full" : "deposit",
+      reason:      "owner_cancelled",
+      source:      "owner_cancel",
+      markBookingRefunded: true,
+    });
+    refundStatus = refund.ok ? "refunded" : "pending";
+  }
 
   const { data: { user: cancelUser } } = await supabase.auth.getUser();
   const { error: cancelAuditErr } = await supabase.from("audit_log").insert({
@@ -427,28 +624,31 @@ export async function cancelBookingPanelAction(
     entity:     "booking",
     entity_id:  bookingId,
     action:     "cancel",
+    new_data:   {
+      refund:        refundStatus,
+      refund_amount: refundDue && onlinePay ? Number(onlinePay.amount) : 0,
+      ...(refundDue && onlinePay ? { mp_payment_id: onlinePay.mp_payment_id } : {}),
+    },
   });
   if (cancelAuditErr) return { error: "Error en auditoría: " + cancelAuditErr.message };
 
   // Notificación outbox para el dueño (best-effort: no bloquea si falla)
-  const { data: bk } = await supabase
-    .from("bookings")
-    .select("customer_name, customer_phone, period")
-    .eq("id", bookingId)
-    .single();
-  if (bk) {
-    await supabase.from("notification_outbox").insert({
-      venue_id: venueId,
-      type:     "booking_cancelled",
-      payload:  {
-        booking_id:     bookingId,
-        customer_name:  bk.customer_name,
-        customer_phone: bk.customer_phone,
-        start:          (bk.period as string).replace(/[\[(]/, "").split(",")[0].trim().replace(/"/g, ""),
-      },
-    });
-    void triggerPushSend();
-  }
+  await supabase.from("notification_outbox").insert({
+    venue_id: venueId,
+    type:     "booking_cancelled",
+    payload:  {
+      booking_id:     bookingId,
+      customer_name:  bk.customer_name,
+      customer_phone: bk.customer_phone,
+      start:          (bk.period as string).replace(/[\[(]/, "").split(",")[0].trim().replace(/"/g, ""),
+      cancelled_by:   "owner",
+      amount_paid:    bk.amount_paid,
+      refund_due:     refundDue,
+      refund_amount:  refundDue && onlinePay ? Number(onlinePay.amount) : 0,
+      refund_status:  refundStatus,
+    },
+  });
+  void triggerPushSend();
 
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
   if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);

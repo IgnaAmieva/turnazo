@@ -1,9 +1,13 @@
 import { notFound } from "next/navigation";
-import { getOwnerVenue } from "@/lib/supabase/panel-queries";
+import { getOwnerVenue, getMpConnectionStatus } from "@/lib/supabase/panel-queries";
 import { getLocalities } from "@/lib/supabase/queries";
-import { updateVenueAction } from "@/app/actions/panel";
+import { updateVenueAction, updatePaymentSettingsAction, updateCancellationPolicyAction } from "@/app/actions/panel";
 import { VenueForm } from "@/components/panel/venue-form";
+import { MpConnectSection } from "@/components/panel/mp-connect-section";
+import { PaymentSettingsSection } from "@/components/panel/payment-settings-section";
+import { CancellationPolicySection } from "@/components/panel/cancellation-policy-section";
 import Link from "next/link";
+import { Suspense } from "react";
 
 export default async function EditarComplejoPage({
   params,
@@ -11,9 +15,10 @@ export default async function EditarComplejoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [venue, localities] = await Promise.all([
+  const [venue, localities, mpConnection] = await Promise.all([
     getOwnerVenue(id),
     getLocalities(),
+    getMpConnectionStatus(id),
   ]);
 
   if (!venue) notFound();
@@ -52,7 +57,39 @@ export default async function EditarComplejoPage({
         </Link>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 p-6">
+      {/* Mercado Pago connection */}
+      <Suspense fallback={null}>
+        <MpConnectSection venueId={id} mpConnection={mpConnection} />
+      </Suspense>
+
+      {/* Payment settings — remounts when MP gets connected/disconnected */}
+      <div className="mt-6">
+        <PaymentSettingsSection
+          key={mpConnection ? "mp-connected" : "mp-disconnected"}
+          action={updatePaymentSettingsAction.bind(null, id)}
+          mpConnected={!!mpConnection}
+          settings={{
+            deposit_required:   venue.deposit_required,
+            deposit_type:       venue.deposit_type,
+            deposit_value:      venue.deposit_value,
+            allow_full_payment: venue.allow_full_payment,
+            allow_pay_at_venue: venue.allow_pay_at_venue,
+          }}
+        />
+      </div>
+
+      {/* Cancellation policy */}
+      <div className="mt-6">
+        <CancellationPolicySection
+          action={updateCancellationPolicyAction.bind(null, id)}
+          settings={{
+            cancel_limit_hours: venue.cancel_limit_hours,
+            refund_policy:      venue.refund_policy,
+          }}
+        />
+      </div>
+
+      <div className="mt-6 bg-white rounded-2xl border border-gray-200 p-6">
         <VenueForm
           action={boundAction}
           localities={localities}
