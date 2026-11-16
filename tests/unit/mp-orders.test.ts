@@ -32,6 +32,8 @@ const input = {
   externalReference: "11111111-2222-3333-4444-555555555555",
   amount:            2500,
   title:             "Seña de turno",
+  payerEmail:        "jugador@test.com",
+  payerName:         "Juan García Pérez",
   backUrl:           "https://turnazo.test/pago/abc123",
   expiresIn:         "PT10M",
 };
@@ -68,7 +70,12 @@ describe("createMpOrder", () => {
       total_amount:       "2500.00",
       external_reference: input.externalReference,
       expiration_time:    "PT10M",
-      items: [{ title: "Seña de turno", unit_price: "2500.00", quantity: 1 }],
+      // payer.email es obligatorio en Checkout Pro; nombre partido en first/last
+      payer: { email: "jugador@test.com", first_name: "Juan", last_name: "García Pérez" },
+      items: [{
+        title: "Seña de turno", unit_price: "2500.00", quantity: 1,
+        description: "Reserva de cancha en Turnazo", category_id: "services",
+      }],
       config: {
         online: {
           success_url: input.backUrl,
@@ -81,6 +88,18 @@ describe("createMpOrder", () => {
     });
     expect(body).not.toHaveProperty("marketplace_fee");
     expect(body).not.toHaveProperty("notification_url");
+  });
+
+  it("manda solo el email del pagador si el nombre viene vacío o es una sola palabra", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(201, { id: "X", checkout_url: "https://mp/x" }));
+
+    await createMpOrder({ ...input, payerEmail: "  Solo@Test.com ", payerName: "" });
+    let body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.payer).toEqual({ email: "Solo@Test.com" });
+
+    await createMpOrder({ ...input, payerName: "Madonna" });
+    body = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    expect(body.payer).toEqual({ email: "jugador@test.com", first_name: "Madonna" });
   });
 
   it("formatea montos con dos decimales y total = suma de items", async () => {

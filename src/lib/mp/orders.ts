@@ -8,8 +8,12 @@
  *   - Body: type "online" y processing_mode "manual" (únicos valores para
  *     Checkout Pro), total_amount (string, 2 decimales, = suma de items),
  *     external_reference (≤ 64 chars), expiration_time (duración ISO 8601
- *     contada desde la creación), items[], config.online.{success_url,
- *     failure_url, pending_url, auto_return}, config.payment_method.
+ *     contada desde la creación), payer.email ("Required for all Checkout
+ *     Pro orders", referencia 2026-11-16; sin él la orden se crea pero el
+ *     checkout rechaza el pago), items[] (title, unit_price, quantity;
+ *     description y category_id opcionales, los usa el antifraude),
+ *     config.online.{success_url, failure_url, pending_url, auto_return},
+ *     config.payment_method.
  *   - Respuesta 201: { id, status: "created", checkout_url, ... }.
  *     El comprador se redirige a checkout_url.
  *   GET /v1/orders/{id}
@@ -95,6 +99,10 @@ export type CreateMpOrderInput = {
   amount: number;
   /** Descripción que ve el jugador en el checkout */
   title: string;
+  /** Email del jugador: obligatorio en Checkout Pro (ahí llega el comprobante) */
+  payerEmail: string;
+  /** Nombre del jugador tal como lo escribió (opcional, ayuda al antifraude) */
+  payerName?: string;
   /** URL de vuelta (éxito, fallo y pendiente van a la misma: no se confía en ella) */
   backUrl: string;
   /** Duración ISO 8601, ej. "PT10M" (vence junto con el hold) */
@@ -108,14 +116,27 @@ export type CreateMpOrderResult =
 export async function createMpOrder(input: CreateMpOrderInput): Promise<CreateMpOrderResult> {
   const amount = input.amount.toFixed(2);
 
+  // "Juan García" → first_name "Juan", last_name "García" (MP los usa para el antifraude).
+  const nameParts = (input.payerName ?? "").trim().split(/\s+/).filter(Boolean);
+  const payer: Record<string, string> = { email: input.payerEmail.trim() };
+  if (nameParts.length > 0) payer.first_name = nameParts[0];
+  if (nameParts.length > 1) payer.last_name = nameParts.slice(1).join(" ");
+
   const body = {
     type:               "online",
     processing_mode:    "manual",
     total_amount:       amount,
     external_reference: input.externalReference,
     expiration_time:    input.expiresIn,
+    payer,
     items: [
-      { title: input.title, unit_price: amount, quantity: 1 },
+      {
+        title:       input.title,
+        description: "Reserva de cancha en Turnazo",
+        category_id: "services",
+        unit_price:  amount,
+        quantity:    1,
+      },
     ],
     config: {
       online: {

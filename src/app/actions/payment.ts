@@ -24,6 +24,8 @@ const PaymentSchema = z.object({
   payment_type:    z.enum(['deposit', 'full']),
   customer_name:   z.string().trim().min(2).max(100),
   customer_phone:  z.string().min(8).max(20).regex(/^[0-9+\s\-(). ]+$/),
+  // Checkout Pro exige payer.email: ahí Mercado Pago manda el comprobante.
+  customer_email:  z.email({ message: 'Ingresá un email válido: ahí te llega el comprobante del pago.' }).max(254),
 });
 
 export type BoundPaymentParams = {
@@ -54,6 +56,7 @@ export async function startPaymentAction(
     payment_type:   bound.payment_type,
     customer_name:  formData.get('customer_name'),
     customer_phone: formData.get('customer_phone'),
+    customer_email: String(formData.get('customer_email') ?? '').trim().toLowerCase(),
   });
 
   if (!parsed.success) {
@@ -125,6 +128,8 @@ export async function startPaymentAction(
     externalReference: bookingId,
     amount,
     title:             data.payment_type === 'deposit' ? 'Seña de turno' : 'Pago de turno',
+    payerEmail:        data.customer_email,
+    payerName:         data.customer_name,
     backUrl:           `${appUrl.replace(/\/$/, '')}/pago/${cancelToken}`,
     expiresIn:         HOLD_DURATION_ISO,
   });

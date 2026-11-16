@@ -221,6 +221,7 @@ async function pay(
   const formData = new FormData();
   formData.set("customer_name",  fields.customer_name  ?? "Jugador Pago");
   formData.set("customer_phone", fields.customer_phone ?? PHONE);
+  formData.set("customer_email", fields.customer_email ?? "  Jugador.Pago@Test.com ");
   // Un navegador malicioso podría mandar un monto: la acción lo ignora
   formData.set("amount", "1");
   try {
@@ -273,6 +274,9 @@ describe("startPaymentAction — camino feliz", () => {
       amount:            2500,
       title:             "Seña de turno",
       expiresIn:         "PT10M",
+      // payer.email (obligatorio en Checkout Pro): normalizado, y el nombre tal cual
+      payerEmail:        "jugador.pago@test.com",
+      payerName:         "Jugador Pago",
     });
     expect(input.backUrl).toBe(`${process.env.NEXT_PUBLIC_APP_URL!.replace(/\/$/, "")}/pago/${b.cancel_token}`);
     expect(input).not.toHaveProperty("marketplaceFee");
@@ -289,6 +293,20 @@ describe("startPaymentAction — camino feliz", () => {
     const [b] = await bookingsOfFixture();
     expect(b.deposit_amount).toBe(PRICE);
     expect(createMpOrderMock.mock.calls[0][0]).toMatchObject({ amount: PRICE, title: "Pago de turno" });
+  });
+});
+
+describe("startPaymentAction — validación del formulario", () => {
+  it("sin email válido no se crea ni el hold ni la orden", async () => {
+    for (const customer_email of ["", "sin-arroba", "juan@"]) {
+      const outcome = await pay("deposit", slotAt08(2), { customer_email });
+      expect(outcome.kind).toBe("state");
+      if (outcome.kind === "state") {
+        expect(outcome.state.fieldErrors?.customer_email?.[0]).toMatch(/email válido/);
+      }
+    }
+    expect(createMpOrderMock).not.toHaveBeenCalled();
+    expect(await bookingsOfFixture()).toHaveLength(0);
   });
 });
 

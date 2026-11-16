@@ -87,6 +87,40 @@ export default function BookingForm({ action, options }: Props) {
         )}
       </div>
 
+      {/* Email: Mercado Pago lo exige para el checkout (payer.email) */}
+      {paysOnline && (
+        <div>
+          <label
+            htmlFor="customer_email"
+            className="block text-sm font-medium text-gray-700 mb-1.5"
+          >
+            Tu email
+          </label>
+          <input
+            id="customer_email"
+            name="customer_email"
+            type="email"
+            inputMode="email"
+            placeholder="Ej: juan@gmail.com"
+            autoComplete="email"
+            required
+            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm
+              text-gray-900 placeholder-gray-400 shadow-sm
+              focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100
+              disabled:opacity-50"
+            disabled={isPending}
+          />
+          <p className="mt-1.5 text-xs text-gray-500">
+            Mercado Pago te manda ahí el comprobante del pago.
+          </p>
+          {state.fieldErrors?.customer_email && (
+            <p className="mt-1.5 text-xs text-red-600">
+              {state.fieldErrors.customer_email[0]}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Forma de pago */}
       <fieldset>
         <legend className="block text-sm font-medium text-gray-700 mb-1.5">

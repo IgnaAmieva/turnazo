@@ -246,6 +246,12 @@ test.describe("opciones de pago en la pantalla de reserva", () => {
     await expect(page.getByText("El resto lo pagás en el lugar.")).toBeVisible();
     await expect(page.getByRole("button", { name: /ir a pagar con mercado pago/i })).toBeVisible();
     await expect(page.getByText(/Tenés 10 minutos para completar el pago/)).toBeVisible();
+
+    // Pago online ⇒ se pide el email (Mercado Pago lo exige para el checkout)
+    const email = page.locator('[name="customer_email"]');
+    await expect(email).toBeVisible();
+    await expect(email).toHaveAttribute("required", "");
+    await expect(page.getByText(/te manda ahí el comprobante/)).toBeVisible();
   });
 
   test("pago total + en el lugar: elegir 'en el lugar' reserva sin pagar", async ({ page, request }) => {
@@ -261,6 +267,8 @@ test.describe("opciones de pago en la pantalla de reserva", () => {
     await page.getByRole("radio", { name: /pagar en el lugar/i }).check();
     const submit = page.getByRole("button", { name: /confirmar reserva/i });
     await expect(submit).toBeVisible();
+    // Sin pago online no se pide email
+    await expect(page.locator('[name="customer_email"]')).toHaveCount(0);
 
     await page.locator('[name="customer_name"]').fill("E2E Pago Lugar");
     await page.locator('[name="customer_phone"]').fill("2622 777002");
@@ -287,6 +295,7 @@ test.describe("opciones de pago en la pantalla de reserva", () => {
 
     await page.locator('[name="customer_name"]').fill("E2E Pago Online");
     await page.locator('[name="customer_phone"]').fill("2622 777003");
+    await page.locator('[name="customer_email"]').fill("e2e.pago@turnazo.test");
     await page.getByRole("radio", { name: /pagar el total online/i }).check();
 
     await page.getByRole("button", { name: /ir a pagar con mercado pago/i }).click({ force: true });
@@ -306,6 +315,7 @@ test.describe("opciones de pago en la pantalla de reserva", () => {
     // El mismo horario se puede reservar de nuevo (otro teléfono, otra persona)
     await page.locator('[name="customer_name"]').fill("E2E Pago Online 2");
     await page.locator('[name="customer_phone"]').fill("2622 777004");
+    await page.locator('[name="customer_email"]').fill("e2e.pago2@turnazo.test");
     await page.getByRole("button", { name: /ir a pagar con mercado pago/i }).click({ force: true });
     // El mensaje del primer intento sigue en pantalla: esperar la fila nueva en la base
     await expect
