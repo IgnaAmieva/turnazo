@@ -58,17 +58,50 @@ export function buildPushPayload(type: string, payload: Record<string, unknown>)
         url: "/panel/agenda",
         tag: `booking-${payload.booking_id}`,
       };
-    case "booking_cancelled":
+    case "booking_cancelled": {
+      const who = payload.customer_name ?? "Un cliente";
+      const paid = Number(payload.amount_paid ?? 0);
+      const refundAmount = Number(payload.refund_amount ?? paid).toLocaleString("es-AR");
+      let body: string;
+      if (payload.cancelled_by === "owner") {
+        // Cancelación desde el panel: si había pago online se devuelve siempre.
+        body = payload.refund_due === true
+          ? `Cancelaste el turno de ${who}. Se le devuelven $${refundAmount} por Mercado Pago.` +
+            (payload.refund_status === "pending" ? " La devolución está en proceso." : "")
+          : `Cancelaste el turno de ${who}.`;
+      } else {
+        body = payload.refund_due === true
+          ? `${who} canceló su turno. Se le devuelven $${refundAmount} por Mercado Pago.`
+          : paid > 0
+            ? `${who} canceló su turno sin devolución (había pagado $${paid.toLocaleString("es-AR")}).`
+            : `${who} canceló su turno`;
+      }
       return {
         title: "Turno cancelado",
-        body:  `${payload.customer_name ?? "Un cliente"} canceló su turno`,
+        body,
         url: "/panel/agenda",
         tag: `cancel-${payload.booking_id}`,
+      };
+    }
+    case "payment_mismatch":
+      return {
+        title: "Pago para revisar",
+        body:  `Recibiste un pago que no coincide con la reserva de ${payload.customer_name ?? "un cliente"}${
+          payload.start
+            ? " del " + new Date(payload.start as string).toLocaleDateString("es-AR", {
+                day: "numeric", month: "numeric", timeZone: "America/Argentina/Mendoza",
+              })
+            : ""
+        }. Revisalo y devolvelo desde Mercado Pago si corresponde.`,
+        url: "/panel/agenda",
+        tag: `mismatch-${payload.booking_id}`,
       };
     case "payment_received":
       return {
         title: "Pago recibido",
-        body:  `${payload.customer_name ?? "Un cliente"} marcó su turno como pagado`,
+        body:  payload.online
+          ? `${payload.customer_name ?? "Un cliente"} pagó $${Number(payload.amount ?? 0).toLocaleString("es-AR")} por Mercado Pago`
+          : `${payload.customer_name ?? "Un cliente"} marcó su turno como pagado`,
         url: "/panel/agenda",
         tag: `pay-${payload.booking_id}`,
       };

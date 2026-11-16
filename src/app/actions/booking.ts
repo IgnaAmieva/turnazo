@@ -5,6 +5,9 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { triggerPushSend } from '@/lib/push';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { refundPayment } from '@/lib/mp/refunds';
+import { RPC_ERROR_MESSAGES, GENERIC_BOOKING_ERROR } from '@/lib/booking-messages';
 
 // ---------------------------------------------------------------------------
 // Schema de validación
@@ -19,20 +22,7 @@ const BookingSchema = z.object({
   customer_phone:  z.string().min(8).max(20).regex(/^[0-9+\s\-(). ]+$/),
 });
 
-// ---------------------------------------------------------------------------
-// Mapeo de errores RPC → mensajes en español
-// ---------------------------------------------------------------------------
-
-const RPC_ERROR_MESSAGES: Record<string, string> = {
-  past_slot:        'Este horario ya pasó.',
-  slot_taken:       'Este turno ya fue reservado por alguien más. Por favor elegí otro horario.',
-  venue_not_found:  'El complejo no fue encontrado o no está disponible.',
-  court_not_found:  'La cancha no fue encontrada o no está disponible.',
-  outside_hours:    'El horario elegido está fuera del horario de apertura.',
-  phone_blocked:    'No podés reservar en este complejo con ese número de teléfono.',
-  deposit_required: 'Este complejo requiere seña (disponible próximamente).',
-  invalid_duration: 'La duración del turno no es válida para esta cancha.',
-};
+// Mensajes de error RPC → src/lib/booking-messages.ts (compartidos con el pago)
 
 // ---------------------------------------------------------------------------
 // createBookingAction — para useActionState
@@ -95,7 +85,7 @@ export async function createBookingAction(
 
   if (res.error) {
     const code = res.error as string;
-    return { error: RPC_ERROR_MESSAGES[code] ?? 'Error al crear la reserva. Intentá de nuevo.' };
+    return { error: RPC_ERROR_MESSAGES[code] ?? GENERIC_BOOKING_ERROR };
   }
 
   const cancelToken = res.cancel_token as string;
@@ -111,6 +101,9 @@ export async function createBookingAction(
 export type CancelActionState = {
   error?: string;
   success?: boolean;
+  /** 'refunded': la plata ya volvió; 'pending': la devolución falló y la reintenta el cron; 'none': sin devolución */
+  refund?: 'refunded' | 'pending' | 'none';
+  refundAmount?: number;
 };
 
 export async function cancelBookingAction(
@@ -126,6 +119,8 @@ export async function cancelBookingAction(
 
   const supabase = await createClient();
 
+  // La base decide: cancela (o no) y dice si corresponde devolución según
+  // cancel_limit_hours y refund_policy del complejo (migración 020).
   const { data: result, error: rpcError } = await supabase.rpc('cancel_booking_by_token', {
     p_cancel_token: cancelToken,
   });
@@ -143,8 +138,29 @@ export async function cancelBookingAction(
     return { error: 'Error al cancelar el turno.' };
   }
 
+  let refund: CancelActionState['refund'] = 'none';
+  let refundAmount = 0;
+
+  // Devolución: la reserva ya quedó cancelada y el pago en 'refund_pending'.
+  // Si el reembolso falla acá, el cron (/api/mp/refund-retry) lo reintenta.
+  if (res.refund_due === true && typeof res.mp_order_id === 'string' && typeof res.mp_payment_id === 'string') {
+    refundAmount = Number(res.refund_amount ?? 0);
+    const r = await refundPayment(createAdminClient(), {
+      bookingId:   String(res.booking_id),
+      venueId:     String(res.venue_id),
+      orderId:     res.mp_order_id,
+      paymentId:   res.mp_payment_id,
+      amount:      refundAmount,
+      paymentType: res.payment_type === 'full' ? 'full' : 'deposit',
+      reason:      'player_cancelled',
+      source:      'player_cancel',
+      markBookingRefunded: true,
+    });
+    refund = r.ok ? 'refunded' : 'pending';
+  }
+
   // El RPC ya insertó en notification_outbox; disparar envío (best-effort)
   void triggerPushSend();
   revalidatePath('/turnos/' + cancelToken);
-  return { success: true };
+  return { success: true, refund, refundAmount };
 }

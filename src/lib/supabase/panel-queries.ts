@@ -114,6 +114,8 @@ export type AgendaBooking = {
   price_total: number;
   amount_paid: number;
   payment_status: string;
+  /** Lo acreditado por Mercado Pago (pagos 'approved'); se devuelve si el dueño cancela */
+  online_paid: number;
   cancel_token: string | null;
 };
 
@@ -179,7 +181,7 @@ export async function getAgendaData(venueId: string, date: string): Promise<Agen
 
   const { data: rawBookings } = await supabase
     .from("bookings")
-    .select("id, court_id, customer_name, customer_phone, period, status, kind, price_total, amount_paid, payment_status, cancel_token")
+    .select("id, court_id, customer_name, customer_phone, period, status, kind, price_total, amount_paid, payment_status, cancel_token, payments(amount, status)")
     .eq("venue_id", venueId)
     .filter("period", "ov", rangeFilter)
     .in("status", ["confirmed", "hold", "completed", "no_show", "cancelled"]);
@@ -204,6 +206,9 @@ export async function getAgendaData(venueId: string, date: string): Promise<Agen
       price_total:    b.price_total ?? 0,
       amount_paid:    b.amount_paid,
       payment_status: b.payment_status,
+      online_paid:    ((b.payments ?? []) as { amount: number; status: string }[])
+        .filter((p) => p.status === "approved")
+        .reduce((sum, p) => sum + Number(p.amount), 0),
       cancel_token:   b.cancel_token,
     };
   });
@@ -244,6 +249,25 @@ export async function getBlockedPhones(venueId: string) {
 
   if (error) throw error;
   return (data ?? []) as { id: string; phone: string; created_at: string }[];
+}
+
+// ---------------------------------------------------------------------------
+// MP connection status
+// ---------------------------------------------------------------------------
+
+export async function getMpConnectionStatus(venueId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  // authenticated can SELECT mp_user_id, mp_email, expires_at (column GRANT)
+  const { data } = await supabase
+    .from("mp_accounts")
+    .select("mp_user_id, mp_email, expires_at")
+    .eq("venue_id", venueId)
+    .single();
+
+  return data;
 }
 
 // Todas las canchas del complejo con sus horarios y precios (para "copiar desde otra cancha")

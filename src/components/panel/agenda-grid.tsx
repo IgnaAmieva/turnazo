@@ -378,6 +378,9 @@ function BookingCard({
   const [expanded, setExpanded] = useState(false);
   const [pending,  setPending]  = useState(false);
   const [err,      setErr]      = useState<string | null>(null);
+  // Cancelar una reserva con pago online devuelve la plata: pide confirmar antes.
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const refundOnCancel = booking.online_paid > 0;
 
   async function runAction(action: PanelAction, extra: Record<string, string> = {}) {
     setPending(true);
@@ -475,14 +478,35 @@ function BookingCard({
               ✕ Marcar ausente
             </button>
           )}
-          {booking.status === "confirmed" && (
+          {booking.status === "confirmed" && !confirmCancel && (
             <button
-              onClick={() => runAction(onCancel)}
+              onClick={() => (refundOnCancel ? setConfirmCancel(true) : runAction(onCancel))}
               disabled={pending}
               className="rounded bg-gray-500 text-white text-[10px] px-2 py-1 font-medium hover:bg-gray-600 disabled:opacity-50"
             >
               🗑 Cancelar turno
             </button>
+          )}
+          {booking.status === "confirmed" && confirmCancel && (
+            <div className="rounded border border-amber-300 bg-amber-50 p-1.5 flex flex-col gap-1">
+              <p className="text-[10px] text-amber-900 leading-snug">
+                Se le devolverán <strong>${booking.online_paid.toLocaleString("es-AR")}</strong> al jugador por Mercado Pago.
+              </p>
+              <button
+                onClick={() => runAction(onCancel)}
+                disabled={pending}
+                className="rounded bg-red-600 text-white text-[10px] px-2 py-1 font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                Confirmar cancelación
+              </button>
+              <button
+                onClick={() => setConfirmCancel(false)}
+                disabled={pending}
+                className="rounded bg-gray-100 text-gray-600 text-[10px] px-2 py-1 hover:bg-gray-200"
+              >
+                Volver
+              </button>
+            </div>
           )}
           {booking.customer_phone && (
             <button

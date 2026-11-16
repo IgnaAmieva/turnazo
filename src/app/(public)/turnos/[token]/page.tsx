@@ -20,6 +20,10 @@ type BookingDetail = {
   payment_status: string;
   cancel_token: string;
   cancel_limit_hours: number;
+  /** Desde migración 020 (antes de aplicarla llegan undefined) */
+  refund_policy?: 'full' | 'none';
+  refund_available?: boolean;
+  refund_status?: string | null;
   venue_name: string;
   venue_phone: string;
   venue_address: string;
@@ -84,6 +88,16 @@ export default async function TurnoPage({ params }: Props) {
   const isConfirmed = booking.status === 'confirmed';
   const isCancelled = booking.status === 'cancelled';
 
+  const paidLabel = `$${booking.amount_paid.toLocaleString('es-AR')}`;
+  const refundStatus = booking.refund_status ?? null;
+  const refundNote = !isCancelled || booking.amount_paid <= 0
+    ? null
+    : refundStatus === 'refunded' || booking.payment_status === 'refunded'
+      ? `Te devolvimos ${paidLabel} por Mercado Pago.`
+      : refundStatus === 'refund_pending' || refundStatus === 'refund_failed'
+        ? `La devolución de ${paidLabel} está en proceso. Puede demorar unos minutos.`
+        : `Lo que pagaste (${paidLabel}) no se devolvió automáticamente. Consultá con el complejo.`;
+
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
       {/* Breadcrumb */}
@@ -137,7 +151,13 @@ export default async function TurnoPage({ params }: Props) {
             ${booking.price_total.toLocaleString('es-AR')}
           </p>
           {booking.amount_paid > 0 ? (
-            <p className="text-sm text-green-700 font-medium mt-0.5">Pagado ✓</p>
+            <p className="text-sm text-green-700 font-medium mt-0.5">
+              {booking.payment_status === 'refunded'
+                ? `Devuelto: ${paidLabel}`
+                : booking.amount_paid >= booking.price_total
+                  ? 'Pagado ✓'
+                  : `Seña pagada: ${paidLabel} · Pagás en la cancha: $${debeEnCancha.toLocaleString('es-AR')}`}
+            </p>
           ) : (
             <p className="text-sm text-gray-500 mt-0.5">
               Pagás en la cancha: ${debeEnCancha.toLocaleString('es-AR')}
@@ -152,12 +172,16 @@ export default async function TurnoPage({ params }: Props) {
           action={cancelAction}
           cancelLimitHours={booking.cancel_limit_hours}
           periodStart={booking.period_start}
+          amountPaid={booking.amount_paid}
+          refundPolicy={booking.refund_policy ?? 'none'}
+          refundAvailable={booking.refund_available === true}
         />
       )}
 
       {isCancelled && (
         <div className="rounded-2xl bg-gray-50 border border-gray-200 p-4 text-center">
           <p className="text-gray-500 text-sm">Este turno fue cancelado.</p>
+          {refundNote && <p className="text-gray-700 text-sm mt-1">{refundNote}</p>}
         </div>
       )}
     </div>
