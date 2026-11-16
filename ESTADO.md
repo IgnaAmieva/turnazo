@@ -94,8 +94,10 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 199 | ✓ verde (2026-11-16, con 018–020 aplicadas) |
+| Unitarios + integración | Vitest | 201 | ✓ verde (2026-11-16, con 018–020 aplicadas) |
 | E2E | Playwright | 65 (incluye el setup de login) | ✓ verde (2026-11-16) |
+
+Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
 Archivos E2E:
 - `public.spec.ts` — flujo público (booking + cancelación)
@@ -109,9 +111,9 @@ Archivos E2E:
 - `payment-flow.spec.ts` — 8 tests del pago del jugador (Bloques 3 y 4): opciones según configuración, "pagar en el lugar" sigue usando `create_booking`, pago online con cuenta MP falsa → error claro y hold liberado, pantalla `/pago/[token]` (pendiente con cuenta regresiva → confirmada al cambiar la base; botón "Cancelar y elegir otro horario" → hold `expired` y vuelve a `/reservar` del mismo horario; vencida; cancelada; token inexistente). Nunca llama a Mercado Pago. Limpia bookings `E2E Pago*`, la cuenta MP falsa y restaura el cobro original.
 
 Archivos Vitest nuevos (Bloques 3 y 4):
-- `tests/unit/mp-orders.test.ts` — 13 tests del cliente de Orders con `fetch` simulado: `createMpOrder` (cuerpo exacto, headers, sin `marketplace_fee`, errores), `getMpOrder` / `isMpOrderPaid` / `mpOrderPaymentId`, `refundMpOrder` (409 `order_already_refunded` = éxito), `cancelMpOrder`.
+- `tests/unit/mp-orders.test.ts` — 14 tests del cliente de Orders con `fetch` simulado: `createMpOrder` (cuerpo exacto con `payer.email` / `first_name` / `last_name` e `items[].description` / `category_id`, headers, sin `marketplace_fee`, errores), `getMpOrder` / `isMpOrderPaid` / `mpOrderPaymentId`, `refundMpOrder` (409 `order_already_refunded` = éxito), `cancelMpOrder`.
 - `tests/unit/mp-signature.test.ts` — 11 tests de la firma `x-signature`: manifiesto (minúsculas, partes ausentes), HMAC, firma válida, otra clave, manipulada, header ausente/malformado, ts viejo/futuro, sin `x-request-id`.
-- `tests/integration/payment-flow.test.ts` — 15 tests de `startPaymentAction`, `getPaymentStatusAction` y `cancelHoldAction` contra la base real con `getMpToken`, `createMpOrder`, `cancelMpOrder` y `redirect` simulados (fixture propio, se borra en `afterAll`).
+- `tests/integration/payment-flow.test.ts` — 16 tests de `startPaymentAction` (incluye: sin email válido no se crea ni el hold ni la orden), `getPaymentStatusAction` y `cancelHoldAction` contra la base real con `getMpToken`, `createMpOrder`, `cancelMpOrder` y `redirect` simulados (fixture propio, se borra en `afterAll`).
 - `tests/integration/cancellation.test.ts` — 17 tests (Bloque 5): `cancelBookingAction` sin pago (igual que siempre), con pago online (`full` dentro del plazo → devuelve, idempotente; reembolso que falla → cancela igual, `refund_failed`, y `/api/mp/refund-retry` lo completa; `none` → sin devolución; fuera del plazo → sin devolución; turno empezado → no; pagado a mano → nada que devolver), `get_booking_by_token` v2, `cancelBookingPanelAction` del dueño (devuelve todo aunque la política sea `none` y esté fuera del plazo; reembolso que falla → `refund_failed` y el cron lo completa; sin pago online → como siempre; otro dueño → no autorizado), y `updateCancellationPolicyAction` (guarda + audit, valida, rechaza otro dueño y anon). 5 marcados "migración 020". Para probar el cron no se puede "envejecer" la fila de `payments` (el trigger `trg_payments_updated_at` pisa `updated_at` en cada UPDATE): el test adelanta 3 min el reloj de `Date` con `vi.useFakeTimers({ toFake: ["Date"] })`.
 - `tests/integration/webhook.test.ts` — 20 tests de `POST /api/mp/webhook` y `reconcilePaymentAction` contra la base real con `getMpToken`, `getMpOrder`, `refundMpOrder` y `triggerPushSend` simulados (fixture propio; borra `payments`, `webhook_events`, `audit_log`, bookings y venue en `afterAll`). 11 pasan sin la migración (firma inválida/ausente/vieja/manipulada → 401 y nada más; monto, moneda o `external_reference` distintos → `mismatch` sin tocar nada; orden no pagada; body que miente; orden desconocida; `type` ≠ order; sin token / MP caído → 500). **9 marcados "migración 019"** (orden pagada → confirmada + `payments` + outbox + push; pago total → `paid`; evento repetido; misma orden con otro evento → `already_confirmed`; pago tarde con horario libre → confirma; pago tarde con horario tomado → reembolso; reserva cancelada → reembolso; reembolso fallido → 500 y reintento; reconciliación desde `/pago`).
 
@@ -149,7 +151,7 @@ Definida en SPEC §9 y §14.
 
 Definida en SPEC §7 y §14. Ver plan detallado en `docs/FASE6-PLAN.md`.
 
-**Estado:** Bloques 1 (OAuth), 2 (configuración de cobro), 3 (pago del jugador), 4 (webhook) y 5 (cancelaciones con devolución, incluida la cancelación del dueño) implementados; migraciones 018, 019 y 020 aplicadas y verificadas; Vault configurado. Commiteado y desplegado en Vercel el 2026-11-16. Falta el Bloque 6: prueba en sandbox real.
+**Estado:** Bloques 1 (OAuth), 2 (configuración de cobro), 3 (pago del jugador), 4 (webhook) y 5 (cancelaciones con devolución, incluida la cancelación del dueño) implementados; migraciones 018, 019 y 020 aplicadas y verificadas; Vault configurado. Commiteado y desplegado en Vercel el 2026-11-16. Bloque 6 (sandbox) en curso: el primer intento de pago fue rechazado por el checkout; se agregó `payer.email` (ver "Bloque 6 — primer intento en sandbox").
 
 **App de Mercado Pago:** creada (Checkout Pro, API de Orders, ambiente de prueba/sandbox).
 
@@ -174,7 +176,7 @@ Definida en SPEC §7 y §14. Ver plan detallado en `docs/FASE6-PLAN.md`.
 3. Flujo de pago jugador (create_booking_hold, startPaymentAction, /pago/[token]) — ✅ aprobado (con 3 arreglos aplicados, ver abajo)
 4. Webhook (firma, idempotencia, confirmación, reembolso si no se puede confirmar, outbox, reconciliación desde /pago) — ✅ aprobado (con 2 arreglos aplicados, ver abajo)
 5. Cancelaciones con devolución (política de cancelación, cron de reintentos, cancelación del dueño con devolución total) — ✅ implementado, 020 aplicada
-6. Prueba en sandbox real (webhook configurado en el panel de MP, `payer.email`, `expiration_time`, una devolución real) — ⬜ pendiente
+6. Prueba en sandbox real (webhook configurado en el panel de MP, `payer.email`, `expiration_time`, una devolución real) — 🟡 en curso: OAuth y creación de órdenes OK; el pago fue rechazado en el checkout → se agregó `payer.email` (2026-11-16), falta repetir el pago
 
 **Bloque 1 — OAuth (completado 2026-11-14):**
 - Callback route: `/api/mp/oauth/callback`
@@ -216,7 +218,7 @@ Verificación previa en la documentación oficial de Mercado Pago (API de Orders
 - `marketplace_fee` es opcional: no se manda (0 % por reserva).
 - **No existe `notification_url` por orden en Orders.** El webhook se configura en el panel de la app de MP: Integraciones → Webhooks → URL `https://<dominio>/api/mp/webhook`, tema "Order (Mercado Pago)". Hay que hacerlo antes de probar el Bloque 4 en sandbox.
 - `config.online.{success_url,failure_url,pending_url,auto_return}` para las URLs de vuelta; `config.payment_method.not_allowed_types: ["ticket"]` para excluir Rapipago/Pago Fácil (no acreditan en 10 minutos).
-- `payer.email` aparece en todos los ejemplos pero la referencia no lo marca obligatorio. No se manda (no se pide email al jugador). **Si el sandbox lo rechaza, hay que agregar un campo de email al formulario.** Primer punto a probar en sandbox.
+- `payer.email`: la referencia actual (`/reference/online-payments/checkout-pro/create-order/post`, leída el 2026-11-16) lo marca **"Required for all Checkout Pro orders"**. Sin él la orden se crea igual (201) pero el checkout rechaza el pago ("No pudimos procesar tu pago"): fue lo que pasó en el primer intento en sandbox. Desde el 2026-11-16 se pide el email en el formulario cuando el pago es online y se manda como `payer.email` (ver Bloque 6).
 
 Código:
 - `src/lib/mp/orders.ts` — `createMpOrder()`: arma y envía la orden; devuelve `{ ok, orderId, checkoutUrl }` o `{ ok: false, status, code, message }`. Sin dependencia del SDK.
@@ -264,6 +266,26 @@ Código:
 
 Pendiente:
 - Configurar la URL del webhook y copiar la clave secreta al entorno; probar un pago real en sandbox (incluye `payer.email`, `PT10M`, `not_allowed_types`).
+
+---
+
+**Bloque 6 — primer intento en sandbox (2026-11-16):**
+
+Resultado de la prueba: la conexión OAuth funcionó (complejo `futmates`, venue `2d2bbf26-5d46-4f54-97de-3cdd8595ff3e`, vendedor de prueba, token vigente hasta 2027-05), las órdenes se crearon bien (`ORDTST01M7K5KEQECXTY8015WV118HS4` y `ORDTST01M7K5YBP2E1845QD73NHTRM58`, seña $1.000 de $10.000), pero el checkout de MP rechazó el pago con "No pudimos procesar tu pago", incluso con el comprador de prueba pagando con saldo en cuenta. En la base los dos holds quedaron `expired` sin fila en `payments` (nunca hubo pago), y a Vercel no llegó ningún webhook.
+
+Diagnóstico pendiente del lado de MP: hay un script local (no versionado, en el scratchpad de la sesión: `mp-diag.ts`) que con `.env.local` lee el token del vendedor con `getMpToken`, hace `GET /v1/orders/{id}` de las dos órdenes e imprime solo `status`, `status_detail`, `total_amount` y, por pago, `status` / `status_detail` / `payment_method`. No se pudo correr porque `.env.local` no tiene `MP_TOKEN_ENCRYPTION_KEY` (el token está cifrado con la clave de Vercel). Hay que copiar esa variable a `.env.local` y correr `npx tsx --tsconfig tsconfig.json <ruta del script>`.
+
+Causa más probable, según la referencia oficial de Orders / Checkout Pro leída el 2026-11-16: `payer.email` es **"Required for all Checkout Pro orders"**, y no se mandaba (el jugador no se registra y no se le pedía email). Cambios:
+- `booking-form.tsx`: campo "Tu email" (`customer_email`, `type=email`, obligatorio) que aparece solo cuando la forma de pago es online ("Mercado Pago te manda ahí el comprobante del pago."). Con "Pagar en el lugar" no se pide nada nuevo.
+- `payment.ts`: valida el email con zod (`z.email`, normalizado en minúsculas); sin email válido devuelve `fieldErrors.customer_email` antes de crear el hold.
+- `orders.ts`: la orden lleva `payer: { email, first_name, last_name }` (nombre partido en la primera palabra / el resto) e `items[0]` con `description: "Reserva de cancha en Turnazo"` y `category_id: "services"` (opcionales, los usa el antifraude de MP).
+- El email **no se guarda en la base** (no hay columna; harían falta una migración 021 `customer_email` en `bookings` y pedirla también al reservar sin pago, si se quiere). Solo viaja del formulario a la orden de MP.
+- Para la prueba en sandbox, en "Tu email" conviene poner el email del **comprador de prueba** (`@testuser.com`).
+
+Tres errores chicos de la misma prueba, arreglados:
+- a. `/api/mp/oauth/callback`: el intercambio del `code` y el cifrado + guardado están en `try/catch`; cualquier excepción (fetch caído, respuesta incompleta, `MP_TOKEN_ENCRYPTION_KEY` ausente o malformada, falta de service key) redirige con `mp_error=exchange_failed` / `mp_error=save_failed` en lugar de un 500 crudo. Nunca se loguean los tokens.
+- b. "Cobro de reservas": después de guardar, el formulario mostraba la seña destildada, "Porcentaje" y el monto vacío aunque lo guardado estuviera bien. Causa: React 19 hace `form.reset()` al terminar una acción pasada por `action=`, y los inputs controlados quedan en el DOM con sus valores por defecto. El form ahora se envía desde `onSubmit` con `startTransition(() => formAction(formData))`, sin reset. Reproducido primero con dos asserts nuevos en `payment-settings.spec.ts` (fallaban) y verificado después (pasan).
+- c. `/registro`: el mensaje ya no dice "(Desarrollo: desactivá email confirmation en Supabase Auth settings.)"; queda "Revisá tu email para confirmar la cuenta."
 
 ---
 
@@ -320,14 +342,14 @@ Pendiente para los bloques siguientes:
 | `VAPID_SUBJECT` | Production (server only) |
 | `PUSH_SEND_SECRET` | Production (debe coincidir con Vault `push_secret`; también protege `/api/mp/refund-retry`) |
 | `PLATFORM_FEE_PERCENT` | Production |
-| `MP_CLIENT_ID` | Production — **falta cargar (2026-11-16)** |
-| `MP_CLIENT_SECRET` | Production — **falta cargar** |
-| `MP_REDIRECT_URI` | Production = `https://turnazo-chi.vercel.app/api/mp/oauth/callback` — **falta cargar** |
-| `MP_STATE_SECRET` | Production — **falta cargar** |
-| `MP_TOKEN_ENCRYPTION_KEY` | Production (32 bytes hex) — **falta cargar**; sin ella no se puede conectar ninguna cuenta de MP ni devolver nada |
-| `MP_WEBHOOK_SECRET` | Production — **falta cargar**; hoy `/api/mp/webhook` responde 500 a todo |
+| `MP_CLIENT_ID` | Production — cargada el 2026-11-16 |
+| `MP_CLIENT_SECRET` | Production — cargada |
+| `MP_REDIRECT_URI` | Production = `https://turnazo-chi.vercel.app/api/mp/oauth/callback` — cargada |
+| `MP_STATE_SECRET` | Production — cargada |
+| `MP_TOKEN_ENCRYPTION_KEY` | Production (32 bytes hex) — cargada; con ella se conectó `futmates` en sandbox |
+| `MP_WEBHOOK_SECRET` | Production — cargada |
 
-Verificado el 2026-11-16 con el deploy de la Fase 6 en Ready: Vercel no tiene ninguna variable `MP_*`. Hasta cargarlas, el Bloque 6 (sandbox) no se puede probar. `.env.example` quedó alineado con los nombres que lee el código.
+Las seis `MP_*` están en Production desde el 2026-11-16 (verificado por la lista de variables de Vercel; los valores no se leen). En `.env.local` siguen sin estar: localmente todo corre con mocks, y para correr el script de diagnóstico de órdenes hay que copiar `MP_TOKEN_ENCRYPTION_KEY` (la misma de Vercel) a `.env.local`. `.env.example` quedó alineado con los nombres que lee el código.
 
 ### Supabase Auth — URL Configuration
 Agregar (no reemplazar) en Dashboard → Authentication → URL Configuration:
