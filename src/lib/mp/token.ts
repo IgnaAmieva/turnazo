@@ -105,8 +105,6 @@ async function refreshMpToken(refreshToken: string): Promise<TokenResponse | nul
       client_id:     process.env.MP_CLIENT_ID,
       client_secret: process.env.MP_CLIENT_SECRET,
       refresh_token: refreshToken,
-      // Igual que en el callback: credenciales de prueba solo con MP_OAUTH_TEST_MODE=true.
-      ...(process.env.MP_OAUTH_TEST_MODE === "true" ? { test_token: true } : {}),
     }),
   });
 

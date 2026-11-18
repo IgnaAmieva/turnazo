@@ -64,7 +64,6 @@ export async function GET(req: NextRequest) {
     refresh_token: string;
     expires_in: number;
     user_id: number;
-    live_mode?: boolean;
   };
   try {
     const tokenRes = await fetch("https://api.mercadopago.com/oauth/token", {
@@ -76,9 +75,6 @@ export async function GET(req: NextRequest) {
         client_secret: process.env.MP_CLIENT_SECRET,
         code,
         redirect_uri:  process.env.MP_REDIRECT_URI,
-        // Solo para el sandbox: pide credenciales de prueba. En producción la
-        // variable no existe y el parámetro no se manda.
-        ...(process.env.MP_OAUTH_TEST_MODE === "true" ? { test_token: true } : {}),
       }),
     });
 
@@ -93,8 +89,6 @@ export async function GET(req: NextRequest) {
       console.error("[mp/callback] token exchange returned an incomplete body");
       return redirectWithError(req, "exchange_failed", venueId);
     }
-    // Solo live_mode, nunca los tokens: confirma si la conexión quedó en modo prueba.
-    console.info("[mp/callback] live_mode:", tokens.live_mode ?? "(no informado)");
   } catch (err) {
     console.error("[mp/callback] token exchange threw:", err instanceof Error ? err.message : "unknown");
     return redirectWithError(req, "exchange_failed", venueId);

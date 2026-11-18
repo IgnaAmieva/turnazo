@@ -19,7 +19,9 @@ type Props = {
 
 export default function PaymentStatusPanel({ token, initial }: Props) {
   const [status, setStatus] = useState<PaymentStatus>(initial);
-  const [now, setNow] = useState(() => Date.now());
+  // La hora se toma solo en el navegador: si el servidor la calculara, el
+  // texto de la cuenta regresiva no coincidiría al hidratar.
+  const [now, setNow] = useState<number | null>(null);
 
   // Reconciliación mientras el pago está pendiente
   useEffect(() => {
@@ -42,19 +44,21 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
   // Cuenta regresiva (1 s)
   useEffect(() => {
     if (status.state !== 'pendiente') return;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [status.state]);
 
-  const remainingMs = status.expiresAt ? new Date(status.expiresAt).getTime() - now : 0;
-  const remaining = Math.max(0, Math.floor(remainingMs / 1000));
-  const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
-  const ss = String(remaining % 60).padStart(2, '0');
+  const remainingMs = now === null ? null : status.expiresAt ? new Date(status.expiresAt).getTime() - now : 0;
+  const remaining = remainingMs === null ? null : Math.max(0, Math.floor(remainingMs / 1000));
+  const countdown = remaining === null
+    ? '--:--'
+    : `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
 
   // Al llegar a cero, reconciliar enseguida (sin esperar el próximo tick): si
   // el pago entró en los últimos segundos, se confirma en vez de mostrar "vencida".
   useEffect(() => {
-    if (status.state !== 'pendiente' || remaining > 0) return;
+    if (status.state !== 'pendiente' || remaining === null || remaining > 0) return;
     let cancelled = false;
     reconcilePaymentAction(token)
       .then((next) => { if (!cancelled) setStatus(next); })
@@ -90,7 +94,7 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
         <p className="mt-4 text-amber-900 text-sm">
           El turno queda reservado para vos durante{' '}
           <span className="font-mono font-semibold tabular-nums" data-testid="countdown">
-            {mm}:{ss}
+            {countdown}
           </span>
         </p>
         {status.amount !== undefined && (

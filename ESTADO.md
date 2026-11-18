@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-15
+Última actualización: 2026-11-18 (Fase 6 cerrada)
 
 ---
 
@@ -94,7 +94,7 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 215 | ✓ verde (2026-11-18, con 018–020 aplicadas) |
+| Unitarios + integración | Vitest | 207 | ✓ verde (2026-11-18, con 018–020 aplicadas) |
 | E2E | Playwright | 65 (incluye el setup de login) | ✓ verde (2026-11-18) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
@@ -112,7 +112,6 @@ Archivos E2E:
 
 Archivos Vitest nuevos (Bloques 3 y 4):
 - `tests/unit/mp-orders.test.ts` — 14 tests del cliente de Orders con `fetch` simulado: `createMpOrder` (cuerpo exacto con `payer.email` / `first_name` / `last_name` e `items[].description` / `category_id`, headers, sin `marketplace_fee`, errores), `getMpOrder` / `isMpOrderPaid` / `mpOrderPaymentId`, `refundMpOrder` (409 `order_already_refunded` = éxito), `cancelMpOrder`.
-- `tests/unit/mp-oauth-test-mode.test.ts` — 8 tests de `MP_OAUTH_TEST_MODE` con `fetch`, Supabase y cifrado simulados: con `"true"` el callback OAuth y el refresh de `token.ts` mandan `test_token: true`; sin la variable, o con `"false"`, `"1"` o `"TRUE"`, no lo mandan; el callback loguea `live_mode` y nunca los tokens.
 - `tests/unit/mp-signature.test.ts` — 11 tests de la firma `x-signature`: manifiesto (minúsculas, partes ausentes), HMAC, firma válida, otra clave, manipulada, header ausente/malformado, ts viejo/futuro, sin `x-request-id`.
 - `tests/integration/payment-flow.test.ts` — 16 tests de `startPaymentAction` (incluye: sin email válido no se crea ni el hold ni la orden), `getPaymentStatusAction` y `cancelHoldAction` contra la base real con `getMpToken`, `createMpOrder`, `cancelMpOrder` y `redirect` simulados (fixture propio, se borra en `afterAll`).
 - `tests/integration/cancellation.test.ts` — 17 tests (Bloque 5): `cancelBookingAction` sin pago (igual que siempre), con pago online (`full` dentro del plazo → devuelve, idempotente; reembolso que falla → cancela igual, `refund_failed`, y `/api/mp/refund-retry` lo completa; `none` → sin devolución; fuera del plazo → sin devolución; turno empezado → no; pagado a mano → nada que devolver), `get_booking_by_token` v2, `cancelBookingPanelAction` del dueño (devuelve todo aunque la política sea `none` y esté fuera del plazo; reembolso que falla → `refund_failed` y el cron lo completa; sin pago online → como siempre; otro dueño → no autorizado), y `updateCancellationPolicyAction` (guarda + audit, valida, rechaza otro dueño y anon). 5 marcados "migración 020". Para probar el cron no se puede "envejecer" la fila de `payments` (el trigger `trg_payments_updated_at` pisa `updated_at` en cada UPDATE): el test adelanta 3 min el reloj de `Date` con `vi.useFakeTimers({ toFake: ["Date"] })`.
@@ -148,11 +147,30 @@ Definida en SPEC §9 y §14.
 
 ---
 
-## Fase 6 — Mercado Pago (EN CURSO)
+## Fase 6 — Mercado Pago — CERRADA (2026-11-18)
 
 Definida en SPEC §7 y §14. Ver plan detallado en `docs/FASE6-PLAN.md`.
 
-**Estado:** Bloques 1 (OAuth), 2 (configuración de cobro), 3 (pago del jugador), 4 (webhook) y 5 (cancelaciones con devolución, incluida la cancelación del dueño) implementados; migraciones 018, 019 y 020 aplicadas y verificadas; Vault configurado. Commiteado y desplegado en Vercel el 2026-11-16. Bloque 6 (sandbox) en curso: el primer intento de pago fue rechazado por el checkout; se agregó `payer.email` (ver "Bloque 6 — primer intento en sandbox").
+**Estado:** Bloques 1 a 6 terminados; migraciones 018, 019 y 020 aplicadas y verificadas; Vault configurado; desplegado en Vercel.
+
+**Cómo se probó (con plata real, 2026-11-18):** complejo `futmates` conectado por OAuth a una cuenta real de MP.
+1. Seña de $100 pagada con dinero en cuenta (orden `ORD01M7R2S6NDBQ5NRBKAT6YHZ0FE`) → reserva confirmada por reconciliación, pago registrado en `payments`, aviso al dueño enviado.
+2. El dueño canceló la reserva desde la agenda → devolución de $100 hecha en MP, pago en `refunded`, aviso enviado.
+
+**Qué aprendimos:**
+- **El `ts` de `x-signature` viene en segundos**, no en milisegundos (ejemplo oficial `ts=1704908010`). Leerlo como ms hacía que todos los avisos se rechazaran con `stale_timestamp`.
+- **El sandbox con una app real + usuarios de prueba no cobra.** El checkout rechaza sin crear ningún pago ("No pudimos procesar tu pago"). Tampoco sirve pedir credenciales de prueba por OAuth con `test_token: true`: MP responde "Test credentials are not supported, use test users with production credentials". Se probó con un `MP_OAUTH_TEST_MODE` que mandaba ese parámetro; se sacó el 2026-11-18 porque no servía. La prueba que valió fue con plata real y montos chicos.
+- **`payer.email` es obligatorio** en las órdenes de Checkout Pro según la referencia de Orders; por eso el formulario pide "Tu email" cuando el pago es online.
+- **Loguear el resultado de la reconciliación** (sin tokens): sin esa línea no había forma de saber si el polling de `/pago` corrió.
+
+**Pendientes para lanzar:**
+- [ ] Nombre y dominio definitivos
+- [ ] Separar la base de pruebas de la de producción
+- [ ] Vercel Pro
+- [ ] Cobro de la suscripción mensual a los dueños ($50.000, 2 meses gratis)
+- [ ] Panel de superadmin para aprobar complejos
+- [ ] Términos y condiciones y política de privacidad
+- [ ] Seguridad: límite de reservas por IP, Sentry, protección de contraseñas filtradas
 
 **App de Mercado Pago:** creada (Checkout Pro, API de Orders, ambiente de prueba/sandbox).
 
@@ -177,7 +195,7 @@ Definida en SPEC §7 y §14. Ver plan detallado en `docs/FASE6-PLAN.md`.
 3. Flujo de pago jugador (create_booking_hold, startPaymentAction, /pago/[token]) — ✅ aprobado (con 3 arreglos aplicados, ver abajo)
 4. Webhook (firma, idempotencia, confirmación, reembolso si no se puede confirmar, outbox, reconciliación desde /pago) — ✅ aprobado (con 2 arreglos aplicados, ver abajo)
 5. Cancelaciones con devolución (política de cancelación, cron de reintentos, cancelación del dueño con devolución total) — ✅ implementado, 020 aplicada
-6. Prueba en sandbox real (webhook configurado en el panel de MP, `payer.email`, `expiration_time`, una devolución real) — 🟡 en curso: OAuth y creación de órdenes OK; el pago fue rechazado en el checkout → se agregó `payer.email` (2026-11-16), falta repetir el pago
+6. Prueba real (webhook configurado en el panel de MP, `payer.email`, `expiration_time`, una devolución real) — ✅ hecha con plata real el 2026-11-18: pago, confirmación, cancelación del dueño y devolución
 
 **Bloque 1 — OAuth (completado 2026-11-14):**
 - Callback route: `/api/mp/oauth/callback`
@@ -288,15 +306,11 @@ Tres errores chicos de la misma prueba, arreglados:
 - b. "Cobro de reservas": después de guardar, el formulario mostraba la seña destildada, "Porcentaje" y el monto vacío aunque lo guardado estuviera bien. Causa: React 19 hace `form.reset()` al terminar una acción pasada por `action=`, y los inputs controlados quedan en el DOM con sus valores por defecto. El form ahora se envía desde `onSubmit` con `startTransition(() => formAction(formData))`, sin reset. Reproducido primero con dos asserts nuevos en `payment-settings.spec.ts` (fallaban) y verificado después (pasan).
 - c. `/registro`: el mensaje ya no dice "(Desarrollo: desactivá email confirmation en Supabase Auth settings.)"; queda "Revisá tu email para confirmar la cuenta."
 
-**Bloque 6 — diagnóstico y modo prueba de OAuth (2026-11-17/18):**
+**Bloque 6 — diagnóstico del sandbox (2026-11-17/18):**
 
-Con las `MP_*` ya en `.env.local` corrió el diagnóstico sobre las tres órdenes de `futmates` (`ORDTST01M7MYEKMFA0ECMH8QZJFPW0H7` del 17/11, ya con `payer.email`, y las dos del 16/11): las tres `canceled` / `expired`, $1.000 ARS, **sin ningún pago**. El checkout rechazó antes de crear un intento de pago. El cuerpo de la orden está completo; `payer.email` no era la causa. El vendedor es usuario de prueba (MLA), pero la aplicación que creó la orden (`MP_CLIENT_ID`) no es suya: es de la cuenta real. La conexión OAuth entregaba credenciales productivas de un usuario de prueba.
+Con las `MP_*` ya en `.env.local` corrió el diagnóstico sobre las tres órdenes de `futmates` (`ORDTST01M7MYEKMFA0ECMH8QZJFPW0H7` del 17/11, ya con `payer.email`, y las dos del 16/11): las tres `canceled` / `expired`, $1.000 ARS, **sin ningún pago**. El checkout rechazó antes de crear un intento de pago. El cuerpo de la orden está completo; `payer.email` no era la causa. El vendedor era usuario de prueba, pero la aplicación que creó la orden (`MP_CLIENT_ID`) es de la cuenta real.
 
-Arreglo: la referencia de `POST /oauth/token` tiene `test_token` ("Added with value = true only when you want to generate credentials for testing").
-- Variable `MP_OAUTH_TEST_MODE`. Solo con el valor exacto `"true"` se manda `test_token: true` en el intercambio `authorization_code` del callback y en el `refresh_token` de `token.ts`. Sin la variable, o con otro valor, no se manda: es el comportamiento anterior.
-- El callback loguea solo `live_mode` de la respuesta (`[mp/callback] live_mode: false` = conexión en modo prueba). Nunca los tokens.
-- Para la prueba: cargar `MP_OAUTH_TEST_MODE=true` en Vercel (Production), redeployar, desconectar y reconectar MP en `futmates`, y mirar el log `live_mode` en Vercel.
-- **En producción real va sin esa variable.** Al sacarla, cada dueño conectado en modo prueba tiene que desconectar y reconectar MP: sus tokens son de prueba y el refresh ya no los convierte.
+Se intentó pedir credenciales de prueba por OAuth (`test_token: true`, detrás de una variable `MP_OAUTH_TEST_MODE`). MP lo rechazó: "Test credentials are not supported, use test users with production credentials". El código se sacó el 2026-11-18 (sin código muerto) y la prueba se hizo con plata real.
 
 **Bloque 6 — primer pago real (2026-11-18):**
 
@@ -370,7 +384,6 @@ Pendiente para los bloques siguientes:
 | `MP_STATE_SECRET` | Production — cargada |
 | `MP_TOKEN_ENCRYPTION_KEY` | Production (32 bytes hex) — cargada; con ella se conectó `futmates` en sandbox |
 | `MP_WEBHOOK_SECRET` | Production — cargada |
-| `MP_OAUTH_TEST_MODE` | Solo para el sandbox: `true`. **No cargada todavía** (2026-11-18). En producción real no se define y los dueños reconectan |
 
 Las seis `MP_*` están en Production desde el 2026-11-16 (verificado por la lista de variables de Vercel; los valores no se leen). En `.env.local` siguen sin estar: localmente todo corre con mocks, y para correr el script de diagnóstico de órdenes hay que copiar `MP_TOKEN_ENCRYPTION_KEY` (la misma de Vercel) a `.env.local`. `.env.example` quedó alineado con los nombres que lee el código.
 

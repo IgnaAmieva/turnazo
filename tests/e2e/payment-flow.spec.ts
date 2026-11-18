@@ -336,6 +336,11 @@ test.describe("pantalla de vuelta /pago/[token]", () => {
     // Un lunes a las 17:00 Mendoza
     const token = await insertHold(request, "E2E Pago Hold", FECHA, 17, 0, 10 * 60 * 1000);
 
+    // La cuenta regresiva se calcula solo en el navegador: sin error de hidratación.
+    const hydration: string[] = [];
+    page.on("pageerror", (err) => { if (/hydrat/i.test(err.message)) hydration.push(err.message); });
+    page.on("console", (msg) => { if (msg.type() === "error" && /hydrat/i.test(msg.text())) hydration.push(msg.text()); });
+
     // Parámetros de MP en la URL: se ignoran por completo
     await page.goto(`/pago/${token}?status=approved&collection_status=approved`);
     await page.waitForLoadState("networkidle");
@@ -347,6 +352,7 @@ test.describe("pantalla de vuelta /pago/[token]", () => {
     // La cuenta regresiva avanza
     const first = await page.getByTestId("countdown").textContent();
     await expect(page.getByTestId("countdown")).not.toHaveText(first!, { timeout: 5_000 });
+    expect(hydration).toEqual([]);
 
     // "Webhook": confirma la reserva en la base. La pantalla reconcilia cada 15 s.
     await updateBooking(request, token, { status: "confirmed", payment_status: "deposit_paid", amount_paid: 2500 });
