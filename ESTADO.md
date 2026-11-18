@@ -94,8 +94,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 201 | ✓ verde (2026-11-16, con 018–020 aplicadas) |
-| E2E | Playwright | 65 (incluye el setup de login) | ✓ verde (2026-11-16) |
+| Unitarios + integración | Vitest | 209 | ✓ verde (2026-11-18, con 018–020 aplicadas) |
+| E2E | Playwright | 65 (incluye el setup de login) | ✓ verde (2026-11-18) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -112,6 +112,7 @@ Archivos E2E:
 
 Archivos Vitest nuevos (Bloques 3 y 4):
 - `tests/unit/mp-orders.test.ts` — 14 tests del cliente de Orders con `fetch` simulado: `createMpOrder` (cuerpo exacto con `payer.email` / `first_name` / `last_name` e `items[].description` / `category_id`, headers, sin `marketplace_fee`, errores), `getMpOrder` / `isMpOrderPaid` / `mpOrderPaymentId`, `refundMpOrder` (409 `order_already_refunded` = éxito), `cancelMpOrder`.
+- `tests/unit/mp-oauth-test-mode.test.ts` — 8 tests de `MP_OAUTH_TEST_MODE` con `fetch`, Supabase y cifrado simulados: con `"true"` el callback OAuth y el refresh de `token.ts` mandan `test_token: true`; sin la variable, o con `"false"`, `"1"` o `"TRUE"`, no lo mandan; el callback loguea `live_mode` y nunca los tokens.
 - `tests/unit/mp-signature.test.ts` — 11 tests de la firma `x-signature`: manifiesto (minúsculas, partes ausentes), HMAC, firma válida, otra clave, manipulada, header ausente/malformado, ts viejo/futuro, sin `x-request-id`.
 - `tests/integration/payment-flow.test.ts` — 16 tests de `startPaymentAction` (incluye: sin email válido no se crea ni el hold ni la orden), `getPaymentStatusAction` y `cancelHoldAction` contra la base real con `getMpToken`, `createMpOrder`, `cancelMpOrder` y `redirect` simulados (fixture propio, se borra en `afterAll`).
 - `tests/integration/cancellation.test.ts` — 17 tests (Bloque 5): `cancelBookingAction` sin pago (igual que siempre), con pago online (`full` dentro del plazo → devuelve, idempotente; reembolso que falla → cancela igual, `refund_failed`, y `/api/mp/refund-retry` lo completa; `none` → sin devolución; fuera del plazo → sin devolución; turno empezado → no; pagado a mano → nada que devolver), `get_booking_by_token` v2, `cancelBookingPanelAction` del dueño (devuelve todo aunque la política sea `none` y esté fuera del plazo; reembolso que falla → `refund_failed` y el cron lo completa; sin pago online → como siempre; otro dueño → no autorizado), y `updateCancellationPolicyAction` (guarda + audit, valida, rechaza otro dueño y anon). 5 marcados "migración 020". Para probar el cron no se puede "envejecer" la fila de `payments` (el trigger `trg_payments_updated_at` pisa `updated_at` en cada UPDATE): el test adelanta 3 min el reloj de `Date` con `vi.useFakeTimers({ toFake: ["Date"] })`.
@@ -287,6 +288,16 @@ Tres errores chicos de la misma prueba, arreglados:
 - b. "Cobro de reservas": después de guardar, el formulario mostraba la seña destildada, "Porcentaje" y el monto vacío aunque lo guardado estuviera bien. Causa: React 19 hace `form.reset()` al terminar una acción pasada por `action=`, y los inputs controlados quedan en el DOM con sus valores por defecto. El form ahora se envía desde `onSubmit` con `startTransition(() => formAction(formData))`, sin reset. Reproducido primero con dos asserts nuevos en `payment-settings.spec.ts` (fallaban) y verificado después (pasan).
 - c. `/registro`: el mensaje ya no dice "(Desarrollo: desactivá email confirmation en Supabase Auth settings.)"; queda "Revisá tu email para confirmar la cuenta."
 
+**Bloque 6 — diagnóstico y modo prueba de OAuth (2026-11-17/18):**
+
+Con las `MP_*` ya en `.env.local` corrió el diagnóstico sobre las tres órdenes de `futmates` (`ORDTST01M7MYEKMFA0ECMH8QZJFPW0H7` del 17/11, ya con `payer.email`, y las dos del 16/11): las tres `canceled` / `expired`, $1.000 ARS, **sin ningún pago**. El checkout rechazó antes de crear un intento de pago. El cuerpo de la orden está completo; `payer.email` no era la causa. El vendedor es usuario de prueba (MLA), pero la aplicación que creó la orden (`MP_CLIENT_ID`) no es suya: es de la cuenta real. La conexión OAuth entregaba credenciales productivas de un usuario de prueba.
+
+Arreglo: la referencia de `POST /oauth/token` tiene `test_token` ("Added with value = true only when you want to generate credentials for testing").
+- Variable `MP_OAUTH_TEST_MODE`. Solo con el valor exacto `"true"` se manda `test_token: true` en el intercambio `authorization_code` del callback y en el `refresh_token` de `token.ts`. Sin la variable, o con otro valor, no se manda: es el comportamiento anterior.
+- El callback loguea solo `live_mode` de la respuesta (`[mp/callback] live_mode: false` = conexión en modo prueba). Nunca los tokens.
+- Para la prueba: cargar `MP_OAUTH_TEST_MODE=true` en Vercel (Production), redeployar, desconectar y reconectar MP en `futmates`, y mirar el log `live_mode` en Vercel.
+- **En producción real va sin esa variable.** Al sacarla, cada dueño conectado en modo prueba tiene que desconectar y reconectar MP: sus tokens son de prueba y el refresh ya no los convierte.
+
 ---
 
 **Bloque 5 — Cancelación del jugador con devolución (2026-11-15, pendiente de revisión):**
@@ -348,6 +359,7 @@ Pendiente para los bloques siguientes:
 | `MP_STATE_SECRET` | Production — cargada |
 | `MP_TOKEN_ENCRYPTION_KEY` | Production (32 bytes hex) — cargada; con ella se conectó `futmates` en sandbox |
 | `MP_WEBHOOK_SECRET` | Production — cargada |
+| `MP_OAUTH_TEST_MODE` | Solo para el sandbox: `true`. **No cargada todavía** (2026-11-18). En producción real no se define y los dueños reconectan |
 
 Las seis `MP_*` están en Production desde el 2026-11-16 (verificado por la lista de variables de Vercel; los valores no se leen). En `.env.local` siguen sin estar: localmente todo corre con mocks, y para correr el script de diagnóstico de órdenes hay que copiar `MP_TOKEN_ENCRYPTION_KEY` (la misma de Vercel) a `.env.local`. `.env.example` quedó alineado con los nombres que lee el código.
 
