@@ -250,9 +250,9 @@ type ReqOpts = {
   signature?: string | null;
 };
 
-/** Request firmado como lo manda Mercado Pago. */
+/** Request firmado como lo manda Mercado Pago: ts en segundos (formato real). */
 function webhookRequest(orderId: string, opts: ReqOpts = {}) {
-  const ts = opts.ts ?? Date.now();
+  const ts = opts.ts ?? Math.floor(Date.now() / 1000);
   const requestId = opts.requestId === undefined ? `req-${RUN}-${randomBytes(4).toString("hex")}` : opts.requestId;
   const eventId = opts.eventId === undefined ? `evt-${RUN}-${randomBytes(4).toString("hex")}` : opts.eventId;
   if (eventId) eventIds.push(eventId);
@@ -311,14 +311,22 @@ describe("POST /api/mp/webhook — firma", () => {
 
   it("ts muy viejo → 401 aunque la firma sea correcta", async () => {
     const b = await insertBooking({ slot: slotAt08(2) });
-    const { status } = await post(b.orderId!, { ts: Date.now() - 10 * 60 * 1000 });
+    const { status } = await post(b.orderId!, { ts: Math.floor(Date.now() / 1000) - 10 * 60 });
     expect(status).toBe(401);
     expect(getMpOrderMock).not.toHaveBeenCalled();
   });
 
+  it("ts en milisegundos dentro de la tolerancia sigue aceptado", async () => {
+    const b = await insertBooking({ slot: slotAt08(2) });
+    getMpOrderMock.mockResolvedValue({ ok: true, order: mpOrder(b.orderId!, b.id) });
+    const { status } = await post(b.orderId!, { ts: Date.now() });
+    expect(status).toBe(200);
+    expect((await getBooking(b.id)).status).toBe("confirmed");
+  });
+
   it("firma válida con data.id manipulado en la query → 401", async () => {
     const b = await insertBooking({ slot: slotAt08(2) });
-    const ts = Date.now();
+    const ts = Math.floor(Date.now() / 1000);
     const requestId = `req-${RUN}-tamper`;
     // Firma sobre OTRA orden
     const manifest = buildMpManifest({ dataId: "ORD-OTRA", requestId, ts: String(ts) });
@@ -514,6 +522,47 @@ describe("POST /api/mp/webhook — confirmación (migración 019)", () => {
     // Ya confirmada: no vuelve a consultar MP
     expect((await reconcilePaymentAction(b.token)).state).toBe("confirmada");
     expect(getMpOrderMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconcilePaymentAction con la forma exacta de una orden real pagada con dinero en cuenta", async () => {
+    const b = await insertBooking({ slot: slotAt08(18), deposit: 100 });
+    // Copia de GET /v1/orders/ORD01M7R2S6NDBQ5NRBKAT6YHZ0FE (2026-11-18), con ids propios del test.
+    getMpOrderMock.mockResolvedValue({ ok: true, order: {
+      id: b.orderId, type: "online", processing_mode: "manual",
+      external_reference: b.id,
+      total_amount: "100.00", total_paid_amount: "100.00",
+      status: "processed", status_detail: "accredited",
+      capture_mode: "automatic_async", currency: "ARS", country_code: "ARG",
+      transactions: { payments: [{
+        id: `PAY-${b.orderId}`, amount: "100", paid_amount: "100", taxes_amount: "0",
+        reference_id: "190377045688", status: "processed", status_detail: "accredited", attempt_number: 1,
+        payment_method: { id: "account_money", issuer_id: "2005", type: "account_money", installments: 1 },
+      }] },
+    } });
+
+    expect((await reconcilePaymentAction(b.token)).state).toBe("confirmada");
+    const row = await getBooking(b.id);
+    expect(row.status).toBe("confirmed");
+    expect(row.payment_status).toBe("deposit_paid");
+    expect(Number(row.amount_paid)).toBe(100);
+    expect(await paymentsOf(b.id)).toHaveLength(1);
+  });
+
+  it("reconcilePaymentAction con el hold ya vencido ('expired') y el horario libre: confirma", async () => {
+    const b = await insertBooking({ slot: slotAt08(19), status: "expired" });
+    getMpOrderMock.mockResolvedValue({ ok: true, order: mpOrder(b.orderId!, b.id) });
+
+    expect((await reconcilePaymentAction(b.token)).state).toBe("confirmada");
+    expect(getMpOrderMock).toHaveBeenCalledTimes(1);
+    expect((await getBooking(b.id)).status).toBe("confirmed");
+    expect(refundMpOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("reconcilePaymentAction no consulta MP con la reserva cancelada", async () => {
+    const b = await insertBooking({ slot: slotAt08(20), status: "cancelled" });
+    getMpOrderMock.mockResolvedValue({ ok: true, order: mpOrder(b.orderId!, b.id) });
+    expect((await reconcilePaymentAction(b.token)).state).toBe("cancelada");
+    expect(getMpOrderMock).not.toHaveBeenCalled();
   });
 });
 

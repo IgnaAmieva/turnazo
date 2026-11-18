@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { cancelHoldAction, getPaymentStatusAction, reconcilePaymentAction } from '@/app/actions/payment';
+import { cancelHoldAction, reconcilePaymentAction } from '@/app/actions/payment';
 import type { PaymentStatus } from '@/lib/payment-status';
 
 /**
@@ -51,11 +51,12 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
   const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
   const ss = String(remaining % 60).padStart(2, '0');
 
-  // Al llegar a cero, consultar el estado enseguida (sin esperar el próximo tick).
+  // Al llegar a cero, reconciliar enseguida (sin esperar el próximo tick): si
+  // el pago entró en los últimos segundos, se confirma en vez de mostrar "vencida".
   useEffect(() => {
     if (status.state !== 'pendiente' || remaining > 0) return;
     let cancelled = false;
-    getPaymentStatusAction(token)
+    reconcilePaymentAction(token)
       .then((next) => { if (!cancelled) setStatus(next); })
       .catch(() => {});
     return () => { cancelled = true; };

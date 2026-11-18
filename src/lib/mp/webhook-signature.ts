@@ -1,15 +1,18 @@
 /**
  * Verificación de la firma de los webhooks de Mercado Pago.
  *
- * Documentación oficial (2026-11-15):
- *   - Header `x-signature`: "ts=<ms>,v1=<hmac hex>".
+ * Documentación oficial (2026-11-15; formato de ts revisado el 2026-11-18):
+ *   - Header `x-signature`: "ts=<epoch>,v1=<hmac hex>". El ejemplo oficial es
+ *     "ts=1704908010,v1=…" (10 dígitos = segundos), y los avisos reales que
+ *     llegaron a producción el 2026-11-18 también traían segundos.
  *   - Manifiesto: "id:[data.id];request-id:[x-request-id];ts:[ts];"
  *     · data.id (query string) en minúsculas si es alfanumérico.
  *     · Las partes ausentes (data.id, x-request-id) se omiten del manifiesto.
  *   - HMAC-SHA256 del manifiesto con la clave secreta de la app, en hexadecimal,
  *     comparado con v1.
- *   - ts es el timestamp de la notificación en milisegundos; se recomienda
- *     aplicar una tolerancia respecto al momento de recepción.
+ *   - ts es el timestamp de la notificación. Se acepta en segundos (ts < 1e12,
+ *     el formato real) o en milisegundos, y se compara contra el reloj con una
+ *     tolerancia de 5 minutos. En el manifiesto va siempre tal como llegó.
  */
 import { createHmac, timingSafeEqual } from "crypto";
 
@@ -56,7 +59,9 @@ export function verifyMpSignature(input: {
     return { ok: false, reason: "malformed_header" };
   }
 
-  const tsMs = Number(ts);
+  const tsRaw = Number(ts);
+  // Menos de 1e12 = segundos (1e12 ms es septiembre de 2001).
+  const tsMs = tsRaw < 1e12 ? tsRaw * 1000 : tsRaw;
   const now = input.nowMs ?? Date.now();
   const tolerance = input.toleranceMs ?? DEFAULT_TS_TOLERANCE_MS;
   if (!Number.isFinite(tsMs) || Math.abs(now - tsMs) > tolerance) {

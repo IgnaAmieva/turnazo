@@ -94,7 +94,7 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 209 | ✓ verde (2026-11-18, con 018–020 aplicadas) |
+| Unitarios + integración | Vitest | 215 | ✓ verde (2026-11-18, con 018–020 aplicadas) |
 | E2E | Playwright | 65 (incluye el setup de login) | ✓ verde (2026-11-18) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
@@ -297,6 +297,17 @@ Arreglo: la referencia de `POST /oauth/token` tiene `test_token` ("Added with va
 - El callback loguea solo `live_mode` de la respuesta (`[mp/callback] live_mode: false` = conexión en modo prueba). Nunca los tokens.
 - Para la prueba: cargar `MP_OAUTH_TEST_MODE=true` en Vercel (Production), redeployar, desconectar y reconectar MP en `futmates`, y mirar el log `live_mode` en Vercel.
 - **En producción real va sin esa variable.** Al sacarla, cada dueño conectado en modo prueba tiene que desconectar y reconectar MP: sus tokens son de prueba y el refresh ya no los convierte.
+
+**Bloque 6 — primer pago real (2026-11-18):**
+
+Pago real aprobado en MP: orden `ORD01M7R2S6NDBQ5NRBKAT6YHZ0FE`, $100 con dinero en cuenta, operación 190377045688, vendedor real `1056941618` conectado a `futmates`. La reserva `a160a375-…` no se confirmó y quedó `expired` a las 19:50 UTC. Diagnóstico con `mp-diag`: orden `processed` / `accredited`, `total_paid_amount` 100.00, un pago `processed` / `accredited` con `account_money`. `isMpOrderPaid` y las verificaciones de `processMpOrder` (moneda, monto, `external_reference`, id de pago) dan bien contra esa orden.
+
+1. **Webhook:** los seis avisos de MP fueron rechazados con `stale_timestamp`. El `ts` de `x-signature` viene en **segundos** (ejemplo oficial `ts=1704908010`; los avisos reales también), y se comparaba como milisegundos. Ahora `ts < 1e12` se toma como segundos; la tolerancia sigue en 5 minutos y el manifiesto usa el `ts` tal como llega. Tests con el `ts` real en segundos; el test de integración del webhook firma en segundos por defecto.
+2. **Reconciliación desde `/pago`:** el polling llama a `reconcilePaymentAction` cada 15 s y eso llama a `processMpOrder`; con la forma exacta de la orden real confirma (test nuevo). En los logs de Vercel no hay ninguna línea de reconciliación entre 19:40 y 19:51, pero tampoco podía haberla: no se logueaba nada cuando salía bien o daba "no pagada". No hay pruebas de que haya corrido después de las 19:40:37 con la reserva en `hold`. Cambios:
+   - `reconcilePaymentAction` loguea `[pago] reconcile <booking> <orden> <outcome>` (sin tokens) en cada llamada.
+   - También reconcilia con la reserva `expired`: `confirm_order_payment` (019) la confirma si el horario sigue libre, o devuelve la plata si no.
+   - Al llegar la cuenta regresiva a cero, la pantalla llama a `reconcilePaymentAction` en lugar de solo leer la base.
+3. Después del deploy se corre una vez `processMpOrder("ORD01M7R2S6NDBQ5NRBKAT6YHZ0FE", "reconcile")` para confirmar esa reserva por el camino normal.
 
 ---
 

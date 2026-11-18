@@ -114,6 +114,35 @@ describe("verifyMpSignature", () => {
     }).ok).toBe(true);
   });
 
+  it("acepta ts en segundos, el formato real de MP, con la misma tolerancia de 5 min", () => {
+    // Aviso real del 2026-11-18: x-request-id de Vercel 1795030839785 ms → ts=1795030839 s.
+    const nowMs = 1_795_030_839_785;
+    const tsSec = "1795030839";
+    const xSignature = sign({ dataId: "ORD01M7R2S6NDBQ5NRBKAT6YHZ0FE", requestId: "req-real", ts: tsSec });
+    const base = { xSignature, xRequestId: "req-real", dataId: "ORD01M7R2S6NDBQ5NRBKAT6YHZ0FE", secret: SECRET };
+
+    expect(verifyMpSignature({ ...base, nowMs })).toEqual({ ok: true, ts: 1_795_030_839_000 });
+    // 4 min después: dentro de la tolerancia
+    expect(verifyMpSignature({ ...base, nowMs: nowMs + 4 * 60 * 1000 }).ok).toBe(true);
+    // 6 min antes o después: fuera
+    expect(verifyMpSignature({ ...base, nowMs: nowMs + 6 * 60 * 1000 })).toEqual({ ok: false, reason: "stale_timestamp" });
+    expect(verifyMpSignature({ ...base, nowMs: nowMs - 6 * 60 * 1000 })).toEqual({ ok: false, reason: "stale_timestamp" });
+    // El ejemplo de la documentación oficial (enero de 2024), firmado y verificado en su momento
+    const docTs = "1704908010";
+    expect(verifyMpSignature({
+      xSignature: sign({ dataId: "a", requestId: "r", ts: docTs }),
+      xRequestId: "r", dataId: "a", secret: SECRET, nowMs: 1_704_908_010_000 + 30_000,
+    }).ok).toBe(true);
+  });
+
+  it("una firma en segundos con el secreto equivocado sigue rechazada", () => {
+    const tsSec = String(Math.floor(NOW / 1000));
+    expect(verifyMpSignature({
+      xSignature: sign({ dataId: "a", requestId: "r", ts: tsSec }, "otra-clave"),
+      xRequestId: "r", dataId: "a", secret: SECRET, nowMs: NOW,
+    })).toEqual({ ok: false, reason: "bad_signature" });
+  });
+
   it("verifica igual cuando falta x-request-id (manifiesto sin esa parte)", () => {
     const res = verifyMpSignature({
       xSignature: sign({ dataId: "ORD1", ts }),

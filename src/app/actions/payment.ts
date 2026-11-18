@@ -190,6 +190,9 @@ export async function getPaymentStatusAction(token: string): Promise<PaymentStat
  * Cada ~15 s, mientras el pago está pendiente, usa la misma lógica del webhook
  * (processMpOrder) para consultar la orden en Mercado Pago y confirmar la
  * reserva si ya se pagó. Cubre el caso en que el webhook se demora o no llega.
+ * También corre con la reserva ya 'expired': si el jugador pagó justo antes de
+ * que venciera el hold, confirm_order_payment (019) la confirma si el horario
+ * sigue libre, y si no devuelve la plata.
  * Siempre devuelve el estado real de la reserva en la base.
  */
 export async function reconcilePaymentAction(token: string): Promise<PaymentStatus> {
@@ -202,9 +205,12 @@ export async function reconcilePaymentAction(token: string): Promise<PaymentStat
     .eq('cancel_token', token)
     .maybeSingle();
 
-  if (booking && booking.status === 'hold' && booking.mp_order_id) {
+  if (booking && (booking.status === 'hold' || booking.status === 'expired') && booking.mp_order_id) {
     try {
-      await processMpOrder(booking.mp_order_id, 'reconcile');
+      const result = await processMpOrder(booking.mp_order_id, 'reconcile');
+      // Solo ids y el resultado: deja rastro en los logs de que el polling corrió.
+      console.info('[pago] reconcile', booking.id, booking.mp_order_id, result.outcome,
+        result.outcome === 'not_paid' ? result.orderStatus : '');
     } catch (err) {
       console.error('[pago] reconcile failed', booking.id, err instanceof Error ? err.message : err);
     }
