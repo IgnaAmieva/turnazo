@@ -66,9 +66,11 @@ export async function createBookingAction(
 
   const data = parsed.data;
 
-  const supabase = await createClient();
+  // create_booking solo lo ejecuta service_role (migración 021): reservar
+  // pasa siempre por acá, donde van el captcha y el límite por IP (S2).
+  const admin = createAdminClient();
 
-  const { data: result, error: rpcError } = await supabase.rpc('create_booking', {
+  const { data: result, error: rpcError } = await admin.rpc('create_booking', {
     p_court_id:       data.court_id,
     p_venue_id:       data.venue_id,
     p_start:          data.start,
@@ -78,6 +80,7 @@ export async function createBookingAction(
   });
 
   if (rpcError) {
+    console.error('[reserva] create_booking:', rpcError.code, rpcError.message);
     return { error: 'Ocurrió un error al procesar la reserva. Intentá de nuevo.' };
   }
 
@@ -126,6 +129,7 @@ export async function cancelBookingAction(
   });
 
   if (rpcError) {
+    console.error('[reserva] cancel_booking_by_token:', rpcError.code, rpcError.message);
     return { error: 'Ocurrió un error al cancelar el turno. Intentá de nuevo.' };
   }
 

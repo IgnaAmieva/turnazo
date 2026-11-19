@@ -14,6 +14,7 @@ import {
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
   getOwnerToken,
+  serviceHeaders,
   unblockTestPhones,
 } from "./helpers";
 
@@ -54,20 +55,13 @@ async function getTemplate(request: import("@playwright/test").APIRequestContext
   return body.whatsapp_template ?? null;
 }
 
-/** Block a phone directly via REST for setup. */
+/** Block a phone directly via REST for setup (service_role). */
 async function blockPhone(
   request: import("@playwright/test").APIRequestContext,
   phone: string,
 ): Promise<void> {
-  const token = await getOwnerToken(request);
-  if (!token) return;
   await request.post(`${SUPABASE_URL}/rest/v1/blocked_phones`, {
-    headers: {
-      apikey:          SUPABASE_ANON_KEY,
-      Authorization:   `Bearer ${token}`,
-      "Content-Type":  "application/json",
-      Prefer:          "resolution=merge-duplicates",
-    },
+    headers: { ...serviceHeaders(), Prefer: "resolution=merge-duplicates" },
     data: { venue_id: VENUE_ID, phone },
   });
 }

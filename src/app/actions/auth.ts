@@ -67,11 +67,9 @@ export async function registerAction(
   });
 
   if (error) {
-    return {
-      error: error.message.includes('already registered')
-        ? 'Ya existe una cuenta con ese email.'
-        : `Error al registrarse: ${error.message}`,
-    };
+    // Mismo mensaje exista o no la cuenta: no revela qué emails están registrados.
+    console.error('[auth] signUp failed:', error.code ?? '', error.status ?? '');
+    return { error: 'No se pudo completar el registro. Si ya tenés cuenta, ingresá con tu email.' };
   }
 
   if (!data.session) {

@@ -191,8 +191,10 @@ describe('anon — disponibilidad y reservas', () => {
     expect(Array.isArray(data)).toBe(true);
   });
 
-  it('puede crear un turno via RPC create_booking', async () => {
-    const { data, error } = await anon.rpc('create_booking', {
+  it('el servidor (service_role) crea un turno via RPC create_booking', async () => {
+    // Desde la migración 021 anon no ejecuta create_booking (ver security-s1.test.ts):
+    // la reserva pasa por la server action, que usa service_role.
+    const { data, error } = await admin.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          slotStart,
@@ -207,26 +209,22 @@ describe('anon — disponibilidad y reservas', () => {
     expect(data.price_total).toBe(5000);
   });
 
-  it('no puede leer bookings directamente (sin policy pública)', async () => {
-    const { data, error } = await anon.from('bookings').select('id');
-
-    // RLS no tiene política pública para bookings; devuelve array vacío, no error 42501
-    expect(error).toBeNull();
-    expect(data).toHaveLength(0);
+  it('no puede leer bookings directamente', async () => {
+    // Sin grant (021): 42501. Antes, RLS devolvía []. En ningún caso hay datos.
+    const { data } = await anon.from('bookings').select('id');
+    expect(data ?? []).toHaveLength(0);
   });
 });
 
 describe('anon — no puede acceder a datos privados', () => {
   it('no puede leer audit_log', async () => {
-    const { data, error } = await anon.from('audit_log').select('id');
-    expect(error).toBeNull();
-    expect(data).toHaveLength(0);
+    const { data } = await anon.from('audit_log').select('id');
+    expect(data ?? []).toHaveLength(0);
   });
 
   it('no puede leer profiles', async () => {
-    const { data, error } = await anon.from('profiles').select('id, role');
-    expect(error).toBeNull();
-    expect(data).toHaveLength(0);
+    const { data } = await anon.from('profiles').select('id, role');
+    expect(data ?? []).toHaveLength(0);
   });
 
   it('no puede insertar en venues directamente', async () => {

@@ -56,7 +56,10 @@ export async function disconnectMpAction(
     .in("payment_status", ["deposit_paid", "paid"])
     .order("period", { ascending: false });
 
-  if (paidError) return { error: "Error al verificar pagos activos: " + paidError.message };
+  if (paidError) {
+    console.error("[mp] paid bookings lookup failed:", paidError.code ?? "", paidError.message);
+    return { error: "No se pudo verificar si hay pagos activos. Intentá de nuevo." };
+  }
 
   const nowMs = Date.now();
   const hasFuturePaid = (paidBookings ?? []).some((b) => {
@@ -84,7 +87,10 @@ export async function disconnectMpAction(
     })
     .eq("id", venueId);
 
-  if (resetError) return { error: "Error al desconectar: " + resetError.message };
+  if (resetError) {
+    console.error("[mp] venue reset failed on disconnect:", resetError.code ?? "", resetError.message);
+    return { error: "No se pudo desconectar Mercado Pago. Intentá de nuevo." };
+  }
 
   // Delete mp_accounts row.
   // MP does NOT have a grant_type "revoke" at /oauth/token: the official way
@@ -94,7 +100,10 @@ export async function disconnectMpAction(
     .delete()
     .eq("venue_id", venueId);
 
-  if (delError) return { error: "Error al desconectar: " + delError.message };
+  if (delError) {
+    console.error("[mp] mp_accounts delete failed on disconnect:", delError.code ?? "", delError.message);
+    return { error: "No se pudo desconectar Mercado Pago. Intentá de nuevo." };
+  }
 
   // Audit log (best-effort — the disconnect already succeeded)
   const { error: auditErr } = await admin.from("audit_log").insert({

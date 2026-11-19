@@ -1,4 +1,8 @@
+import path from "path";
 import { Page } from "@playwright/test";
+
+// Secretos de los tests (nunca en el repo): .env.local
+process.loadEnvFile(path.join(__dirname, "../../.env.local"));
 
 /** Collect page-level JS errors (uncaught exceptions / server component errors rendered to page) */
 export function collectPageErrors(page: Page): string[] {
@@ -45,11 +49,30 @@ export const SPORT      = "padel";
 export const VENUE_PATH = `/${LOCALITY}/${SPORT}/${VENUE_ID}`;
 
 export const OWNER_EMAIL    = "dueno@turnazo.test";
-export const OWNER_PASSWORD = "TurnazoPrueba1!";
+/** Contraseña del dueño de prueba: E2E_OWNER_PASSWORD en .env.local. */
+export const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD ?? "";
+if (!OWNER_PASSWORD) throw new Error("Falta E2E_OWNER_PASSWORD en .env.local");
 
 // Supabase public constants (safe to store here — these are NEXT_PUBLIC_ values)
 export const SUPABASE_URL      = "https://mysomysshywixbaamuyw.supabase.co";
 export const SUPABASE_ANON_KEY = "sb_publishable_UgVj5Rp4lyPko1Hi1e8Hbg_N_wfHBxY";
+
+/**
+ * service_role para preparar y limpiar datos de prueba. Desde la migración
+ * 021 ni anon ni el dueño escriben directo en bookings / notification_outbox
+ * ni leen audit_log.
+ */
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+export function serviceHeaders(): Record<string, string> {
+  if (!SERVICE_KEY) throw new Error("Falta SUPABASE_SERVICE_ROLE_KEY en .env.local");
+  return {
+    apikey:         SERVICE_KEY,
+    Authorization:  `Bearer ${SERVICE_KEY}`,
+    "Content-Type": "application/json",
+    // Supabase rechaza las claves secretas con User-Agent de navegador.
+    "User-Agent":   "turnazo-e2e",
+  };
+}
 
 /**
  * Login to Supabase via the REST API and return an access token.
@@ -70,21 +93,14 @@ export async function getOwnerToken(request: import("@playwright/test").APIReque
 }
 
 /**
- * Delete test bookings by customer_name pattern(s).
- * Uses the owner token — the owner has ALL on bookings for their venue.
+ * Delete test bookings by customer_name pattern(s), only on the fixture venue.
+ * Uses service_role (the owner has no DELETE on bookings since migration 021).
  */
 export async function deleteTestBookings(
   request: import("@playwright/test").APIRequestContext,
   patterns: string[] = ["E2E block*", "Audit Test*", "Test E2E"],
 ): Promise<void> {
-  const token = await getOwnerToken(request);
-  if (!token) return;
-  const headers = {
-    apikey:        SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-    Prefer:        "return=minimal",
-  };
+  const headers = { ...serviceHeaders(), Prefer: "return=minimal" };
   for (const pattern of patterns) {
     const op   = pattern.includes("*") ? "like" : "eq";
     const encoded = encodeURIComponent(pattern.replace(/\*/g, "*"));
@@ -96,43 +112,26 @@ export async function deleteTestBookings(
 }
 
 /**
- * Delete notification_outbox rows for the fixture venue.
- * Uses the owner token — requires the notif_outbox_owner_delete policy (migration 016).
+ * Delete notification_outbox rows for the fixture venue (service_role).
  * Call in afterAll alongside deleteTestBookings to keep the table clean.
  */
 export async function deleteTestOutboxRows(
   request: import("@playwright/test").APIRequestContext,
 ): Promise<void> {
-  const token = await getOwnerToken(request);
-  if (!token) return;
   await request.delete(
     `${SUPABASE_URL}/rest/v1/notification_outbox?venue_id=eq.${VENUE_ID}`,
-    {
-      headers: {
-        apikey:        SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Prefer:        "return=minimal",
-      },
-    }
+    { headers: { ...serviceHeaders(), Prefer: "return=minimal" } }
   );
 }
 
 /**
- * Delete blocked_phones entries for the given phones.
+ * Delete blocked_phones entries for the given phones (fixture venue, service_role).
  */
 export async function unblockTestPhones(
   request: import("@playwright/test").APIRequestContext,
   phones: string[],
 ): Promise<void> {
-  const token = await getOwnerToken(request);
-  if (!token) return;
-  const headers = {
-    apikey:        SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-    Prefer:        "return=minimal",
-  };
+  const headers = { ...serviceHeaders(), Prefer: "return=minimal" };
   for (const phone of phones) {
     await request.delete(
       `${SUPABASE_URL}/rest/v1/blocked_phones?venue_id=eq.${VENUE_ID}&phone=eq.${phone}`,
@@ -142,7 +141,8 @@ export async function unblockTestPhones(
 }
 
 /**
- * Create a confirmed booking via the create_booking RPC (anon user).
+ * Create a confirmed booking via the create_booking RPC (service_role: since
+ * migration 021 only the server can call it).
  * date: YYYY-MM-DD, mendozaHour/mendozaMin: Mendoza local time.
  * Slot must align with the court's slot_minutes grid from open_time.
  * Returns the booking_id or null if creation failed.
@@ -160,7 +160,7 @@ export async function createTestBooking(
   const endUtcMs   = startUtcMs + 90 * 60 * 1000;
   try {
     const res = await request.post(`${SUPABASE_URL}/rest/v1/rpc/create_booking`, {
-      headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      headers: serviceHeaders(),
       data: {
         p_court_id:       COURT_ID,
         p_venue_id:       VENUE_ID,

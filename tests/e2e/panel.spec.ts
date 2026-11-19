@@ -9,8 +9,7 @@ import {
   OWNER_PASSWORD,
   VENUE_ID,
   SUPABASE_URL,
-  SUPABASE_ANON_KEY,
-  getOwnerToken,
+  serviceHeaders,
 } from "./helpers";
 
 // ---------------------------------------------------------------------------
@@ -139,16 +138,13 @@ test("saving court hours writes an audit_log row", async ({ page, request }) => 
   await page.goto(`/panel/complejos/${VENUE_ID}/canchas/${COURT_ID}`);
   await page.waitForLoadState("networkidle");
 
-  // Record the current audit_log count before the action
-  const tokenBefore = await getOwnerToken(request);
-  expect(tokenBefore).not.toBeNull();
-
+  // Record the current audit_log count before the action (service_role: el
+  // dueño no lee audit_log desde la migración 021)
   const countBefore = await request.get(
     `${SUPABASE_URL}/rest/v1/audit_log?venue_id=eq.${VENUE_ID}&entity=eq.court_hours&select=count`,
     {
       headers: {
-        apikey:        SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${tokenBefore!}`,
+        ...serviceHeaders(),
         Accept:        "application/vnd.pgrst.object+json",
         Prefer:        "count=exact",
       },
@@ -163,13 +159,11 @@ test("saving court hours writes an audit_log row", async ({ page, request }) => 
   await page.waitForTimeout(2_000);
 
   // Verify a new audit_log row was written
-  const tokenAfter = await getOwnerToken(request);
   const countAfter = await request.get(
     `${SUPABASE_URL}/rest/v1/audit_log?venue_id=eq.${VENUE_ID}&entity=eq.court_hours&select=count`,
     {
       headers: {
-        apikey:        SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${tokenAfter!}`,
+        ...serviceHeaders(),
         Accept:        "application/vnd.pgrst.object+json",
         Prefer:        "count=exact",
       },

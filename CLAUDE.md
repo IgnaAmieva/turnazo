@@ -118,7 +118,7 @@ tests/
 - Tests en `tests/unit/phone.test.ts`.
 
 ### Tests E2E
-- **Fixtures de prueba:** `VENUE_ID = b2c3d4e5-0000-0000-0000-000000000001`, `COURT_ID = c3d4e5f6-0000-0000-0000-000000000001`, dueño: `dueno@turnazo.test` / `TurnazoPrueba1!`.
+- **Fixtures de prueba:** `VENUE_ID = b2c3d4e5-0000-0000-0000-000000000001`, `COURT_ID = c3d4e5f6-0000-0000-0000-000000000001`, dueño: `dueno@turnazo.test` (la contraseña está en `.env.local` como `E2E_OWNER_PASSWORD`, nunca en el repo).
 - **Limpieza:** cada `afterAll` borra lo que creó usando `deleteTestBookings(request, [pattern])`. El conteo de filas en `bookings` debe ser idéntico antes y después de correr el set completo dos veces seguidas.
 - **Slots de test:** `nextWeekday(3, 7)` = miércoles 7+ días (agenda), `nextWeekday(4, 21)` = jueves 21+ días (audit). Siempre alineados con la grilla de 90 min desde 08:00.
 

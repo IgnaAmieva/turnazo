@@ -18,6 +18,64 @@ export type PanelActionState = {
 } | null;
 
 // ---------------------------------------------------------------------------
+// Errores: el detalle de Postgres/Supabase va al log del servidor, nunca al
+// usuario (nombres de tablas, columnas y restricciones).
+// ---------------------------------------------------------------------------
+
+type DbError = { code?: string; message: string };
+
+const GENERIC_ERROR = "No se pudo guardar. Intentá de nuevo.";
+
+function dbError(err: DbError): PanelActionState {
+  console.error("[panel] db error:", err.code ?? "", err.message);
+  return { error: GENERIC_ERROR };
+}
+
+function auditError(err: DbError): PanelActionState {
+  console.error("[panel] audit_log insert failed:", err.code ?? "", err.message);
+  return { error: "No se pudo registrar el cambio. Intentá de nuevo." };
+}
+
+/** Códigos que devuelven los RPCs panel_* (migración 021). */
+const PANEL_RPC_MESSAGES: Record<string, string> = {
+  not_authenticated:    "No autenticado",
+  not_owner:            "No autorizado",
+  court_not_in_venue:   "Esa cancha no es de este complejo.",
+  invalid_period:       "El inicio debe ser antes que el fin",
+  past_period:          "El bloqueo tiene que terminar en el futuro.",
+  period_too_long:      "Un bloqueo puede durar como máximo 7 días.",
+  invalid_note:         "La nota puede tener hasta 80 caracteres.",
+  slot_taken:           "Ese horario ya está ocupado.",
+  not_confirmed:        "La reserva ya no está confirmada",
+  already_paid:         "La reserva ya está paga.",
+  no_show_before_start:
+    "Una reserva pagada online solo se puede marcar como ausente después de su horario. " +
+    "Para liberar el turno antes, cancelala: se le devuelve lo pagado.",
+};
+
+/** Llama a un RPC panel_* con la sesión del dueño y traduce el resultado. */
+async function callPanelRpc(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  fn: "panel_create_block" | "panel_cancel_booking" | "panel_mark_paid" | "panel_mark_no_show",
+  args: Record<string, unknown>,
+): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; state: PanelActionState }> {
+  const { data, error } = await supabase.rpc(fn as never, args as never);
+  if (error) return { ok: false, state: dbError(error) };
+  const res = (data ?? {}) as Record<string, unknown>;
+  if (res.error) {
+    const code = String(res.error);
+    return { ok: false, state: { error: PANEL_RPC_MESSAGES[code] ?? GENERIC_ERROR } };
+  }
+  return { ok: true, data: res };
+}
+
+/** booking_id + venue_id de las acciones de agenda */
+const BookingRefSchema = z.object({
+  booking_id: z.string().guid(),
+  venue_id:   z.string().guid(),
+});
+
+// ---------------------------------------------------------------------------
 // Venue actions
 // ---------------------------------------------------------------------------
 
@@ -60,12 +118,12 @@ export async function createVenueAction(
       payment_alias:      payment_alias      || null,
       payment_link:       payment_link       || null,
       whatsapp_template:  whatsapp_template  || null,
-      status:             "pending",
+      // status lo fija la base: siempre 'pending' (trigger trg_venues_status, 021)
     })
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return dbError(error);
 
   const { error: auditErr } = await supabase.from("audit_log").insert({
     profile_id: user.id,
@@ -75,7 +133,7 @@ export async function createVenueAction(
     action:     "create",
     new_data:   parsed.data,
   });
-  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath("/panel/complejos");
   redirect("/panel/complejos");
@@ -112,7 +170,7 @@ export async function updateVenueAction(
     .eq("id", venueId)
     .eq("owner_id", user.id);
 
-  if (error) return { error: error.message };
+  if (error) return dbError(error);
 
   const { error: auditErr } = await supabase.from("audit_log").insert({
     profile_id: user.id,
@@ -122,7 +180,7 @@ export async function updateVenueAction(
     action:     "update",
     new_data:   parsed.data,
   });
-  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}`);
   revalidatePath("/panel/complejos");
@@ -190,7 +248,10 @@ export async function updatePaymentSettingsAction(
       .select("id")
       .eq("venue_id", venueId)
       .maybeSingle();
-    if (mpError) return { error: "No se pudo verificar Mercado Pago: " + mpError.message };
+    if (mpError) {
+      console.error("[panel] mp_accounts lookup failed:", mpError.code ?? "", mpError.message);
+      return { error: "No se pudo verificar Mercado Pago. Intentá de nuevo." };
+    }
     if (!mpAccount) {
       return { error: "Conectá Mercado Pago para activar la seña o el pago total." };
     }
@@ -209,7 +270,7 @@ export async function updatePaymentSettingsAction(
     .update(settings)
     .eq("id", venueId)
     .eq("owner_id", user.id);
-  if (error) return { error: error.message };
+  if (error) return dbError(error);
 
   const { error: auditErr } = await supabase.from("audit_log").insert({
     profile_id: user.id,
@@ -219,7 +280,7 @@ export async function updatePaymentSettingsAction(
     action:     "update_payment_settings",
     new_data:   settings,
   });
-  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}`);
   return {};
@@ -263,7 +324,7 @@ export async function updateCancellationPolicyAction(
     .update(parsed.data)
     .eq("id", venueId)
     .eq("owner_id", user.id);
-  if (error) return { error: error.message };
+  if (error) return dbError(error);
 
   const { error: auditErr } = await supabase.from("audit_log").insert({
     profile_id: user.id,
@@ -273,7 +334,7 @@ export async function updateCancellationPolicyAction(
     action:     "update_cancellation_policy",
     new_data:   parsed.data,
   });
-  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}`);
   return {};
@@ -320,7 +381,7 @@ export async function createCourtAction(
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return dbError(error);
 
   // Horarios precargados según deporte (SPEC §12)
   const { data: sport } = await supabase
@@ -352,7 +413,7 @@ export async function createCourtAction(
     action:     "create",
     new_data:   parsed.data,
   });
-  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/canchas`);
   redirect(`/panel/complejos/${venueId}/canchas/${court.id}`);
@@ -388,7 +449,7 @@ export async function updateCourtAction(
     .eq("id", courtId)
     .eq("venue_id", venueId);
 
-  if (error) return { error: error.message };
+  if (error) return dbError(error);
 
   const { error: auditErr } = await supabase.from("audit_log").insert({
     profile_id: user.id,
@@ -398,7 +459,7 @@ export async function updateCourtAction(
     action:     "update",
     new_data:   parsed.data,
   });
-  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/canchas/${courtId}`);
   return null;
@@ -446,11 +507,11 @@ export async function saveCourtHoursAction(
 
   // Replace all hours for this court
   const { error: delErr } = await supabase.from("court_hours").delete().eq("court_id", courtId);
-  if (delErr) return { error: delErr.message };
+  if (delErr) return dbError(delErr);
 
   if (hours.length > 0) {
     const { error: insErr } = await supabase.from("court_hours").insert(hours);
-    if (insErr) return { error: insErr.message };
+    if (insErr) return dbError(insErr);
   }
 
   const { error: auditErr } = await supabase.from("audit_log").insert({
@@ -461,7 +522,7 @@ export async function saveCourtHoursAction(
     action:     "update",
     new_data:   hours,
   });
-  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/canchas/${courtId}`);
   return null;
@@ -509,11 +570,11 @@ export async function saveCourtPricesAction(
   }));
 
   const { error: delErr } = await supabase.from("court_prices").delete().eq("court_id", courtId);
-  if (delErr) return { error: delErr.message };
+  if (delErr) return dbError(delErr);
 
   if (prices.length > 0) {
     const { error: insErr } = await supabase.from("court_prices").insert(prices);
-    if (insErr) return { error: insErr.message };
+    if (insErr) return dbError(insErr);
   }
 
   const { error: auditErr } = await supabase.from("audit_log").insert({
@@ -524,7 +585,7 @@ export async function saveCourtPricesAction(
     action:     "update",
     new_data:   prices,
   });
-  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/canchas/${courtId}`);
   return null;
@@ -533,83 +594,52 @@ export async function saveCourtPricesAction(
 // ---------------------------------------------------------------------------
 // Agenda: booking management actions
 // ---------------------------------------------------------------------------
-
-/** Verifica que la reserva pertenece a un complejo del usuario autenticado */
-async function assertOwnsBooking(supabase: Awaited<ReturnType<typeof createClient>>, bookingId: string, venueId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-  const { data: b } = await supabase
-    .from("bookings")
-    .select("id")
-    .eq("id", bookingId)
-    .eq("venue_id", venueId)
-    .single();
-  const { data: v } = await supabase
-    .from("venues")
-    .select("id")
-    .eq("id", venueId)
-    .eq("owner_id", user.id)
-    .single();
-  return !!(b && v);
-}
+// Desde la migración 021 el dueño no escribe directo en bookings: cada acción
+// llama a un RPC SECURITY DEFINER (panel_*) que verifica que el complejo sea
+// suyo, que la reserva/cancha sea de ese complejo y valida los datos.
 
 export async function cancelBookingPanelAction(
   _prevState: PanelActionState,
   formData: FormData
 ): Promise<PanelActionState> {
-  const bookingId = formData.get("booking_id") as string;
-  const venueId   = formData.get("venue_id")   as string;
-  const date      = formData.get("date")        as string;
-  if (!bookingId || !venueId) return { error: "Datos incompletos" };
+  const parsed = BookingRefSchema.safeParse({
+    booking_id: formData.get("booking_id"),
+    venue_id:   formData.get("venue_id"),
+  });
+  if (!parsed.success) return { error: "Datos incompletos" };
+  const { booking_id: bookingId, venue_id: venueId } = parsed.data;
+  const date = formData.get("date") as string | null;
 
   const supabase = await createClient();
-  const owns = await assertOwnsBooking(supabase, bookingId, venueId);
-  if (!owns) return { error: "No autorizado" };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
 
-  // Pago online acreditado (si lo hay): cuando cancela el complejo se devuelve
-  // siempre, sin importar el plazo ni la política de devoluciones.
-  const { data: onlinePay } = await supabase
-    .from("payments")
-    .select("mp_order_id, mp_payment_id, amount, type")
-    .eq("booking_id", bookingId)
-    .eq("status", "approved")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const refundDue = !!onlinePay && Number(onlinePay.amount) > 0 && !!onlinePay.mp_order_id;
+  // Cancela solo si está confirmada (dos clicks no disparan dos devoluciones).
+  // Si hay pago online acreditado, el RPC lo deja 'refund_pending' en la misma
+  // transacción: cuando cancela el complejo se devuelve siempre.
+  const rpc = await callPanelRpc(supabase, "panel_cancel_booking", {
+    p_booking_id: bookingId,
+    p_venue_id:   venueId,
+  });
+  if (!rpc.ok) return rpc.state;
+  const res = rpc.data;
 
-  // Solo se cancela una reserva confirmada: así dos clicks (o dos pestañas)
-  // no disparan dos devoluciones.
-  const { data: cancelled, error } = await supabase
-    .from("bookings")
-    .update({ status: "cancelled" })
-    .eq("id", bookingId)
-    .eq("status", "confirmed")
-    .select("customer_name, customer_phone, period, amount_paid");
-  if (error) return { error: error.message };
-  const bk = cancelled?.[0];
-  if (!bk) return { error: "La reserva ya no está confirmada" };
+  const refundDue =
+    res.refund_due === true && typeof res.mp_order_id === "string" && typeof res.mp_payment_id === "string";
+  const refundAmount = refundDue ? Number(res.refund_amount ?? 0) : 0;
 
-  // Devolución (misma función idempotente que el webhook y el jugador). Antes
-  // se marca el pago 'refund_pending' para que, si esto se cae, el cron lo tome.
+  // Devolución (misma función idempotente que el webhook y el jugador). Si
+  // falla acá, el pago queda en 'refund_failed' y el cron la reintenta.
   let refundStatus: "none" | "refunded" | "pending" = "none";
-  if (refundDue && onlinePay) {
-    const admin = createAdminClient();
-    const { data: payRow } = await admin
-      .from("payments").select("raw").eq("mp_payment_id", onlinePay.mp_payment_id).maybeSingle();
-    const prevRaw = (payRow?.raw && typeof payRow.raw === "object" && !Array.isArray(payRow.raw) ? payRow.raw : {}) as Record<string, unknown>;
-    await admin
-      .from("payments")
-      .update({ status: "refund_pending", raw: { ...prevRaw, reason: "owner_cancelled" } as never })
-      .eq("mp_payment_id", onlinePay.mp_payment_id)
-      .eq("status", "approved");
+  const admin = createAdminClient();
+  if (refundDue) {
     const refund = await refundPayment(admin, {
       bookingId,
       venueId,
-      orderId:     onlinePay.mp_order_id!,
-      paymentId:   onlinePay.mp_payment_id,
-      amount:      Number(onlinePay.amount),
-      paymentType: onlinePay.type === "full" ? "full" : "deposit",
+      orderId:     res.mp_order_id as string,
+      paymentId:   res.mp_payment_id as string,
+      amount:      refundAmount,
+      paymentType: res.payment_type === "full" ? "full" : "deposit",
       reason:      "owner_cancelled",
       source:      "owner_cancel",
       markBookingRefunded: true,
@@ -617,37 +647,38 @@ export async function cancelBookingPanelAction(
     refundStatus = refund.ok ? "refunded" : "pending";
   }
 
-  const { data: { user: cancelUser } } = await supabase.auth.getUser();
-  const { error: cancelAuditErr } = await supabase.from("audit_log").insert({
-    profile_id: cancelUser!.id,
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
     venue_id:   venueId,
     entity:     "booking",
     entity_id:  bookingId,
     action:     "cancel",
     new_data:   {
       refund:        refundStatus,
-      refund_amount: refundDue && onlinePay ? Number(onlinePay.amount) : 0,
-      ...(refundDue && onlinePay ? { mp_payment_id: onlinePay.mp_payment_id } : {}),
+      refund_amount: refundAmount,
+      ...(refundDue ? { mp_payment_id: res.mp_payment_id as string } : {}),
     },
   });
-  if (cancelAuditErr) return { error: "Error en auditoría: " + cancelAuditErr.message };
+  if (auditErr) return auditError(auditErr);
 
-  // Notificación outbox para el dueño (best-effort: no bloquea si falla)
-  await supabase.from("notification_outbox").insert({
+  // Aviso al dueño (best-effort). Va con service_role: el dueño no escribe en
+  // notification_outbox desde la 021.
+  const { error: outboxErr } = await admin.from("notification_outbox").insert({
     venue_id: venueId,
     type:     "booking_cancelled",
     payload:  {
       booking_id:     bookingId,
-      customer_name:  bk.customer_name,
-      customer_phone: bk.customer_phone,
-      start:          (bk.period as string).replace(/[\[(]/, "").split(",")[0].trim().replace(/"/g, ""),
+      customer_name:  (res.customer_name as string | null) ?? null,
+      customer_phone: (res.customer_phone as string | null) ?? null,
+      start:          (res.start as string | null) ?? null,
       cancelled_by:   "owner",
-      amount_paid:    bk.amount_paid,
+      amount_paid:    Number(res.amount_paid ?? 0),
       refund_due:     refundDue,
-      refund_amount:  refundDue && onlinePay ? Number(onlinePay.amount) : 0,
+      refund_amount:  refundAmount,
       refund_status:  refundStatus,
     },
   });
+  if (outboxErr) console.error("[panel] outbox insert failed on cancel:", outboxErr.code ?? "", outboxErr.message);
   void triggerPushSend();
 
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
@@ -655,105 +686,107 @@ export async function cancelBookingPanelAction(
   return null;
 }
 
+/**
+ * Marcar pagado (cobrado en el complejo). El monto sale de la base
+ * (price_total), no del formulario. Si se pagó el total online no se permite;
+ * si se pagó una seña online, registra que el resto se cobró en el complejo.
+ */
 export async function markPaidAction(
   _prevState: PanelActionState,
   formData: FormData
 ): Promise<PanelActionState> {
-  const bookingId  = formData.get("booking_id")  as string;
-  const venueId    = formData.get("venue_id")    as string;
-  const date       = formData.get("date")         as string;
-  const priceTotal = Number(formData.get("price_total") ?? 0);
-  if (!bookingId || !venueId) return { error: "Datos incompletos" };
+  const parsed = BookingRefSchema.safeParse({
+    booking_id: formData.get("booking_id"),
+    venue_id:   formData.get("venue_id"),
+  });
+  if (!parsed.success) return { error: "Datos incompletos" };
+  const { booking_id: bookingId, venue_id: venueId } = parsed.data;
+  const date = formData.get("date") as string | null;
 
   const supabase = await createClient();
-  const owns = await assertOwnsBooking(supabase, bookingId, venueId);
-  if (!owns) return { error: "No autorizado" };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
 
-  const { error } = await supabase
-    .from("bookings")
-    .update({ payment_status: "paid", amount_paid: priceTotal })
-    .eq("id", bookingId);
-  if (error) return { error: error.message };
+  // El RPC también encola el aviso 'payment_received'.
+  const rpc = await callPanelRpc(supabase, "panel_mark_paid", {
+    p_booking_id: bookingId,
+    p_venue_id:   venueId,
+  });
+  if (!rpc.ok) return rpc.state;
 
-  const { data: { user: paidUser } } = await supabase.auth.getUser();
-  const { error: paidAuditErr } = await supabase.from("audit_log").insert({
-    profile_id: paidUser!.id,
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
     venue_id:   venueId,
     entity:     "booking",
     entity_id:  bookingId,
     action:     "mark_paid",
-    new_data:   { price_total: priceTotal },
+    new_data:   { price_total: Number(rpc.data.price_total ?? 0), online_paid: Number(rpc.data.online_paid ?? 0) },
   });
-  if (paidAuditErr) return { error: "Error en auditoría: " + paidAuditErr.message };
+  if (auditErr) return auditError(auditErr);
 
-  // Notificación outbox para el dueño (best-effort)
-  const { data: paidBk } = await supabase
-    .from("bookings")
-    .select("customer_name, customer_phone, period")
-    .eq("id", bookingId)
-    .single();
-  if (paidBk) {
-    await supabase.from("notification_outbox").insert({
-      venue_id: venueId,
-      type:     "payment_received",
-      payload:  {
-        booking_id:     bookingId,
-        customer_name:  paidBk.customer_name,
-        customer_phone: paidBk.customer_phone,
-        start:          (paidBk.period as string).replace(/[\[(]/, "").split(",")[0].trim().replace(/"/g, ""),
-        price_total:    priceTotal,
-      },
-    });
-    void triggerPushSend();
-  }
+  void triggerPushSend();
 
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
   if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);
   return null;
 }
 
+/**
+ * Marcar ausente. Una reserva pagada online solo se puede marcar después de
+ * que empezó el turno: antes, el camino es cancelar (que devuelve la plata).
+ */
 export async function markNoShowAction(
   _prevState: PanelActionState,
   formData: FormData
 ): Promise<PanelActionState> {
-  const bookingId = formData.get("booking_id") as string;
-  const venueId   = formData.get("venue_id")   as string;
-  const date      = formData.get("date")        as string;
-  if (!bookingId || !venueId) return { error: "Datos incompletos" };
+  const parsed = BookingRefSchema.safeParse({
+    booking_id: formData.get("booking_id"),
+    venue_id:   formData.get("venue_id"),
+  });
+  if (!parsed.success) return { error: "Datos incompletos" };
+  const { booking_id: bookingId, venue_id: venueId } = parsed.data;
+  const date = formData.get("date") as string | null;
 
   const supabase = await createClient();
-  const owns = await assertOwnsBooking(supabase, bookingId, venueId);
-  if (!owns) return { error: "No autorizado" };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
 
-  const { error } = await supabase
-    .from("bookings")
-    .update({ status: "no_show" })
-    .eq("id", bookingId);
-  if (error) return { error: error.message };
+  const rpc = await callPanelRpc(supabase, "panel_mark_no_show", {
+    p_booking_id: bookingId,
+    p_venue_id:   venueId,
+  });
+  if (!rpc.ok) return rpc.state;
 
-  const { data: { user: noShowUser } } = await supabase.auth.getUser();
-  const { error: noShowAuditErr } = await supabase.from("audit_log").insert({
-    profile_id: noShowUser!.id,
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
     venue_id:   venueId,
     entity:     "booking",
     entity_id:  bookingId,
     action:     "mark_no_show",
   });
-  if (noShowAuditErr) return { error: "Error en auditoría: " + noShowAuditErr.message };
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
   if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);
   return null;
 }
 
+const BlockPhoneSchema = z.object({
+  venue_id: z.string().guid(),
+  phone:    z.string().max(30),
+});
+
 export async function blockPhonePanelAction(
   _prevState: PanelActionState,
   formData: FormData
 ): Promise<PanelActionState> {
-  const phone   = formData.get("phone")    as string;
-  const venueId = formData.get("venue_id") as string;
-  const date    = formData.get("date")     as string;
-  if (!phone || !venueId) return { error: "Datos incompletos" };
+  const parsed = BlockPhoneSchema.safeParse({
+    venue_id: formData.get("venue_id"),
+    phone:    formData.get("phone"),
+  });
+  if (!parsed.success) return { error: "Datos incompletos" };
+  const { venue_id: venueId, phone } = parsed.data;
+  const date = formData.get("date") as string | null;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -768,12 +801,13 @@ export async function blockPhonePanelAction(
   if (!v) return { error: "No autorizado" };
 
   const normalizedPhone = phone.replace(/\D/g, "");
-  if (normalizedPhone.length < 7) return { error: "Teléfono inválido" };
+  if (normalizedPhone.length < 7 || normalizedPhone.length > 15) return { error: "Teléfono inválido" };
 
+  // Si ya estaba bloqueado no hace nada (ON CONFLICT DO NOTHING: no requiere UPDATE).
   const { error } = await supabase
     .from("blocked_phones")
-    .upsert({ venue_id: venueId, phone: normalizedPhone }, { onConflict: "venue_id,phone" });
-  if (error) return { error: error.message };
+    .upsert({ venue_id: venueId, phone: normalizedPhone }, { onConflict: "venue_id,phone", ignoreDuplicates: true });
+  if (error) return dbError(error);
 
   const { error: blockAuditErr } = await supabase.from("audit_log").insert({
     profile_id: user.id,
@@ -783,68 +817,71 @@ export async function blockPhonePanelAction(
     action:     "create",
     new_data:   { phone: normalizedPhone },
   });
-  if (blockAuditErr) return { error: "Error en auditoría: " + blockAuditErr.message };
+  if (blockAuditErr) return auditError(blockAuditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
   if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);
   return null;
 }
 
+const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+const ManualBlockSchema = z.object({
+  venue_id: z.string().guid(),
+  court_id: z.string().guid(),
+  start:    z.string().regex(LOCAL_DATETIME), // "YYYY-MM-DDTHH:MM" hora de Mendoza
+  end:      z.string().regex(LOCAL_DATETIME),
+  note:     z.string().trim().max(80, "La nota puede tener hasta 80 caracteres."),
+});
+
 export async function createManualBlockAction(
   _prevState: PanelActionState,
   formData: FormData
 ): Promise<PanelActionState> {
-  const venueId = formData.get("venue_id") as string;
-  const courtId = formData.get("court_id") as string;
-  const start   = formData.get("start")    as string; // "YYYY-MM-DDTHH:MM" Mendoza
-  const end     = formData.get("end")      as string;
-  const note    = (formData.get("note") as string | null)?.trim() || "Bloqueo";
-  const date    = formData.get("date")     as string;
-
-  if (!venueId || !courtId || !start || !end) return { error: "Datos incompletos" };
+  const parsed = ManualBlockSchema.safeParse({
+    venue_id: formData.get("venue_id"),
+    court_id: formData.get("court_id"),
+    start:    formData.get("start"),
+    end:      formData.get("end"),
+    note:     formData.get("note") ?? "",
+  });
+  if (!parsed.success) {
+    const noteErr = parsed.error.flatten().fieldErrors.note?.[0];
+    return { error: noteErr ?? "Datos incompletos" };
+  }
+  const { venue_id: venueId, court_id: courtId, start, end } = parsed.data;
+  const note = parsed.data.note || "Bloqueo";
+  const date = formData.get("date") as string | null;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado" };
 
-  const { data: v } = await supabase
-    .from("venues")
-    .select("id")
-    .eq("id", venueId)
-    .eq("owner_id", user.id)
-    .single();
-  if (!v) return { error: "No autorizado" };
+  // start/end son "YYYY-MM-DDTHH:MM" en hora de Mendoza (UTC-3)
+  const startDate = new Date(start + ":00-03:00");
+  const endDate   = new Date(end   + ":00-03:00");
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return { error: "Datos incompletos" };
+  if (startDate >= endDate) return { error: "El inicio debe ser antes que el fin" };
 
-  // start/end are "YYYY-MM-DDTHH:MM" in Mendoza time (UTC-3)
-  const startUtc = new Date(start + ":00-03:00").toISOString();
-  const endUtc   = new Date(end   + ":00-03:00").toISOString();
-
-  if (new Date(startUtc) >= new Date(endUtc)) return { error: "El inicio debe ser antes que el fin" };
-
-  const { data: blockData, error } = await supabase.from("bookings").insert({
-    court_id:       courtId,
-    venue_id:       venueId,
-    period:         `[${startUtc},${endUtc})`,
-    status:         "confirmed",
-    kind:           "block",
-    customer_name:  note,
-    customer_phone: null,
-    price_total:    0,
-    amount_paid:    0,
-    payment_status: "unpaid",
-    cancel_token:   crypto.randomUUID(),
-  }).select("id").single();
-  if (error) return { error: error.message };
+  // El RPC verifica que el complejo sea del dueño y la cancha de ese complejo.
+  const rpc = await callPanelRpc(supabase, "panel_create_block", {
+    p_venue_id: venueId,
+    p_court_id: courtId,
+    p_start:    startDate.toISOString(),
+    p_end:      endDate.toISOString(),
+    p_note:     note,
+  });
+  if (!rpc.ok) return rpc.state;
 
   const { error: blockCreateAuditErr } = await supabase.from("audit_log").insert({
     profile_id: user.id,
     venue_id:   venueId,
     entity:     "booking",
-    entity_id:  blockData!.id,
+    entity_id:  rpc.data.booking_id as string,
     action:     "create_block",
-    new_data:   { court_id: courtId, start: startUtc, end: endUtc, note },
+    new_data:   { court_id: courtId, start: startDate.toISOString(), end: endDate.toISOString(), note },
   });
-  if (blockCreateAuditErr) return { error: "Error en auditoría: " + blockCreateAuditErr.message };
+  if (blockCreateAuditErr) return auditError(blockCreateAuditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
   if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);
@@ -880,7 +917,7 @@ export async function unblockPhoneAction(
     .delete()
     .eq("venue_id", venueId)
     .eq("phone", phone);
-  if (error) return { error: error.message };
+  if (error) return dbError(error);
 
   const { error: auditErr } = await supabase.from("audit_log").insert({
     profile_id: user.id,
@@ -890,7 +927,7 @@ export async function unblockPhoneAction(
     action:     "delete",
     new_data:   { phone },
   });
-  if (auditErr) return { error: "Error en auditoría: " + auditErr.message };
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/bloqueados`);
   return null;

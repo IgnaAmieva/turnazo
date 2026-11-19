@@ -2,7 +2,6 @@
 
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getMpToken } from '@/lib/mp/token';
 import { createMpOrder, cancelMpOrder } from '@/lib/mp/orders';
@@ -78,8 +77,9 @@ export async function startPaymentAction(
   // 1. Hold en la base: valida todo y calcula el monto. Si el jugador toca dos
   //    veces, el segundo intento devuelve hold_limit_reached o slot_taken:
   //    nunca hay dos holds (ni dos órdenes) para el mismo intento.
-  const supabase = await createClient();
-  const { data: result, error: rpcError } = await supabase.rpc('create_booking_hold', {
+  //    create_booking_hold solo lo ejecuta service_role (migración 021).
+  const admin = createAdminClient();
+  const { data: result, error: rpcError } = await admin.rpc('create_booking_hold', {
     p_court_id:       data.court_id,
     p_venue_id:       data.venue_id,
     p_start:          data.start,
@@ -141,7 +141,6 @@ export async function startPaymentAction(
   }
 
   // 4. Guardar mp_order_id en la reserva (solo si sigue en hold).
-  const admin = createAdminClient();
   const { error: updError, count } = await admin
     .from('bookings')
     .update({ mp_order_id: order.orderId }, { count: 'exact' })

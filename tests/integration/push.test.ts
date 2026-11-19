@@ -121,7 +121,7 @@ describe('create_booking v4 — notification_outbox', () => {
   it('inserta fila en notification_outbox al crear reserva', async () => {
     const { start, end } = slotAt08(3);
 
-    const { data: result, error } = await anonClient.rpc('create_booking', {
+    const { data: result, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -159,7 +159,7 @@ describe('create_booking v4 — notification_outbox', () => {
     // Aquí verificamos que el booking fue creado y persiste independientemente.
     const { start, end } = slotAt08(4);
 
-    const { data: result, error } = await anonClient.rpc('create_booking', {
+    const { data: result, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -207,7 +207,7 @@ describe('cancel_booking_by_token — notification_outbox', () => {
   it('create_booking retorna cancel_token válido', async () => {
     const { start, end } = slotAt08(5);
 
-    const { data: result, error } = await anonClient.rpc('create_booking', {
+    const { data: result, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),

@@ -6,6 +6,7 @@
 
 export const RPC_ERROR_MESSAGES: Record<string, string> = {
   past_slot:        'Este horario ya pasó.',
+  too_far_ahead:    'Solo se puede reservar hasta 30 días adelante.',
   slot_taken:       'Este turno ya fue reservado por alguien más. Por favor elegí otro horario.',
   venue_not_found:  'El complejo no fue encontrado o no está disponible.',
   court_not_found:  'La cancha no fue encontrada o no está disponible.',

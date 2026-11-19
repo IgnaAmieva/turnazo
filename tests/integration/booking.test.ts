@@ -243,7 +243,7 @@ describe('create_booking', () => {
   it('creates a booking for a valid future slot', async () => {
     const { start, end } = futureSlot();
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -265,7 +265,7 @@ describe('create_booking', () => {
   it('rejects a duplicate booking (slot_taken)', async () => {
     const { start, end } = futureSlot();
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -282,7 +282,7 @@ describe('create_booking', () => {
     const pastStart = new Date(Date.now() - 3_600_000).toISOString();
     const pastEnd   = new Date(Date.now() - 3_600_000 + 90 * 60 * 1000).toISOString();
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          pastStart,
@@ -301,7 +301,7 @@ describe('create_booking', () => {
 
     const { start, end } = slotAt08(2);
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -328,7 +328,7 @@ describe('create_booking v2 (migration 007)', () => {
   it('fix1a: pádel 23:00-00:30 (slot que cruza medianoche) es válido', async () => {
     const { start, end } = slotAt23(3, 90);
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       midnightCourtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -347,7 +347,7 @@ describe('create_booking v2 (migration 007)', () => {
   it('fix1b: fútbol 23:00-00:00 (cierre a medianoche exacta) es válido', async () => {
     const { start, end } = slotAt23(3, 60);
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       midnightCloseCourtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -372,7 +372,7 @@ describe('create_booking v2 (migration 007)', () => {
     const start = new Date(d.getTime() + (11 * 60 + 30) * 60 * 1000); // 11:30 UTC
     const end   = new Date(start.getTime() + 90 * 60 * 1000);
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -390,7 +390,7 @@ describe('create_booking v2 (migration 007)', () => {
   it('fix3a: nombre menor a 2 caracteres retorna invalid_name', async () => {
     const { start, end } = slotAt08(5);
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -407,7 +407,7 @@ describe('create_booking v2 (migration 007)', () => {
     // "+54 2622-123456" → normalizado a "542622123456" (12 dígitos)
     const { start, end } = slotAt08(4);
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -429,7 +429,7 @@ describe('create_booking v2 (migration 007)', () => {
     // Crear 3 turnos confirmados en días distintos
     for (const day of [6, 7, 8]) {
       const { start, end } = slotAt08(day);
-      const { data } = await anonClient.rpc('create_booking', {
+      const { data } = await db.rpc('create_booking', {
         p_court_id:       courtId,
         p_venue_id:       venueId,
         p_start:          start.toISOString(),
@@ -442,7 +442,7 @@ describe('create_booking v2 (migration 007)', () => {
 
     // 4.º intento → debe fallar
     const { start, end } = slotAt08(9);
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       courtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -460,7 +460,7 @@ describe('create_booking v2 (migration 007)', () => {
   it('fix5: cancha sin precio configurado retorna price_not_set', async () => {
     const { start, end } = slotAt08(10);
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       noPriceCourtId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -484,7 +484,7 @@ describe('create_booking v3 (migration 008)', () => {
   it('008-A: turno a las 00:30 Mendoza con horario 08:00-02:00 retorna booking', async () => {
     const { start, end } = slotAt0030(11, 90);
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       court008AId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -504,7 +504,7 @@ describe('create_booking v3 (migration 008)', () => {
   it('008-B: turno a las 23:00 con precio 18:00-00:00 retorna precio correcto', async () => {
     const { start, end } = slotAt23(12, 60);
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       court008BId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -524,7 +524,7 @@ describe('create_booking v3 (migration 008)', () => {
   it('008-C: turno a las 01:00 con horario y precio 22:00-02:00 retorna booking', async () => {
     const { start, end } = slotAt0100(13, 60);
 
-    const { data, error } = await anonClient.rpc('create_booking', {
+    const { data, error } = await db.rpc('create_booking', {
       p_court_id:       court008CId,
       p_venue_id:       venueId,
       p_start:          start.toISOString(),
@@ -575,7 +575,7 @@ describe('create_booking (migration 018)', () => {
       .eq('venue_id', venueId);
 
     try {
-      const { data, error } = await anonClient.rpc('create_booking', {
+      const { data, error } = await db.rpc('create_booking', {
         p_court_id:       courtId,
         p_venue_id:       venueId,
         p_start:          start.toISOString(),

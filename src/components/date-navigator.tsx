@@ -32,10 +32,19 @@ function formatLabel(dateStr: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+/**
+ * Días que se pueden reservar contando hoy. La base rechaza turnos que
+ * empiezan a más de 30 días de ahora (too_far_ahead, migración 021): con 30
+ * días calendario (hoy + 29) todos los turnos visibles entran en ese límite.
+ */
+const BOOKING_DAYS = 30;
+
 export default function DateNavigator({ date, basePath }: Props) {
   const router = useRouter();
   const today = todayInMendoza();
   const isPast = date <= today;
+  const lastDay = addDays(today, BOOKING_DAYS - 1);
+  const isLast = date >= lastDay;
 
   function navigate(newDate: string) {
     router.push(`${basePath}?fecha=${newDate}`);
@@ -60,7 +69,10 @@ export default function DateNavigator({ date, basePath }: Props) {
 
       <button
         onClick={() => navigate(addDays(date, 1))}
+        disabled={isLast}
+        title={isLast ? `Se puede reservar hasta ${BOOKING_DAYS} días adelante` : undefined}
         className="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+          disabled:opacity-30 disabled:cursor-not-allowed
           hover:bg-gray-100 active:bg-gray-200"
         aria-label="Ir al dia siguiente"
       >

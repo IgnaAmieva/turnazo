@@ -46,11 +46,8 @@ export async function POST(req: NextRequest) {
     const result = await sendPendingNotifications(supabase);
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
-    console.error("[push/send]", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 }
-    );
+    console.error("[push/send]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "send_failed" }, { status: 500 });
   }
 }
 

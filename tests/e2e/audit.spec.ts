@@ -11,9 +11,8 @@ import {
   OWNER_PASSWORD,
   VENUE_ID,
   SUPABASE_URL,
-  SUPABASE_ANON_KEY,
   nextWeekday,
-  getOwnerToken,
+  serviceHeaders,
   createTestBooking,
   deleteTestBookings,
   deleteTestOutboxRows,
@@ -48,21 +47,15 @@ async function loginAsOwner(page: import("@playwright/test").Page) {
   }
 }
 
+/** Cuenta filas de audit_log con service_role (el dueño no lee audit_log desde la 021). */
 async function countAuditRows(
   request: import("@playwright/test").APIRequestContext,
-  token:   string,
   action:  string,
   entity:  string,
 ): Promise<number> {
   const res = await request.get(
     `${SUPABASE_URL}/rest/v1/audit_log?venue_id=eq.${VENUE_ID}&entity=eq.${entity}&action=eq.${action}&select=id`,
-    {
-      headers: {
-        apikey:        SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${token}`,
-        Prefer:        "count=exact",
-      },
-    }
+    { headers: { ...serviceHeaders(), Prefer: "count=exact" } }
   );
   const cr = res.headers()["content-range"] ?? "*/0";
   return parseInt(cr.split("/")[1] ?? "0", 10) || 0;
@@ -99,8 +92,7 @@ test("cancel booking writes audit_log row (entity=booking, action=cancel)", asyn
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AUDIT_DATE}`);
   await page.waitForLoadState("networkidle");
 
-  const token  = await getOwnerToken(request);
-  const before = await countAuditRows(request, token!, "cancel", "booking");
+  const before = await countAuditRows(request, "cancel", "booking");
 
   // Click the booking card to expand, then cancel
   await page.getByText(SLOTS.cancel.name).first().click();
@@ -108,8 +100,7 @@ test("cancel booking writes audit_log row (entity=booking, action=cancel)", asyn
   await page.getByRole("button", { name: /cancelar turno/i }).click();
   await page.waitForTimeout(2_000);
 
-  const tokenAfter = await getOwnerToken(request);
-  const after      = await countAuditRows(request, tokenAfter!, "cancel", "booking");
+  const after      = await countAuditRows(request, "cancel", "booking");
   expect(after).toBeGreaterThan(before);
 });
 
@@ -122,16 +113,14 @@ test("mark paid writes audit_log row (entity=booking, action=mark_paid)", async 
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AUDIT_DATE}`);
   await page.waitForLoadState("networkidle");
 
-  const token  = await getOwnerToken(request);
-  const before = await countAuditRows(request, token!, "mark_paid", "booking");
+  const before = await countAuditRows(request, "mark_paid", "booking");
 
   await page.getByText(SLOTS.markPaid.name).first().click();
   await expect(page.getByRole("button", { name: /marcar pagado/i })).toBeVisible({ timeout: 3_000 });
   await page.getByRole("button", { name: /marcar pagado/i }).click();
   await page.waitForTimeout(2_000);
 
-  const tokenAfter = await getOwnerToken(request);
-  const after      = await countAuditRows(request, tokenAfter!, "mark_paid", "booking");
+  const after      = await countAuditRows(request, "mark_paid", "booking");
   expect(after).toBeGreaterThan(before);
 });
 
@@ -144,16 +133,14 @@ test("mark no-show writes audit_log row (entity=booking, action=mark_no_show)", 
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AUDIT_DATE}`);
   await page.waitForLoadState("networkidle");
 
-  const token  = await getOwnerToken(request);
-  const before = await countAuditRows(request, token!, "mark_no_show", "booking");
+  const before = await countAuditRows(request, "mark_no_show", "booking");
 
   await page.getByText(SLOTS.noShow.name).first().click();
   await expect(page.getByRole("button", { name: /marcar ausente/i })).toBeVisible({ timeout: 3_000 });
   await page.getByRole("button", { name: /marcar ausente/i }).click();
   await page.waitForTimeout(2_000);
 
-  const tokenAfter = await getOwnerToken(request);
-  const after      = await countAuditRows(request, tokenAfter!, "mark_no_show", "booking");
+  const after      = await countAuditRows(request, "mark_no_show", "booking");
   expect(after).toBeGreaterThan(before);
 });
 
@@ -166,16 +153,14 @@ test("block phone writes audit_log row (entity=blocked_phone, action=create)", a
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AUDIT_DATE}`);
   await page.waitForLoadState("networkidle");
 
-  const token  = await getOwnerToken(request);
-  const before = await countAuditRows(request, token!, "create", "blocked_phone");
+  const before = await countAuditRows(request, "create", "blocked_phone");
 
   await page.getByText(SLOTS.blockPhone.name).first().click();
   await expect(page.getByRole("button", { name: /bloquear teléfono/i })).toBeVisible({ timeout: 3_000 });
   await page.getByRole("button", { name: /bloquear teléfono/i }).click();
   await page.waitForTimeout(2_000);
 
-  const tokenAfter = await getOwnerToken(request);
-  const after      = await countAuditRows(request, tokenAfter!, "create", "blocked_phone");
+  const after      = await countAuditRows(request, "create", "blocked_phone");
   expect(after).toBeGreaterThan(before);
 });
 
@@ -188,8 +173,7 @@ test("create manual block writes audit_log row (entity=booking, action=create_bl
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AUDIT_DATE}`);
   await page.waitForLoadState("networkidle");
 
-  const token  = await getOwnerToken(request);
-  const before = await countAuditRows(request, token!, "create_block", "booking");
+  const before = await countAuditRows(request, "create_block", "booking");
 
   // Use a slot not occupied by any other test booking (14:00 Mendoza, 90 min)
   const startVal = `${AUDIT_DATE}T14:00`;
@@ -203,7 +187,6 @@ test("create manual block writes audit_log row (entity=booking, action=create_bl
   await page.getByRole("button", { name: /guardar bloqueo/i }).click();
   await page.waitForTimeout(2_000);
 
-  const tokenAfter = await getOwnerToken(request);
-  const after      = await countAuditRows(request, tokenAfter!, "create_block", "booking");
+  const after      = await countAuditRows(request, "create_block", "booking");
   expect(after).toBeGreaterThan(before);
 });
