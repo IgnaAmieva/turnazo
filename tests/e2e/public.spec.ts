@@ -51,18 +51,20 @@ test("home page shows localities with venue counts", async ({ page }) => {
   // Tunuyán should appear as a link (has venues) with its venue count.
   // The exact number is not asserted: the shared DB also holds real venues
   // created from the panel (e.g. "futmates" on 2026-11-16).
-  const tunuyan = page.getByRole("link", { name: /tunuy/i });
+  // V2a: chip "Tunuyán · N" en "¿Dónde?"
+  const tunuyan = page.getByTestId("localidad").filter({ hasText: /tunuy/i });
   await expect(tunuyan).toBeVisible();
-  await expect(tunuyan).toContainText(/\d+ complejos?/);
+  await expect(tunuyan).toContainText(/Tunuyán · \d+/);
 });
 
 // ---------------------------------------------------------------------------
 // Locality page
 // ---------------------------------------------------------------------------
-test("/tunuyan shows sports with correct counts", async ({ page }) => {
+test("/tunuyan sigue funcionando: abre el inicio con la localidad y los deportes con su cantidad", async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto(`/${LOCALITY}`);
   await page.waitForLoadState("networkidle");
+  expect(new URL(page.url()).searchParams.get("localidad")).toBe(LOCALITY);
   await assertNoError(page);
   expect(errors).toHaveLength(0);
 

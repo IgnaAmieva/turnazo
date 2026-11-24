@@ -4,11 +4,13 @@ import {
   getVenueWithCourts,
   getCourtAvailability,
 } from "@/lib/supabase/queries";
-import { todayInMendoza, mendozaToUtc, parseTstzrange } from "@/lib/slots";
+import {
+  todayInMendoza, mendozaToUtc, parseTstzrange, generateSlots, weekdayInMendoza, formatTimeMendoza,
+} from "@/lib/slots";
 import CourtCalendar from "@/components/court-calendar";
 import AvailabilityWatcher from "@/components/availability-watcher";
 import DateNavigator from "@/components/date-navigator";
-import { BookingSheetProvider } from "@/components/booking-sheet";
+import { BookingSheetProvider, type SheetSlot } from "@/components/booking-sheet";
 import { RememberSearch } from "@/components/player-memory-ui";
 import type { Metadata } from "next";
 import Breadcrumbs from "@/components/breadcrumbs";
@@ -16,7 +18,7 @@ import { notFound } from "next/navigation";
 
 type Props = {
   params: Promise<{ locality: string; sport: string; venue: string }>;
-  searchParams: Promise<{ fecha?: string; _now?: string }>;
+  searchParams: Promise<{ fecha?: string; _now?: string; cancha?: string; inicio?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -28,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function VenuePage({ params, searchParams }: Props) {
   const { locality: lSlug, sport: sSlug, venue: venueId } = await params;
-  const { fecha, _now } = await searchParams;
+  const { fecha, _now, cancha, inicio } = await searchParams;
 
   const today = todayInMendoza();
   const date = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : today;
@@ -66,6 +68,30 @@ export default async function VenuePage({ params, searchParams }: Props) {
   );
 
   const basePath = `/${lSlug}/${sSlug}/${venueId}`;
+
+  // Turno elegido en el inicio o en la lista (?cancha=&inicio=): la hoja arranca
+  // abierta, solo si el turno sigue libre, con precio y todavía no empezó.
+  let initialSlot: SheetSlot | null = null;
+  const chosenCourt = cancha ? venue.courts.find((c) => c.id === cancha) : undefined;
+  if (chosenCourt && inicio && !Number.isNaN(Date.parse(inicio))) {
+    const weekday = weekdayInMendoza(date);
+    const slot = generateSlots({
+      date,
+      hours: chosenCourt.hours.filter((h) => h.weekday === weekday),
+      slotMinutes: chosenCourt.slot_minutes,
+      booked: availabilityByCourtId[chosenCourt.id] ?? [],
+      prices: chosenCourt.prices.filter((p) => p.weekday === weekday),
+      cutoff: date <= today ? (nowUtc ?? new Date()) : undefined,
+    }).find((s) => s.start.toISOString() === new Date(inicio).toISOString());
+    if (slot && slot.available && slot.price !== null) {
+      initialSlot = {
+        courtId: chosenCourt.id, courtName: chosenCourt.name,
+        start: slot.start.toISOString(), end: slot.end.toISOString(), date,
+        timeLabel: `${formatTimeMendoza(slot.start)} – ${formatTimeMendoza(slot.end)}`,
+        price: slot.price,
+      };
+    }
+  }
 
   return (
     <div>
@@ -107,6 +133,7 @@ export default async function VenuePage({ params, searchParams }: Props) {
         </p>
       ) : (
         <BookingSheetProvider
+          initialSlot={initialSlot}
           venue={{
             id: venue.id, name: venue.name, address: venue.address,
             deposit_required: venue.deposit_required, deposit_type: venue.deposit_type,

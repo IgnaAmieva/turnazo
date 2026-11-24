@@ -23,7 +23,7 @@ test.afterAll(async ({ request }) => {
 });
 
 for (const scheme of ["light", "dark"] as const) {
-  test(`inicio (${scheme}): localidades sin complejos dicen "Próximamente", se leen (AA) y no se pueden tocar`, async ({ page }) => {
+  test(`inicio (${scheme}): localidades sin complejos dicen "pronto", se leen (AA) y no se pueden tocar`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto("/");
     const soon = page.getByTestId("locality-soon");
@@ -31,12 +31,10 @@ for (const scheme of ["light", "dark"] as const) {
     const n = await soon.count();
     for (let i = 0; i < n; i++) {
       const card = soon.nth(i);
-      await expect(card).toContainText("Próximamente");
+      await expect(card).toContainText("· pronto");
       await expect(card).toHaveAttribute("aria-disabled", "true");
-      expect(await card.locator("a").count()).toBe(0);
-      for (const span of await card.locator("span").all()) {
-        expect(await contrastOf(span)).toBeGreaterThanOrEqual(4.5);
-      }
+      expect(await card.evaluate((el) => el.closest("a"))).toBeNull();
+      expect(await contrastOf(card)).toBeGreaterThanOrEqual(4.5);
     }
   });
 

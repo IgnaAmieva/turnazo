@@ -33,8 +33,21 @@ export type SheetVenue = VenuePaymentConfig & { id: string; name: string; addres
 
 const OpenSheet = createContext<((slot: SheetSlot) => void) | null>(null);
 
-export function BookingSheetProvider({ venue, children }: { venue: SheetVenue; children: ReactNode }) {
-  const [slot, setSlot] = useState<SheetSlot | null>(null);
+export function BookingSheetProvider({ venue, initialSlot = null, children }: {
+  venue: SheetVenue;
+  /** Turno elegido desde el inicio o la lista (?cancha=&inicio=): la hoja arranca abierta. */
+  initialSlot?: SheetSlot | null;
+  children: ReactNode;
+}) {
+  const [slot, setSlot] = useState<SheetSlot | null>(initialSlot);
+  // El turno elegido no queda en la URL: al recargar o volver no se reabre la hoja
+  useEffect(() => {
+    if (!initialSlot) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('cancha');
+    url.searchParams.delete('inicio');
+    window.history.replaceState(window.history.state, '', url.toString());
+  }, [initialSlot]);
   return (
     <OpenSheet.Provider value={setSlot}>
       {children}

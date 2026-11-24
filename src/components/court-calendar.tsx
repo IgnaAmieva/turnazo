@@ -99,6 +99,21 @@ export default function CourtCalendar({
           );
         }
 
+        // Sin precio cargado para ese horario (ej. futmates de 22:00 a 00:00): la base
+        // rechaza la reserva (price_not_set), así que no se ofrece como libre.
+        if (slot.price === null) {
+          return (
+            <div
+              key={startIso}
+              data-testid="slot-no-price"
+              className="min-h-11 rounded-lg border border-dashed border-line bg-transparent p-3 flex flex-col items-center gap-1 cursor-not-allowed"
+            >
+              <span className="text-base text-ink-muted">{label}</span>
+              <span className="text-xs text-ink-muted">Consultá al complejo</span>
+            </div>
+          );
+        }
+
         const href = `/${localitySlug}/${sportSlug}/${venueId}/reservar?cancha=${court.id}&inicio=${startIso}&fin=${endIso}&fecha=${date}`;
 
         return (

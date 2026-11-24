@@ -6,6 +6,7 @@ import { updateCourtAction, saveCourtHoursAction, saveCourtPricesAction } from "
 import { CourtForm } from "@/components/panel/court-form";
 import { CourtHoursEditor } from "@/components/panel/court-hours-editor";
 import { CourtPricesEditor } from "@/components/panel/court-prices-editor";
+import { unpricedRanges } from "@/lib/price-coverage";
 
 export default async function EditarCanchaPage({
   params,
@@ -25,6 +26,19 @@ export default async function EditarCanchaPage({
   const boundUpdateCourt = updateCourtAction.bind(null, id, cid);
   const boundSaveHours   = saveCourtHoursAction.bind(null, id, cid);
   const boundSavePrices  = saveCourtPricesAction.bind(null, id, cid);
+
+  // Horarios abiertos sin precio, agrupados por tramo: "22:00 a 00:00 · dom, lun, …"
+  const DAYS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  const byRange = new Map<string, { from: string; to: string; days: number[] }>();
+  for (const u of unpricedRanges(court.hours, court.prices, court.slot_minutes)) {
+    const k = `${u.from}-${u.to}`;
+    const cur = byRange.get(k) ?? { from: u.from, to: u.to, days: [] };
+    cur.days.push(u.weekday);
+    byRange.set(k, cur);
+  }
+  const unpriced = [...byRange.values()].map((r) => ({
+    from: r.from, to: r.to, days: r.days.length === 7 ? "todos los días" : r.days.map((d) => DAYS[d]).join(", "),
+  }));
 
   return (
     <div>
@@ -67,6 +81,18 @@ export default async function EditarCanchaPage({
           <p className="text-sm text-ink-muted mb-4">
             Cada fila define el precio de una franja horaria de un día de la semana.
           </p>
+          {unpriced.length > 0 && (
+            <div role="status" data-testid="sin-precio"
+              className="mb-4 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-ink">
+              <p className="font-semibold">Hay turnos sin precio: los jugadores no los pueden reservar.</p>
+              <ul className="mt-1 list-disc pl-5">
+                {unpriced.map((u) => (
+                  <li key={`${u.from}-${u.to}`}>{u.from} a {u.to} · {u.days}</li>
+                ))}
+              </ul>
+              <p className="mt-1 text-ink-muted">Agregá una franja que cubra esos horarios.</p>
+            </div>
+          )}
           <CourtPricesEditor
             action={boundSavePrices}
             initialPrices={court.prices}

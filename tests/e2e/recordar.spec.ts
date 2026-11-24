@@ -1,6 +1,6 @@
 /**
  * Rediseño M1: el dispositivo recuerda nombre, celular, localidad y deporte
- * (y nada más). "Seguir en …" en el inicio, datos precargados al reservar y
+ * (y nada más). En el inicio (V2a) se abre la búsqueda recordada, datos precargados al reservar y
  * "No soy yo" que borra todo. Reserva solo en el complejo de prueba y la borra.
  */
 import { test, expect, type Page } from "@playwright/test";
@@ -28,19 +28,19 @@ test.afterAll(async ({ request }) => {
   await deleteTestOutboxRows(request);
 });
 
-test("sin nada guardado no hay 'Seguir en…'; al mirar complejos queda localidad y deporte", async ({ page }) => {
+test("sin nada guardado no hay saludo; al mirar complejos, el inicio abre esa localidad y deporte", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.getByTestId("seguir-en")).toHaveCount(0);
+  await expect(page.getByTestId("hola")).toHaveCount(0);
 
   await page.goto("/tunuyan/padel");
   await expect.poll(() => stored(page)).toContain("tunuyan");
 
   await page.goto("/");
-  const link = page.getByRole("link", { name: "Seguir en Tunuyán · Pádel" });
-  await expect(link).toBeVisible();
-  await expect(link).toHaveAttribute("href", "/tunuyan/padel");
-  expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(page).toHaveURL(/\?localidad=tunuyan&deporte=padel/);
+  const padel = page.getByTestId("deporte").filter({ hasText: "Pádel" });
+  await expect(padel).toHaveAttribute("aria-current", "true");
+  expect((await padel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(JSON.parse((await stored(page))!)).toEqual({
     localidad: { slug: "tunuyan", nombre: "Tunuyán" },
     deporte:   { slug: "padel",   nombre: "Pádel" },
@@ -93,26 +93,28 @@ test("reservar guarda solo nombre y celular; la próxima vez vienen precargados;
   expect(await stored(page)).toBeNull();
 
   await page.goto("/");
-  await expect(page.getByTestId("seguir-en")).toHaveCount(0);
+  await expect(page.getByTestId("hola")).toHaveCount(0);
 });
 
-test("inicio: título '¿Dónde jugamos?' y saludo solo con el primer nombre", async ({ page }) => {
+test("inicio: título '¿Jugamos hoy?' y saludo solo con el primer nombre", async ({ page }) => {
   await page.addInitScript((k) => localStorage.setItem(k, JSON.stringify({
     nombre: "Juan Carlos Pérez", celular: "2622123456",
     localidad: { slug: "tunuyan", nombre: "Tunuyán" }, deporte: { slug: "padel", nombre: "Pádel" },
   })), KEY);
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("¿Dónde jugamos?");
-  await expect(page.getByTestId("seguir-en")).toContainText("Hola, Juan");
-  await expect(page.getByTestId("seguir-en")).not.toContainText("Carlos");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("¿Jugamos hoy?");
+  await expect(page.getByTestId("hola")).toContainText("Hola, Juan");
+  await expect(page.getByTestId("hola")).not.toContainText("Carlos");
 });
 
 test("'No soy yo' también está en el inicio y borra la búsqueda recordada", async ({ page }) => {
   await page.goto("/tunuyan/padel");
   await page.goto("/");
-  await expect(page.getByTestId("seguir-en")).toBeVisible();
-  await page.getByRole("button", { name: "No soy yo" }).click();
-  await expect(page.getByTestId("seguir-en")).toHaveCount(0);
+  await expect(page.getByTestId("hola")).toBeVisible();
+  const notMe = page.getByRole("button", { name: "No soy yo" });
+  expect((await notMe.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await notMe.click();
+  await expect(page.getByTestId("hola")).toHaveCount(0);
   expect(await stored(page)).toBeNull();
 });
 
@@ -125,6 +127,7 @@ test("un valor manipulado en localStorage se ignora (solo campos permitidos)", a
   await page.goto(reservarUrl(20));
   await expect(page.getByLabel("Tu nombre")).toHaveValue("Ana");
   await page.goto("/");
-  // localidad inválida → no hay "Seguir en…"
-  await expect(page.getByTestId("seguir-en")).toHaveCount(0);
+  // localidad inválida → no se abre ninguna búsqueda recordada
+  await page.waitForLoadState("networkidle");
+  expect(new URL(page.url()).search).toBe("");
 });

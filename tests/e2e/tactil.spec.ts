@@ -68,7 +68,7 @@ test("todo el flujo público tiene objetivos táctiles de 44 px o más", async (
   };
 
   await check("inicio", "/");
-  await check("localidad", "/tunuyan");
+  await check("inicio con localidad y deporte", "/?localidad=tunuyan&deporte=padel");
   await page.goto("/tunuyan/padel");
   await page.locator(".leaflet-control-zoom").waitFor(); // el mapa carga después
   await check("complejos");

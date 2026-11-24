@@ -111,3 +111,23 @@
   line-height: 44px;
   font-size: 22px;
 }
+
+/*
+ * Portadas verdes (inicio, complejo): en claro, el verde de primary con texto
+ * crema; en oscuro primary es lima, así que la portada usa surface (verde) y
+ * el texto ink (crema). Mismas variables, sin colores nuevos.
+ */
+.cover {
+  background-color: var(--primary);
+  color: var(--on-primary);
+}
+[data-theme="dark"] .cover {
+  background-color: var(--surface);
+  color: var(--ink);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .cover {
+    background-color: var(--surface);
+    color: var(--ink);
+  }
+}

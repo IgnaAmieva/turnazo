@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño: pendientes de M3 en la rama `rediseno`; sigue V2; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño V2a en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 322 | ✓ verde (2026-11-24, rama `rediseno` pendientes M3) |
-| E2E | Playwright | 103 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` pendientes M3) |
+| Unitarios + integración | Vitest | 325 | ✓ verde (2026-11-24, rama `rediseno` V2a) |
+| E2E | Playwright | 110 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` V2a) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -122,6 +122,11 @@ Rediseño D0 (paleta, fuente, modo claro/oscuro):
 - Modo: `src/lib/theme.ts` (`THEME_SCRIPT` inline en el `<head>`, sin parpadeo): automático sigue al celular; el botón `components/theme-toggle.tsx` (encabezado público) cicla Automático → Claro → Oscuro y guarda solo `turnazo-theme` en localStorage. Actualiza el color de la barra del celular. Tests: `tests/unit/theme.test.ts` (ejecuta el mismo script con un navegador simulado) y `tests/e2e/theme.spec.ts`.
 - Fuente Outfit (500 texto, 800 títulos) con `next/font`.
 - Desde D2 no queda ninguna pantalla forzada en claro.
+
+Rediseño V2 (diseño aprobado "versión 2"; la imagen de referencia está en diseno/, fuera del repo):
+- V2a · Inicio: deporte y lugar en una sola pantalla (?localidad=&deporte=; sin elección, la búsqueda recordada o la primera con complejos). Portada verde con líneas de cancha (SVG, clase `.cover` en globals.css: primary en claro, surface en oscuro, mismas variables), "Hola, Juan" + "No soy yo", "¿Jugamos hoy?" y "Lo antes posible · 18:00 · complejo →" (primer turno libre CON precio de hoy o, si no queda, de mañana), que abre el complejo con la hoja de ese turno (?cancha=&inicio=, la hoja limpia la URL). "¿Qué querés jugar?" con íconos de línea (components/sport-art.tsx), el elegido en primary, sin complejos "Pronto" sin link. "¿Dónde?": chips "Tunuyán · 3", sin complejos "· pronto". /[localidad] redirige al inicio con esa localidad; /[localidad]/[deporte] sigue igual. Se quitó "Seguir en…" (lo reemplaza la portada).
+- lib/free-slots.ts: canchas de una localidad+deporte en UNA consulta; disponibilidad con get_court_availability una vez por cancha y fecha por request (React cache), tope MAX_COURTS = 24 canchas; solo hoy y, si hace falta, mañana.
+- Bug de futmates (22:00 y 23:00 sin precio): la cancha abre de 10:00 a 00:00 y el precio está cargado de 08:00 a 22:00 (la fila que propone el editor por defecto). No es un error de cálculo: falta la franja de precio. La base rechaza esas reservas (price_not_set). Arreglo: la grilla ya no ofrece como libre un turno sin precio ("Consultá al complejo", sin link), "Lo antes posible" y la lista los saltean, y el panel de la cancha avisa "Hay turnos sin precio: 22:00 a 00:00 · todos los días" (lib/price-coverage.ts + tests/unit/price-coverage.test.ts). Los datos de futmates no se tocaron: el dueño tiene que agregar la franja 22:00–00:00.
 
 Pendientes de M3:
 - Teléfono bloqueado (y todo error general): los datos vuelven a la línea recordada con "Cambiar" y "No soy yo"; con los campos abiertos, "No soy yo" va dentro de la misma tarjeta. Los errores sin reintento muestran "Cerrar" (44 px) donde iba Confirmar: en la hoja la cierra; en /reservar vuelve al complejo.
@@ -491,7 +496,9 @@ SELECT vault.create_secret('<mismo-valor-que-PUSH_SEND_SECRET>', 'push_secret');
    borran outbox rows y bloquean teléfonos. Solo correr `pnpm test:e2e` contra
    `localhost:3001`.
 
-## Propuesta: create_booking que reemplaza el hold (no aplicada, para revisar)
+## Pendiente S5: create_booking que reemplaza el hold (p_replace_hold_token)
+
+Aprobada la idea, pero no ahora: va en S5, en una migración aparte (no en la 023).
 
 Hoy "Pagar en el lugar" después de un error de Mercado Pago hace dos pasos: la acción de pago libera el hold (`status = 'expired'`) y después el formulario llama a `create_booking`. La restricción `no_overlap` (holds + confirmadas) impide dos reservas activas, pero entre los dos pasos el turno queda libre unos segundos y otro jugador podría tomarlo (el jugador lo ve: "Este turno ya fue reservado" + "Ver otros horarios").
 

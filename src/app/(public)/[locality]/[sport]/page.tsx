@@ -42,8 +42,8 @@ export default async function VenuesPage({ params }: Props) {
         deporte={{ slug: sport.slug, nombre: sport.name }}
       />
       <Breadcrumbs
-        back={`/${locality.slug}`}
-        items={[{ href: "/", label: "Inicio" }, { href: `/${locality.slug}`, label: locality.name }]}
+        back={`/?localidad=${locality.slug}&deporte=${sport.slug}`}
+        items={[{ href: `/?localidad=${locality.slug}&deporte=${sport.slug}`, label: "Inicio" }]}
         current={sport.name}
       />
 

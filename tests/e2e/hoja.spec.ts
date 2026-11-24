@@ -186,8 +186,7 @@ test("pago online desde la hoja: error de MP pegado y 'Pagar en el lugar' reserv
 // ---------------------------------------------------------------------------
 test("celular: '← Volver' de 44 px al paso anterior lógico; sin migas", async ({ page }) => {
   const cases: [string, string][] = [
-    ["/tunuyan", "/"],
-    ["/tunuyan/padel", "/tunuyan"],
+    ["/tunuyan/padel", "/?localidad=tunuyan&deporte=padel"],
     [venueUrl, "/tunuyan/padel"],
   ];
   for (const [url, back] of cases) {
