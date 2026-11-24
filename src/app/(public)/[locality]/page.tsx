@@ -1,6 +1,7 @@
 import { getLocalityBySlug, getSportsWithVenueCount } from "@/lib/supabase/queries";
 import type { Metadata } from "next";
 import Link from "next/link";
+import Breadcrumbs from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 
 type Props = { params: Promise<{ locality: string }> };
@@ -30,11 +31,7 @@ export default async function LocalityPage({ params }: Props) {
 
   return (
     <div className="max-w-lg mx-auto">
-      <nav className="text-sm text-ink-muted mb-6">
-        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">Inicio</Link>
-        <span className="mx-2">/</span>
-        <span className="text-ink">{locality.name}</span>
-      </nav>
+      <Breadcrumbs back="/" items={[{ href: "/", label: "Inicio" }]} current={locality.name} />
 
       <h1 className="text-2xl font-bold text-ink mb-1">{locality.name}</h1>
       <p className="text-ink-muted mb-8">¿Qué deporte querés jugar?</p>

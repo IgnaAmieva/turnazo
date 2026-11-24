@@ -8,9 +8,10 @@ import { todayInMendoza, mendozaToUtc, parseTstzrange } from "@/lib/slots";
 import CourtCalendar from "@/components/court-calendar";
 import AvailabilityWatcher from "@/components/availability-watcher";
 import DateNavigator from "@/components/date-navigator";
+import { BookingSheetProvider } from "@/components/booking-sheet";
 import { RememberSearch } from "@/components/player-memory-ui";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Breadcrumbs from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 
 type Props = {
@@ -72,15 +73,15 @@ export default async function VenuePage({ params, searchParams }: Props) {
         localidad={{ slug: locality.slug, nombre: locality.name }}
         deporte={{ slug: sport.slug, nombre: sport.name }}
       />
-      <nav className="text-sm text-ink-muted mb-6">
-        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">Inicio</Link>
-        <span className="mx-2">/</span>
-        <Link href={`/${lSlug}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{locality.name}</Link>
-        <span className="mx-2">/</span>
-        <Link href={`/${lSlug}/${sSlug}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{sport.name}</Link>
-        <span className="mx-2">/</span>
-        <span className="text-ink">{venue.name}</span>
-      </nav>
+      <Breadcrumbs
+        back={`/${lSlug}/${sSlug}`}
+        items={[
+          { href: "/", label: "Inicio" },
+          { href: `/${lSlug}`, label: locality.name },
+          { href: `/${lSlug}/${sSlug}`, label: sport.name },
+        ]}
+        current={venue.name}
+      />
 
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
@@ -105,6 +106,14 @@ export default async function VenuePage({ params, searchParams }: Props) {
           No hay canchas de {sport.name} disponibles en este complejo.
         </p>
       ) : (
+        <BookingSheetProvider
+          venue={{
+            id: venue.id, name: venue.name, address: venue.address,
+            deposit_required: venue.deposit_required, deposit_type: venue.deposit_type,
+            deposit_value: venue.deposit_value, allow_full_payment: venue.allow_full_payment,
+            allow_pay_at_venue: venue.allow_pay_at_venue,
+          }}
+        >
         <div className="mt-6 space-y-8">
           {venue.courts.map((court) => (
             <section key={court.id}>
@@ -127,6 +136,7 @@ export default async function VenuePage({ params, searchParams }: Props) {
             </section>
           ))}
         </div>
+        </BookingSheetProvider>
       )}
     </div>
   );

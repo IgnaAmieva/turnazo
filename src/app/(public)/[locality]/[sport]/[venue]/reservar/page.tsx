@@ -8,7 +8,9 @@ import {
   getVenueWithCourts,
 } from '@/lib/supabase/queries';
 import { formatTimeMendoza, formatDateMendoza, weekdayInMendoza } from '@/lib/slots';
-import BookingForm, { type PaymentOption } from './booking-form';
+import BookingForm from './booking-form';
+import { buildPaymentOptions } from '@/lib/payment-options';
+import Breadcrumbs from '@/components/breadcrumbs';
 import { createBookingAction, type BookingActionState } from '@/app/actions/booking';
 import { startPaymentAction } from '@/app/actions/payment';
 
@@ -63,39 +65,8 @@ export default async function ReservarPage({ params, searchParams }: Props) {
 
   const displayPrice = priceEntry?.price ?? null;
 
-  // Opciones de pago habilitadas por el complejo. Los montos que se muestran
-  // son orientativos: el monto real lo calcula create_booking_hold en la base.
-  const paymentOptions: PaymentOption[] = [];
-  if (venue.deposit_required) {
-    let depositAmount: number | null = null;
-    if (displayPrice !== null && venue.deposit_value !== null) {
-      depositAmount = venue.deposit_type === 'percent'
-        ? Math.round(displayPrice * venue.deposit_value / 100)
-        : Math.min(venue.deposit_value, displayPrice);
-    }
-    paymentOptions.push({
-      value: 'deposit',
-      label: 'Pagar la seña online',
-      detail: 'El resto lo pagás en el lugar.',
-      amount: depositAmount,
-    });
-  }
-  if (venue.allow_full_payment) {
-    paymentOptions.push({
-      value: 'full',
-      label: 'Pagar el total online',
-      detail: 'Pagás todo ahora con Mercado Pago.',
-      amount: displayPrice,
-    });
-  }
-  if (venue.allow_pay_at_venue) {
-    paymentOptions.push({
-      value: 'venue',
-      label: 'Pagar en el lugar',
-      detail: 'Reservás ahora y pagás cuando vas a jugar.',
-      amount: displayPrice,
-    });
-  }
+  // Opciones de pago habilitadas por el complejo (montos orientativos).
+  const paymentOptions = buildPaymentOptions(venue, displayPrice);
 
   // Labels de fecha y hora
   const startLabel = formatTimeMendoza(startDate);
@@ -120,18 +91,16 @@ export default async function ReservarPage({ params, searchParams }: Props) {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-ink-muted mb-6 flex flex-wrap gap-1 items-center">
-        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">Inicio</Link>
-        <span>/</span>
-        <Link href={`/${lSlug}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{locality.name}</Link>
-        <span>/</span>
-        <Link href={`/${lSlug}/${sSlug}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{sport.name}</Link>
-        <span>/</span>
-        <Link href={`/${lSlug}/${sSlug}/${venueId}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{venue.name}</Link>
-        <span>/</span>
-        <span className="text-ink">Reservar</span>
-      </nav>
+      <Breadcrumbs
+        back={`/${lSlug}/${sSlug}/${venueId}?fecha=${fecha}`}
+        items={[
+          { href: '/', label: 'Inicio' },
+          { href: `/${lSlug}`, label: locality.name },
+          { href: `/${lSlug}/${sSlug}`, label: sport.name },
+          { href: `/${lSlug}/${sSlug}/${venueId}`, label: venue.name },
+        ]}
+        current="Reservar"
+      />
 
       <h1 className="text-2xl font-bold text-ink mb-5">Confirmar reserva</h1>
 

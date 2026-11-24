@@ -1,5 +1,4 @@
 import { getLocalitiesWithVenueCount } from "@/lib/supabase/queries";
-import { APP_NAME } from "@/lib/constants";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ContinueSearch } from "@/components/player-memory-ui";
@@ -12,7 +11,7 @@ export default async function HomePage() {
 
   return (
     <div className="max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold text-ink mb-1">{APP_NAME}</h1>
+      <h1 className="text-2xl font-bold text-ink mb-1">¿Dónde jugamos?</h1>
       <p className="text-ink-muted mb-6">¿En qué localidad querés reservar?</p>
 
       <ContinueSearch />

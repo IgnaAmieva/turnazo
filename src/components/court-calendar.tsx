@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { SlotLink } from '@/components/booking-sheet';
 import {
   generateSlots,
   weekdayInMendoza,
@@ -102,10 +102,18 @@ export default function CourtCalendar({
         const href = `/${localitySlug}/${sportSlug}/${venueId}/reservar?cancha=${court.id}&inicio=${startIso}&fin=${endIso}&fecha=${date}`;
 
         return (
-          <Link
+          <SlotLink
             key={startIso}
             href={href}
-            data-testid="slot-free"
+            slot={{
+              courtId: court.id,
+              courtName: court.name,
+              start: startIso,
+              end: endIso,
+              date,
+              timeLabel: `${label} – ${formatTimeMendoza(slot.end)}`,
+              price: slot.price,
+            }}
             className="min-h-11 rounded-lg border border-line bg-surface p-3 flex flex-col items-center gap-1
               hover:border-primary active:bg-surface-2 transition-colors
               focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -116,7 +124,7 @@ export default function CourtCalendar({
                 ${slot.price.toLocaleString('es-AR')}
               </span>
             )}
-          </Link>
+          </SlotLink>
         );
       })}
     </div>

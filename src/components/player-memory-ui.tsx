@@ -36,7 +36,7 @@ export function ContinueSearch() {
   const { localidad, deporte } = mem;
   return (
     <div className="mb-6 rounded-2xl border border-line bg-surface p-4 shadow-sm" data-testid="seguir-en">
-      {mem.nombre && <p className="text-sm text-ink-muted mb-2">Hola, {mem.nombre}</p>}
+      {mem.nombre && <p className="text-sm text-ink-muted mb-2">Hola, {mem.nombre.split(/\s+/)[0]}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href={`/${localidad.slug}/${deporte.slug}`}

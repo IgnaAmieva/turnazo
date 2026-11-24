@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
+import Breadcrumbs from "@/components/breadcrumbs";
 import { createClient } from '@/lib/supabase/server';
 import { formatTimeMendoza, formatDateMendoza } from '@/lib/slots';
 import CancelForm from './cancel-form';
@@ -110,11 +111,7 @@ export default async function TurnoPage({ params }: Props) {
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
       {/* Breadcrumb */}
-      <nav className="text-sm text-ink-muted mb-6">
-        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">Inicio</Link>
-        <span className="mx-2">/</span>
-        <span className="text-ink">Mi turno</span>
-      </nav>
+      <Breadcrumbs back="/" items={[{ href: "/", label: "Inicio" }]} current="Mi turno" />
 
       {/* Badge de estado */}
       <div className="mb-6">

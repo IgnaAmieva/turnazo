@@ -91,6 +91,17 @@ test("reservar guarda solo nombre y celular; la próxima vez vienen precargados;
   await expect(page.getByTestId("seguir-en")).toHaveCount(0);
 });
 
+test("inicio: título '¿Dónde jugamos?' y saludo solo con el primer nombre", async ({ page }) => {
+  await page.addInitScript((k) => localStorage.setItem(k, JSON.stringify({
+    nombre: "Juan Carlos Pérez", celular: "2622123456",
+    localidad: { slug: "tunuyan", nombre: "Tunuyán" }, deporte: { slug: "padel", nombre: "Pádel" },
+  })), KEY);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("¿Dónde jugamos?");
+  await expect(page.getByTestId("seguir-en")).toContainText("Hola, Juan");
+  await expect(page.getByTestId("seguir-en")).not.toContainText("Carlos");
+});
+
 test("'No soy yo' también está en el inicio y borra la búsqueda recordada", async ({ page }) => {
   await page.goto("/tunuyan/padel");
   await page.goto("/");

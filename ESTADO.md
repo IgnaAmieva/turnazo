@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño M1 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño M2 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 274 | ✓ verde (2026-11-24, rama `rediseno` M1) |
-| E2E | Playwright | 91 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` M1) |
+| Unitarios + integración | Vitest | 274 | ✓ verde (2026-11-24, rama `rediseno` M2) |
+| E2E | Playwright | 99 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` M2) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -122,6 +122,16 @@ Rediseño D0 (paleta, fuente, modo claro/oscuro):
 - Modo: `src/lib/theme.ts` (`THEME_SCRIPT` inline en el `<head>`, sin parpadeo): automático sigue al celular; el botón `components/theme-toggle.tsx` (encabezado público) cicla Automático → Claro → Oscuro y guarda solo `turnazo-theme` en localStorage. Actualiza el color de la barra del celular. Tests: `tests/unit/theme.test.ts` (ejecuta el mismo script con un navegador simulado) y `tests/e2e/theme.spec.ts`.
 - Fuente Outfit (500 texto, 800 títulos) con `next/font`.
 - Desde D2 no queda ninguna pantalla forzada en claro.
+
+Rediseño M2 (reserva en la hoja del complejo):
+- `src/components/booking-sheet.tsx`: tocar un turno libre abre una hoja (abajo en el celular, centrada en escritorio) con el mismo `BookingForm` y las MISMAS server actions que /reservar (online → `startPaymentAction` → Mercado Pago; en el lugar → `createBookingAction` → /turnos/…). Las server actions no cambiaron. Con datos recordados: turno → Confirmar = 2 toques.
+- El turno sigue siendo un `<a href="/reservar?…">`: sin JavaScript (o Ctrl/Cmd + clic) se usa la página /reservar, que sigue igual.
+- `BookingForm`: pie fijo abajo (`sticky`) con el error pegado al botón (`data-testid="reserva-error"`), en la hoja y en /reservar. Lugar reservado para Turnstile: `<div data-captcha-slot>` (se completa al mergear `s2-captcha`; no se trajo código de esa rama).
+- `src/lib/payment-options.ts`: `buildPaymentOptions` (sacado de /reservar, mismo cálculo) para la página y la hoja.
+- Celular: las migas de pan se reemplazan por "← Volver" (44 px) al paso anterior lógico (`components/breadcrumbs.tsx`): localidad → inicio, complejos → localidad, complejo → complejos, reservar → complejo con su fecha, mi turno / pago → inicio. Escritorio: migas completas.
+- Inicio: título "¿Dónde jugamos?"; el saludo usa solo el primer nombre.
+- `tests/e2e/hoja.spec.ts`: 2 toques con datos recordados, Confirmar a la vista, lugar del captcha, error pegado al botón cuando el turno se ocupa con la hoja abierta, Cerrar/Escape, sin JS → /reservar, pago online desde la hoja con la cuenta MP falsa (error de MP; se restaura el cobro), "← Volver" y migas en escritorio.
+- Capturas: `11-hoja` y `12-hoja-error` (claro/oscuro).
 
 Rediseño M1 (recordar al jugador, 44 px en el flujo público):
 - `src/lib/player-memory.ts`: localStorage `turnazo-jugador` con SOLO nombre, celular, última localidad y último deporte (`sanitizePlayerMemory` descarta cualquier otro campo, slugs raros y textos largos). Nunca el email ni nada del pago. `tests/unit/player-memory.test.ts`.

@@ -4,23 +4,20 @@ import { useActionState, useState } from 'react';
 import { type BookingActionState } from '@/app/actions/booking';
 import { rememberPlayer, usePlayerMemory } from '@/lib/player-memory';
 import { NotMeButton } from '@/components/player-memory-ui';
+import type { PaymentOption } from '@/lib/payment-options';
 
-export type PaymentOption = {
-  value: 'deposit' | 'full' | 'venue';
-  label: string;
-  detail: string;
-  /** Monto orientativo (el real lo calcula la base); null si no hay precio */
-  amount: number | null;
-};
+export type { PaymentOption };
 
 type Props = {
   action: (prevState: BookingActionState, formData: FormData) => Promise<BookingActionState>;
   options: PaymentOption[];
+  /** "sheet": dentro de la hoja del complejo (el pie fijo usa el fondo de la hoja). */
+  variant?: 'page' | 'sheet';
 };
 
 const initialState: BookingActionState = {};
 
-export default function BookingForm({ action, options }: Props) {
+export default function BookingForm({ action, options, variant = 'page' }: Props) {
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [selected, setSelected] = useState<PaymentOption['value']>(options[0]?.value ?? 'venue');
 
@@ -47,13 +44,6 @@ export default function BookingForm({ action, options }: Props) {
             Reservás como <strong className="font-extrabold">{savedName || savedPhone}</strong>
           </p>
           <NotMeButton />
-        </div>
-      )}
-
-      {/* Error general */}
-      {state.error && (
-        <div className="rounded-xl bg-danger-soft border border-danger/40 p-4 text-danger text-sm">
-          {state.error}
         </div>
       )}
 
@@ -188,24 +178,40 @@ export default function BookingForm({ action, options }: Props) {
         </div>
       </fieldset>
 
-      {/* Botón */}
-      <button
-        type="submit"
-        disabled={isPending}
-        className="w-full rounded-2xl bg-primary py-3.5 text-sm font-extrabold text-on-primary
-          shadow-sm hover:opacity-90 active:opacity-80 transition-colors
-          disabled:opacity-60 disabled:cursor-not-allowed"
+      {/* Pie fijo abajo: el error queda pegado al botón */}
+      <div
+        data-testid="reserva-pie"
+        className={`sticky bottom-0 z-10 -mx-4 space-y-2 border-t border-line px-4 pt-3
+          pb-[calc(0.75rem+env(safe-area-inset-bottom))] ${variant === 'sheet' ? 'bg-surface' : 'bg-bg'}`}
       >
-        {isPending
-          ? (paysOnline ? 'Preparando el pago…' : 'Reservando…')
-          : (paysOnline ? 'Ir a pagar con Mercado Pago' : 'Confirmar reserva')}
-      </button>
+        {state.error && (
+          <div role="alert" data-testid="reserva-error"
+            className="rounded-xl bg-danger-soft border border-danger/40 px-4 py-3 text-danger text-sm">
+            {state.error}
+          </div>
+        )}
 
-      <p className="text-xs text-ink-muted text-center">
-        {paysOnline
-          ? 'Tenés 10 minutos para completar el pago. Si no se paga, el turno se libera solo.'
-          : 'Al confirmar aceptás las condiciones del complejo.'}
-      </p>
+        {/* Lugar reservado para el captcha (Turnstile, rama s2-captcha): se integra al mergear S2. */}
+        <div data-captcha-slot="" />
+
+        <button
+          type="submit"
+          disabled={isPending}
+          className="w-full min-h-11 rounded-2xl bg-primary py-3.5 text-sm font-extrabold text-on-primary
+            shadow-sm hover:opacity-90 active:opacity-80 transition-colors
+            disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isPending
+            ? (paysOnline ? 'Preparando el pago…' : 'Reservando…')
+            : (paysOnline ? 'Ir a pagar con Mercado Pago' : 'Confirmar reserva')}
+        </button>
+
+        <p className="text-xs text-ink-muted text-center">
+          {paysOnline
+            ? 'Tenés 10 minutos para completar el pago. Si no se paga, el turno se libera solo.'
+            : 'Al confirmar aceptás las condiciones del complejo.'}
+        </p>
+      </div>
     </form>
   );
 }

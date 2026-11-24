@@ -7,6 +7,7 @@ import {
 } from "@/lib/supabase/queries";
 import type { Metadata } from "next";
 import Link from "next/link";
+import Breadcrumbs from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import VenueMap from "@/components/venue-map-wrapper";
 import { RememberSearch } from "@/components/player-memory-ui";
@@ -40,13 +41,11 @@ export default async function VenuesPage({ params }: Props) {
         localidad={{ slug: locality.slug, nombre: locality.name }}
         deporte={{ slug: sport.slug, nombre: sport.name }}
       />
-      <nav className="text-sm text-ink-muted mb-6">
-        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">Inicio</Link>
-        <span className="mx-2">/</span>
-        <Link href={`/${locality.slug}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{locality.name}</Link>
-        <span className="mx-2">/</span>
-        <span className="text-ink">{sport.name}</span>
-      </nav>
+      <Breadcrumbs
+        back={`/${locality.slug}`}
+        items={[{ href: "/", label: "Inicio" }, { href: `/${locality.slug}`, label: locality.name }]}
+        current={sport.name}
+      />
 
       <h1 className="text-2xl font-bold text-ink mb-1">
         {sport.name} en {locality.name}
