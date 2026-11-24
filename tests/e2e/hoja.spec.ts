@@ -32,18 +32,24 @@ async function remember(page: Page) {
 const venueUrl = `${VENUE_PATH}?fecha=${FECHA}`;
 const slotAt = (page: Page, hhmm: string) =>
   page.locator("section").first().getByTestId("slot-free").filter({ hasText: hhmm }).first(); // Cancha 1
+/** V2c: tocar el turno lo elige; "Reservar" en la barra de abajo abre la hoja. */
+const pick = async (page: Page, hhmm: string) => {
+  await slotAt(page, hhmm).click();
+  await page.getByTestId("barra-reservar").getByRole("button", { name: "Reservar" }).click();
+};
 
 test.afterAll(async ({ request }) => {
   await deleteTestBookings(request, ["E2E Hoja*"]);
   await deleteTestOutboxRows(request);
 });
 
-test("con datos recordados: turno → Confirmar = 2 toques y queda reservado", async ({ page }) => {
+test("con datos recordados: turno → Reservar → Confirmar = 3 toques y queda reservado", async ({ page }) => {
   await remember(page);
   await page.goto(venueUrl);
   let taps = 0;
 
   await slotAt(page, "17:00").click(); taps++;
+  await page.getByTestId("barra-reservar").getByRole("button", { name: "Reservar" }).click(); taps++;
   const sheet = page.getByRole("dialog");
   await expect(sheet).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${VENUE_PATH}\\?`)); // no navegó a /reservar
@@ -60,7 +66,7 @@ test("con datos recordados: turno → Confirmar = 2 toques y queda reservado", a
   const nav = page.waitForURL(/\/turnos\//, { timeout: 25_000 });
   await confirm.click(); taps++;
   await nav;
-  expect(taps).toBe(2);
+  expect(taps).toBe(3);
   await expect(page.getByText(/confirmado/i)).toBeVisible();
   await expect(page.getByText(NAME)).toBeVisible();
 });
@@ -68,7 +74,7 @@ test("con datos recordados: turno → Confirmar = 2 toques y queda reservado", a
 test("turno tomado con la hoja abierta: error pegado y 'Ver otros horarios' reemplaza a Confirmar", async ({ page, request }) => {
   await remember(page);
   await page.goto(venueUrl);
-  await slotAt(page, "18:30").click();
+  await pick(page, "18:30");
   const sheet = page.getByRole("dialog");
   await expect(sheet).toBeVisible();
 
@@ -96,11 +102,11 @@ test("turno tomado con la hoja abierta: error pegado y 'Ver otros horarios' reem
 
 test("Cerrar y Escape cierran la hoja sin reservar", async ({ page }) => {
   await page.goto(venueUrl);
-  await slotAt(page, "20:00").click();
+  await pick(page, "20:00");
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Cerrar" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
-  await slotAt(page, "20:00").click();
+  await pick(page, "20:00");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toBeHidden();
 });
@@ -153,7 +159,7 @@ test("pago online desde la hoja: error de MP pegado y 'Pagar en el lugar' reserv
 
     await remember(page);
     await page.goto(venueUrl);
-    await slotAt(page, "14:00").click();
+    await pick(page, "14:00");
     const sheet = page.getByRole("dialog");
     await sheet.getByRole("radio", { name: /pagar el total online/i }).check();
     await sheet.getByLabel("Tu email").fill("e2e-hoja@turnazo.test");

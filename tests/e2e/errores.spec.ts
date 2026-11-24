@@ -21,6 +21,7 @@ const BLOCKED_DIGITS = "2622000321"; // la base guarda (y bloquea) solo los díg
 const openSheet = async (page: Page, hhmm: string) => {
   await page.goto(`${VENUE_PATH}?fecha=${FECHA}`);
   await page.locator("section").first().getByTestId("slot-free").filter({ hasText: hhmm }).first().click();
+  await page.getByTestId("barra-reservar").getByRole("button", { name: "Reservar" }).click(); // V2c
   const sheet = page.getByRole("dialog");
   await expect(sheet).toBeVisible();
   return sheet;

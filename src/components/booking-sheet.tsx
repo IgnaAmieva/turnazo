@@ -31,15 +31,27 @@ export type SheetSlot = {
 
 export type SheetVenue = VenuePaymentConfig & { id: string; name: string; address: string };
 
-const OpenSheet = createContext<((slot: SheetSlot) => void) | null>(null);
+type SheetCtx = {
+  selected: SheetSlot | null;
+  select: (slot: SheetSlot) => void;
+  open: (slot: SheetSlot) => void;
+};
+const SheetContext = createContext<SheetCtx | null>(null);
 
+const sameSlot = (a: SheetSlot | null, b: SheetSlot) => a !== null && a.courtId === b.courtId && a.start === b.start;
+
+/**
+ * V2c: tocar un turno lo ELIGE (queda en lima) y la barra fija de abajo
+ * ("Hoy 19:00 · Cancha 1 · $10.000" + "Reservar") abre la hoja de M2.
+ */
 export function BookingSheetProvider({ venue, initialSlot = null, children }: {
   venue: SheetVenue;
   /** Turno elegido desde el inicio o la lista (?cancha=&inicio=): la hoja arranca abierta. */
   initialSlot?: SheetSlot | null;
   children: ReactNode;
 }) {
-  const [slot, setSlot] = useState<SheetSlot | null>(initialSlot);
+  const [selected, setSelected] = useState<SheetSlot | null>(initialSlot);
+  const [openSlot, setOpenSlot] = useState<SheetSlot | null>(initialSlot);
   // El turno elegido no queda en la URL: al recargar o volver no se reabre la hoja
   useEffect(() => {
     if (!initialSlot) return;
@@ -49,31 +61,75 @@ export function BookingSheetProvider({ venue, initialSlot = null, children }: {
     window.history.replaceState(window.history.state, '', url.toString());
   }, [initialSlot]);
   return (
-    <OpenSheet.Provider value={setSlot}>
+    <SheetContext.Provider value={{ selected, select: setSelected, open: (s) => { setSelected(s); setOpenSlot(s); } }}>
       {children}
-      {slot && <BookingSheet key={`${slot.courtId}-${slot.start}`} venue={venue} slot={slot} onClose={() => setSlot(null)} />}
-    </OpenSheet.Provider>
+      {selected && <ReserveBar slot={selected} onReserve={() => setOpenSlot(selected)} />}
+      {openSlot && <BookingSheet key={`${openSlot.courtId}-${openSlot.start}`} venue={venue} slot={openSlot}
+        onClose={() => setOpenSlot(null)} onSlotGone={() => { setOpenSlot(null); setSelected(null); }} />}
+    </SheetContext.Provider>
   );
 }
 
-/** Link a /reservar que, con JavaScript, abre la hoja en vez de navegar. */
-export function SlotLink({ href, slot, className, children }: {
-  href: string; slot: SheetSlot; className: string; children: ReactNode;
+/**
+ * Link a /reservar. Con JavaScript, tocarlo elige el turno (lima con borde
+ * primary) en vez de navegar; sin JavaScript (o con Ctrl/Cmd) sigue siendo el link.
+ */
+export function SlotLink({ href, slot, className, selectedClassName, children }: {
+  href: string; slot: SheetSlot; className: string; selectedClassName: string; children: ReactNode;
 }) {
-  const open = useContext(OpenSheet);
+  const ctx = useContext(SheetContext);
+  const isSelected = Boolean(ctx && sameSlot(ctx.selected, slot));
   return (
     <Link
       href={href}
       data-testid="slot-free"
-      className={className}
+      data-selected={isSelected ? 'true' : undefined}
+      aria-pressed={ctx ? isSelected : undefined}
+      className={`${className} ${isSelected ? selectedClassName : ''}`}
       onClick={(e) => {
-        if (!open || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (!ctx || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
-        open(slot);
+        ctx.select(slot);
       }}
     >
       {children}
     </Link>
+  );
+}
+
+function shortDay(date: string) {
+  const fmt = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Mendoza' }).format(d);
+  const today = fmt(new Date());
+  const tomorrow = fmt(new Date(Date.now() + 24 * 3600 * 1000));
+  if (date === today) return 'Hoy';
+  if (date === tomorrow) return 'Mañana';
+  const [y, m, d] = date.split('-').map(Number);
+  const label = new Intl.DateTimeFormat('es-AR', { timeZone: 'UTC', weekday: 'short', day: 'numeric' })
+    .format(new Date(Date.UTC(y, m - 1, d, 12))).replace('.', '').replace(',', '');
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/** Barra fija abajo con el turno elegido y "Reservar". */
+function ReserveBar({ slot, onReserve }: { slot: SheetSlot; onReserve: () => void }) {
+  return (
+    <div data-testid="barra-reservar"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur
+        px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
+      <div className="mx-auto flex max-w-lg items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm text-ink-muted">
+            {shortDay(slot.date)} {slot.timeLabel.split(' – ')[0]} · {slot.courtName}
+          </p>
+          {slot.price !== null && (
+            <p className="text-xl font-extrabold text-ink">${slot.price.toLocaleString('es-AR')}</p>
+          )}
+        </div>
+        <button type="button" onClick={onReserve}
+          className="min-h-12 shrink-0 rounded-2xl bg-primary px-8 text-base font-extrabold text-on-primary shadow-sm hover:opacity-90">
+          Reservar
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -85,7 +141,11 @@ function formatDay(date: string) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function BookingSheet({ venue, slot, onClose }: { venue: SheetVenue; slot: SheetSlot; onClose: () => void }) {
+function BookingSheet({ venue, slot, onClose, onSlotGone }: {
+  venue: SheetVenue; slot: SheetSlot; onClose: () => void;
+  /** El turno ya no se puede reservar: además de cerrar, se deja de tenerlo elegido. */
+  onSlotGone: () => void;
+}) {
   const panelRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const options = buildPaymentOptions(venue, slot.price);
@@ -150,7 +210,7 @@ function BookingSheet({ venue, slot, onClose }: { venue: SheetVenue; slot: Sheet
               action={action}
               options={options}
               variant="sheet"
-              onOtherTimes={() => { onClose(); router.refresh(); }}
+              onOtherTimes={() => { onSlotGone(); router.refresh(); }}
               onClose={onClose}
             />
           )}

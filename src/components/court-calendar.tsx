@@ -9,6 +9,8 @@ import {
 } from '@/lib/slots';
 import { APP_TIMEZONE } from '@/lib/constants';
 
+const CELL = 'min-h-14 rounded-2xl border px-1 py-2 flex flex-col items-center justify-center gap-0.5 text-center';
+
 interface Court {
   id: string;
   name: string;
@@ -78,7 +80,9 @@ export default function CourtCalendar({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+    // V2c: 4 columnas. Libre en tarjeta neutra con precio; elegido en lima con
+    // borde primary; ocupado punteado y tachado.
+    <div className="grid grid-cols-4 gap-2">
       {slots.map((slot) => {
         const startIso = slot.start.toISOString();
         const endIso   = slot.end.toISOString();
@@ -89,7 +93,7 @@ export default function CourtCalendar({
             <div
               key={startIso}
               data-testid="slot-taken"
-              className="min-h-11 rounded-lg border border-dashed border-line bg-transparent p-3 flex flex-col items-center gap-1 cursor-not-allowed"
+              className={`${CELL} border-dashed border-line bg-transparent cursor-not-allowed`}
             >
               <span className="text-base text-ink-muted line-through">
                 {label}
@@ -106,10 +110,10 @@ export default function CourtCalendar({
             <div
               key={startIso}
               data-testid="slot-no-price"
-              className="min-h-11 rounded-lg border border-dashed border-line bg-transparent p-3 flex flex-col items-center gap-1 cursor-not-allowed"
+              className={`${CELL} border-dashed border-line bg-transparent cursor-not-allowed`}
             >
               <span className="text-base text-ink-muted">{label}</span>
-              <span className="text-xs text-ink-muted">Consultá al complejo</span>
+              <span className="text-xs leading-tight text-ink-muted">Consultá</span>
             </div>
           );
         }
@@ -129,16 +133,14 @@ export default function CourtCalendar({
               timeLabel: `${label} – ${formatTimeMendoza(slot.end)}`,
               price: slot.price,
             }}
-            className="min-h-11 rounded-lg border border-line bg-surface p-3 flex flex-col items-center gap-1
-              hover:border-primary active:bg-surface-2 transition-colors
-              focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={`group ${CELL} border-line bg-surface shadow-sm hover:border-primary transition-colors
+              focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
+            selectedClassName="!border-2 !border-primary !bg-accent"
           >
-            <span className="text-base font-extrabold text-ink">{label}</span>
-            {slot.price !== null && (
-              <span className="text-sm text-ink-muted">
-                ${slot.price.toLocaleString('es-AR')}
-              </span>
-            )}
+            <span className="text-base font-extrabold text-ink group-data-[selected=true]:text-on-accent">{label}</span>
+            <span className="text-xs text-ink-muted group-data-[selected=true]:font-extrabold group-data-[selected=true]:text-on-accent">
+              ${slot.price.toLocaleString('es-AR')}
+            </span>
           </SlotLink>
         );
       })}
