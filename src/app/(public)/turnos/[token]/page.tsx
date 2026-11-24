@@ -1,38 +1,14 @@
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import Breadcrumbs from "@/components/breadcrumbs";
-import { createClient } from '@/lib/supabase/server';
 import { formatTimeMendoza, formatDateMendoza } from '@/lib/slots';
 import { formatArgentinePhone } from '@/lib/phone';
+import { getBookingByToken, directionsUrl, originFrom } from '@/lib/mi-turno';
 import CancelForm from './cancel-form';
+import { SaveLink, TurnoActions } from './turno-actions';
 import { cancelBookingAction, type CancelActionState } from '@/app/actions/booking';
-
-// ---------------------------------------------------------------------------
-// Tipos
-// ---------------------------------------------------------------------------
-
-type BookingDetail = {
-  id: string;
-  status: string;
-  customer_name: string;
-  customer_phone: string;
-  price_total: number;
-  amount_paid: number;
-  payment_status: string;
-  cancel_token: string;
-  cancel_limit_hours: number;
-  /** Desde migración 020 (antes de aplicarla llegan undefined) */
-  refund_policy?: 'full' | 'none';
-  refund_available?: boolean;
-  refund_status?: string | null;
-  venue_name: string;
-  venue_phone: string;
-  venue_address: string;
-  court_name: string;
-  period_start: string;
-  period_end: string;
-};
 
 /** Estados que no son confirmado ni cancelado, en palabras del jugador. */
 const STATUS_LABEL: Record<string, string> = {
@@ -41,21 +17,6 @@ const STATUS_LABEL: Record<string, string> = {
   completed: 'Jugado',
   no_show:   'No se presentó',
 };
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-async function getBookingDetails(token: string): Promise<BookingDetail | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc('get_booking_by_token', {
-    p_cancel_token: token,
-  });
-  if (error || !data) return null;
-  const d = data as Record<string, unknown>;
-  if (d.error) return null;
-  return d as unknown as BookingDetail;
-}
 
 // ---------------------------------------------------------------------------
 // Página
@@ -67,7 +28,7 @@ type Props = {
 
 export default async function TurnoPage({ params }: Props) {
   const { token } = await params;
-  const booking = await getBookingDetails(token);
+  const booking = await getBookingByToken(token);
 
   // Inline server action — captures token from closure so no hidden input needed
   async function cancelAction(prevState: CancelActionState, formData: FormData) {
@@ -93,6 +54,17 @@ export default async function TurnoPage({ params }: Props) {
   const endLabel   = formatTimeMendoza(periodEnd);
   const dateRaw    = formatDateMendoza(periodStart);
   const dateLabel  = dateRaw.charAt(0).toUpperCase() + dateRaw.slice(1);
+
+  // M4: link para guardar, WhatsApp, calendario y cómo llegar
+  const turnoUrl = `${originFrom(await headers())}/turnos/${token}`;
+  const mapsHref = isConfirmedStatus(booking.status) ? await directionsUrl(token, booking) : '';
+  // Lo que se comparte NO lleva el link del turno: con él se puede cancelar.
+  const shareText = [
+    `Turno en ${booking.venue_name} · ${booking.court_name}`,
+    `${dateLabel}, de ${startLabel} a ${endLabel}`,
+    booking.venue_address,
+    mapsHref && `Cómo llegar: ${mapsHref}`,
+  ].filter(Boolean).join('\n');
 
   const debeEnCancha = booking.price_total - booking.amount_paid;
 
@@ -136,6 +108,8 @@ export default async function TurnoPage({ params }: Props) {
         )}
       </div>
 
+      {!isCancelled && <SaveLink url={turnoUrl} />}
+
       {/* Card con detalles */}
       <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm space-y-4 mb-6">
         <div>
@@ -173,6 +147,14 @@ export default async function TurnoPage({ params }: Props) {
         </div>
       </div>
 
+      {isConfirmed && (
+        <TurnoActions
+          whatsappHref={`https://wa.me/?text=${encodeURIComponent(shareText)}`}
+          calendarHref={`/turnos/${token}/calendario`}
+          mapsHref={mapsHref}
+        />
+      )}
+
       {/* Cancelación */}
       {isConfirmed && (
         <CancelForm
@@ -206,4 +188,8 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <span>{value}</span>
     </p>
   );
+}
+
+function isConfirmedStatus(status: string) {
+  return status === 'confirmed';
 }

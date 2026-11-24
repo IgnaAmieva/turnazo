@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño: etiquetas 023 en la rama `rediseno`; 023 aplicada por el revisor; migración 023 escrita, sin aplicar; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño M4 en la rama `rediseno`; 023 aplicada por el revisor; migración 023 escrita, sin aplicar; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 342 | ✓ verde (2026-11-24, rama `rediseno` etiquetas 023) |
-| E2E | Playwright | 124 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` etiquetas 023, --workers=1) |
+| Unitarios + integración | Vitest | 345 | ✓ verde (2026-11-24, rama `rediseno` M4) |
+| E2E | Playwright | 127 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` M4, --workers=1) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -123,6 +123,12 @@ Rediseño D0 (paleta, fuente, modo claro/oscuro):
 - Fuente Outfit (500 texto, 800 títulos) con `next/font`.
 - Desde D2 no queda ninguna pantalla forzada en claro.
 
+Rediseño M4 (Mi turno):
+- "Guardá este link" arriba de todo (borde primary): el link de Mi turno en un campo de solo lectura y "Copiar link" (44 px; sin permiso de portapapeles queda seleccionado para copiar a mano).
+- Con el turno confirmado: "Compartir por WhatsApp" (wa.me/?text= con cancha, día, horario, dirección y "Cómo llegar"; SIN el link de Mi turno, porque con él se puede cancelar), "Agregar al calendario" (GET /turnos/{token}/calendario → turno.ics, RFC 5545, horas en UTC, Cache-Control private/no-store; 404 si el turno no existe o no está confirmado) y "Cómo llegar" (Google Maps con el pin del complejo; sin pin, nombre y dirección).
+- lib/mi-turno.ts (reserva por token, link de Cómo llegar, origen del pedido) y lib/ics.ts (con test). El link se arma con el host del pedido, así sirve en local, en el Preview y en producción.
+- E2E tests/e2e/mi-turno.spec.ts con fecha "viernes 14+ días" (antes "26+ días" podía caer a más de 30 y la base devolvía too_far_ahead).
+
 Rediseño V2 (diseño aprobado "versión 2"; la imagen de referencia está en diseno/, fuera del repo):
 - V2a · Inicio: deporte y lugar en una sola pantalla (?localidad=&deporte=; sin elección, la búsqueda recordada o la primera con complejos). Portada verde con líneas de cancha (SVG, clase `.cover` en globals.css: primary en claro, surface en oscuro, mismas variables), "Hola, Juan" + "No soy yo", "¿Jugamos hoy?" y "Lo antes posible · 18:00 · complejo →" (primer turno libre CON precio de hoy o, si no queda, de mañana), que abre el complejo con la hoja de ese turno (?cancha=&inicio=, la hoja limpia la URL). "¿Qué querés jugar?" con íconos de línea (components/sport-art.tsx), el elegido en primary, sin complejos "Pronto" sin link. "¿Dónde?": chips "Tunuyán · 3", sin complejos "· pronto". /[localidad] redirige al inicio con esa localidad; /[localidad]/[deporte] sigue igual. Se quitó "Seguir en…" (lo reemplaza la portada).
 - lib/free-slots.ts: canchas de una localidad+deporte en UNA consulta; disponibilidad con get_court_availability una vez por cancha y fecha por request (React cache), tope MAX_COURTS = 24 canchas; solo hoy y, si hace falta, mañana.
@@ -138,7 +144,7 @@ Pendientes de M3:
 - Teléfono bloqueado (y todo error general): los datos vuelven a la línea recordada con "Cambiar" y "No soy yo"; con los campos abiertos, "No soy yo" va dentro de la misma tarjeta. Los errores sin reintento muestran "Cerrar" (44 px) donde iba Confirmar: en la hoja la cierra; en /reservar vuelve al complejo.
 - Celular siempre "característica + espacio + número" (`formatArgentinePhone` en lib/phone.ts, con la lista de características de 3 dígitos; "11" de 2; el resto de 4): línea recordada, campos (al salir del campo) y Mi turno. Se recuerda ya formateado.
 - Error de Mercado Pago → "Pagar en el lugar": `tests/integration/mp-pay-at-venue.test.ts` (complejo propio, MP simulado) confirma que el hold se libera antes de devolver el error y queda una sola reserva activa; dos toques → una reserva + slot_taken; si otro jugador toma el turno en el medio → slot_taken con "Ver otros horarios". Si no se pudo liberar el hold, la acción devuelve `mp_hold_not_released` ("el turno queda apartado a tu nombre 10 minutos") en vez de ofrecer "Pagar en el lugar". Propuesta de base (no aplicada): ver "Propuesta: create_booking que reemplaza el hold".
-- M4 (Mi turno: link, WhatsApp, .ics, Cómo llegar) quedó para después; el avance está fuera del repo.
+- M4 (Mi turno) hecho después, ver "Rediseño M4".
 
 Rediseño M3 (errores con acción) y ajuste de datos recordados:
 - Datos recordados (hoja y /reservar): una línea "Juan Pérez · 2622 123456" con "Cambiar" (44 px, despliega los campos) y "No soy yo". Sin datos recordados, los campos como antes. Nombre y celular son campos controlados: lo escrito no se borra cuando la reserva vuelve con error. Solo se recuerda un celular con 8+ dígitos y un nombre de 2+ letras (antes se guardaba un celular mal escrito).
