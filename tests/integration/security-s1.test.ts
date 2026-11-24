@@ -137,19 +137,23 @@ afterAll(async () => {
     : { data: [] as { id: string }[] };
   const venues = [...new Set([venueA, venueB, ...extraVenueIds, ...(owned ?? []).map((v) => v.id)])].filter(Boolean);
   const courts = [courtA, courtB].filter(Boolean);
-  if (courts.length) {
+  // Varias vueltas: el cron de devoluciones que dispara otro archivo de tests
+  // en paralelo puede grabar un pago de estas reservas en el medio (la base es
+  // compartida, ver S7 en ESTADO.md) y la FK de payments frena el DELETE.
+  for (let i = 0; courts.length && i < 5; i++) {
     const { data: bks } = await admin.from("bookings").select("id").in("court_id", courts);
     const ids = (bks ?? []).map((b) => b.id);
-    if (ids.length) {
-      await admin.from("payments").delete().in("booking_id", ids);
-      await admin.from("audit_log").delete().in("entity_id", ids);
-      await admin.from("bookings").delete().in("id", ids);
-    }
+    if (!ids.length) break;
+    await admin.from("payments").delete().in("booking_id", ids);
+    await admin.from("audit_log").delete().in("entity_id", ids);
+    const { error } = await admin.from("bookings").delete().in("id", ids);
+    if (error) await new Promise((r) => setTimeout(r, 1000));
   }
   if (venues.length) {
     await admin.from("notification_outbox").delete().in("venue_id", venues);
     await admin.from("audit_log").delete().in("venue_id", venues);
-    await admin.from("venues").delete().in("id", venues); // courts, horarios y precios en cascada
+    const { error } = await admin.from("venues").delete().in("id", venues); // courts, horarios y precios en cascada
+    if (error) throw new Error("security-s1: no se pudieron borrar los complejos de prueba: " + error.message);
   }
   await ownerA.auth.signOut();
   await ownerB.auth.signOut();

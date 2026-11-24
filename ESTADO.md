@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-19 (Fase 7 S1: código desplegado, 021 pendiente de aplicar)
+Última actualización: 2026-11-19 (Fase 7 S1 cerrado: 021 aplicada, todo verde)
 
 ---
 
@@ -83,7 +83,7 @@
 | 019 | `019_confirm_order_payment.sql` | Aplicada por el revisor (2026-11-15). Función `confirm_order_payment(p_booking_id, p_mp_order_id, p_mp_payment_id, p_amount, p_raw)` SECURITY DEFINER, `search_path = ''`, EXECUTE solo para `service_role`. Los 9 tests "migración 019" pasaron sin tocarlos (8 de entrada; el 9.º, "si el reembolso falla…", codificaba el bug del arreglo 1 del Bloque 4 y pasó al aplicar ese arreglo) |
 | 020 | `020_cancellation_refunds.sql` | Aplicada por el revisor (2026-11-16); secreto `refund_retry_url` creado en Vault apuntando a `https://turnazo-chi.vercel.app/api/mp/refund-retry`. Los 5 tests "migración 020" y los 2 E2E salteados pasaron sin tocarlos. `cancel_booking_by_token` v3 (cancelación con devolución según `cancel_limit_hours` / `refund_policy`, marca el pago `refund_pending`, outbox con `refund_due`), `get_booking_by_token` v2 (`refund_policy`, `refund_available`, `refund_status`), `refund_retry_cron()` + cron `turnazo-refund-retry` cada 30 min (lee `refund_retry_url` y `push_secret` de Vault). Probada con rollback (ver Bloque 5). Al aplicarla deben pasar a verde los 5 tests marcados "migración 020" en `tests/integration/cancellation.test.ts` y dejan de saltearse los 2 E2E de `cancellation.spec.ts` |
 
-| 021 | `021_security_lockdown.sql` | **Aprobada por el revisor, pendiente de aplicar (2026-11-19).** Fase 7 S1: grants mínimos para anon/authenticated columna por columna (se revoca todo, incluidos TRUNCATE/TRIGGER/REFERENCES, y los privilegios por defecto); FK compuesta `bookings(court_id, venue_id) → courts(id, venue_id)` (C1); el dueño ya no escribe en `bookings`: RPCs `panel_create_block`, `panel_cancel_booking` (pago online → `refund_pending` en la misma transacción), `panel_mark_paid` (no si se pagó todo online; con seña, amount_paid = price_total), `panel_mark_no_show` (con pago online solo después de empezado el turno) (M2); trigger `trg_venues_status`: solo superadmin/servidor cambia `venues.status` (A1); `create_booking` / `create_booking_hold` solo `service_role` (C2/A2); `_validate_booking_slot` rechaza turnos a más de 30 días (`too_far_ahead`). Se aplica **después** del deploy del código de S1 (el código viejo llama a `create_booking` con anon). Validada en PGlite reconstruyendo 001–020 con stubs de Supabase: 64/64 consultas de la app y ataques |
+| 021 | `021_security_lockdown.sql` | Aplicada por el revisor (2026-11-19), después del deploy `dpl_EjtXUcyNHyUG3tBLDCRSoXmKBV7c` (commit `99891c5`). Fase 7 S1: grants mínimos para anon/authenticated columna por columna (se revoca todo, incluidos TRUNCATE/TRIGGER/REFERENCES, y los privilegios por defecto); FK compuesta `bookings(court_id, venue_id) → courts(id, venue_id)` (C1); el dueño ya no escribe en `bookings`: RPCs `panel_create_block`, `panel_cancel_booking` (pago online → `refund_pending` en la misma transacción), `panel_mark_paid` (no si se pagó todo online; con seña, amount_paid = price_total), `panel_mark_no_show` (con pago online solo después de empezado el turno) (M2); trigger `trg_venues_status`: solo superadmin/servidor cambia `venues.status` (A1); `create_booking` / `create_booking_hold` solo `service_role` (C2/A2); `_validate_booking_slot` rechaza turnos a más de 30 días (`too_far_ahead`). Se aplica **después** del deploy del código de S1 (el código viejo llama a `create_booking` con anon). Validada en PGlite reconstruyendo 001–020 con stubs de Supabase: 64/64 consultas de la app y ataques |
 
 **Próxima migración:** `022_*.sql`
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 207 | ✓ verde (2026-11-18, con 018–020 aplicadas) |
-| E2E | Playwright | 65 (incluye el setup de login) | ✓ verde (2026-11-18) |
+| Unitarios + integración | Vitest | 227 | ✓ verde (2026-11-19, con 021 aplicada) |
+| E2E | Playwright | 65 (incluye el setup de login) | ✓ verde (2026-11-19, con 021 aplicada) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -112,10 +112,14 @@ Archivos E2E:
 - `cancellation.spec.ts` — 5 tests (Bloque 5): panel "Cancelaciones" (guarda plazo + política, persiste al recargar, rechaza fuera de rango), panel agenda: cancelar una reserva con pago online muestra "Se le devolverán $X al jugador", pide confirmar, cancela y deja la devolución en proceso (`refund_failed`, sin token de MP en local), y jugador con pago online (devolución total dentro del plazo → avisa el monto, cancela, devolución "en proceso"; política `none` → aviso, checkbox obligatorio, cancela sin devolver). Los 2 del jugador se saltean si la 020 no está aplicada. La limpieza busca las reservas `E2E Cancel*` por nombre (no por ids en memoria: si un test falla, Playwright reinicia el worker y vuelve a correr `beforeAll`), borra primero `payments` y `audit_log`, después reservas y outbox; restaura la política original.
 - `payment-flow.spec.ts` — 8 tests del pago del jugador (Bloques 3 y 4): opciones según configuración, "pagar en el lugar" sigue usando `create_booking`, pago online con cuenta MP falsa → error claro y hold liberado, pantalla `/pago/[token]` (pendiente con cuenta regresiva → confirmada al cambiar la base; botón "Cancelar y elegir otro horario" → hold `expired` y vuelve a `/reservar` del mismo horario; vencida; cancelada; token inexistente). Nunca llama a Mercado Pago. Limpia bookings `E2E Pago*`, la cuenta MP falsa y restaura el cobro original.
 
-Fase 7 S1 (seguridad):
+Fase 7 S1 (seguridad) — CERRADO (2026-11-19):
+- Con la 021 aplicada: Vitest 227/227 y Playwright 65/65; la base quedó igual que antes de correr (3 complejos, 3 usuarios, 14 reservas, 0 teléfonos bloqueados).
+- Choque entre tests encontrado al cerrar: el cron de reintento de devoluciones (`/api/mp/refund-retry`) barre **todos** los pagos `refund_failed` de la base. `cancellation.test.ts` exigía `attempted: 1` y, corriendo en paralelo con `webhook.test.ts` (que deja un pago propio en `refund_failed`), el cron tomó los dos. Arreglo: el test comprueba solo su propio pago (llamadas al reembolso con su orden, estado de su fila, `failed: 0`), no los totales del cron.
+- **Este choque es otro motivo para S7 (base de tests separada de producción):** hoy los tests corren contra la misma base que producción, así que un test puede tocar los pagos de otro test, y en el futuro los de clientes reales (el cron que dispara un test reintentaría devoluciones reales con el `refundMpOrder` simulado de ese test).
 - `tests/integration/security-s1.test.ts` — 18 tests: cada ataque del informe S1 (C1, C2, A1, A2, M2) intentado con la anon key, con un dueño ajeno y con service_role; todos tienen que fallar. Requieren la 021. Fixture propio (dos dueños, dos complejos); `afterAll` borra por dueño, así también limpia lo que un ataque llegue a crear.
 - La contraseña del dueño de prueba ya no está en el repo: `E2E_OWNER_PASSWORD` en `.env.local` (rotada el 2026-11-19; la vieja quedó en el historial de git y ya no sirve). Los E2E preparan y limpian datos con `SUPABASE_SERVICE_ROLE_KEY` (helpers `serviceHeaders()`): desde la 021 el dueño no escribe `bookings` / `notification_outbox` ni lee `audit_log`.
 - El selector de fechas público no avanza más de 30 días (hoy + 29), coherente con `too_far_ahead`.
+- `security-s1.test.ts`: la limpieza da varias vueltas (el cron de devoluciones de otro archivo puede grabar un pago de sus reservas en el medio y la FK frena el borrado) y falla en voz alta si no puede borrar los complejos. Pasó una vez que quedaron 4 complejos "S1 …" y rompieron los conteos de `public.spec.ts`; se borraron.
 
 Archivos Vitest nuevos (Bloques 3 y 4):
 - `tests/unit/mp-orders.test.ts` — 14 tests del cliente de Orders con `fetch` simulado: `createMpOrder` (cuerpo exacto con `payer.email` / `first_name` / `last_name` e `items[].description` / `category_id`, headers, sin `marketplace_fee`, errores), `getMpOrder` / `isMpOrderPaid` / `mpOrderPaymentId`, `refundMpOrder` (409 `order_already_refunded` = éxito), `cancelMpOrder`.

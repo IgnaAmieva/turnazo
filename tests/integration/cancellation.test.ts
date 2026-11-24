@@ -329,14 +329,22 @@ describe("cancelBookingAction — pago online (migración 020)", () => {
     expect((await callRefundRetry("mal")).status).toBe(401);
 
     // Recién tocada: el cron no la toma todavía (ventana de 2 min)
+    // El cron barre TODOS los 'refund_failed' de la base (otros archivos de test
+    // corren en paralelo): se comprueba solo el pago de este test, no los totales.
+    const ownRefundCalls = () =>
+      refundMpOrderMock.mock.calls.filter((c) => c[1] === b.orderId).length;
+    expect(ownRefundCalls()).toBe(1);
+
     const early = await callRefundRetry();
     expect(early.status).toBe(200);
-    expect(early.json.attempted).toBe(0);
+    expect(ownRefundCalls()).toBe(1);
+    expect((await payment(b.paymentId!)).status).toBe("refund_failed");
 
     const retry = await withClockAhead(() => callRefundRetry());
     expect(retry.status).toBe(200);
-    expect(retry.json).toMatchObject({ ok: true, attempted: 1, refunded: 1, failed: 0 });
-    expect(refundMpOrderMock).toHaveBeenLastCalledWith("APP_USR-fake", b.orderId, `refund-${b.paymentId}`);
+    expect(retry.json).toMatchObject({ ok: true, failed: 0 });
+    expect(ownRefundCalls()).toBe(2);
+    expect(refundMpOrderMock).toHaveBeenCalledWith("APP_USR-fake", b.orderId, `refund-${b.paymentId}`);
 
     const pay = await payment(b.paymentId!);
     expect(pay.status).toBe("refunded");
