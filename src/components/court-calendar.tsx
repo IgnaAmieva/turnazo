@@ -104,12 +104,14 @@ export default function CourtCalendar({
           <Link
             key={startIso}
             href={href}
-            className="rounded-lg border border-transparent bg-accent p-3 flex flex-col items-center gap-1
-              hover:brightness-95 active:brightness-90 transition-colors"
+            data-testid="slot-free"
+            className="min-h-11 rounded-lg border border-line bg-surface p-3 flex flex-col items-center gap-1
+              hover:border-primary active:bg-surface-2 transition-colors
+              focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
-            <span className="text-sm font-extrabold text-on-accent">{label}</span>
+            <span className="text-base font-extrabold text-ink">{label}</span>
             {slot.price !== null && (
-              <span className="text-xs text-on-accent">
+              <span className="text-sm text-ink-muted">
                 ${slot.price.toLocaleString('es-AR')}
               </span>
             )}

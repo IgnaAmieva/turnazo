@@ -36,9 +36,13 @@ export default async function HomePage() {
                     </span>
                   </Link>
                 ) : (
-                  <div className="block rounded-2xl border border-line bg-surface-2 p-6 text-center opacity-50 cursor-not-allowed">
+                  <div
+                    aria-disabled="true"
+                    data-testid="locality-soon"
+                    className="block rounded-2xl border border-dashed border-line bg-surface-2 p-6 text-center cursor-default select-none"
+                  >
                     <span className="text-lg font-semibold text-ink-muted block">{loc.name}</span>
-                    <span className="text-xs text-ink-muted mt-1 block">Sin complejos</span>
+                    <span className="text-sm text-ink-muted mt-1 block">Próximamente</span>
                   </div>
                 )}
               </li>
