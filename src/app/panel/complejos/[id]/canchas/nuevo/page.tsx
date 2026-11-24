@@ -23,14 +23,14 @@ export default async function NuevaCanchaPage({
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/panel/complejos" className="text-sm text-gray-500 hover:text-gray-700">← Complejos</Link>
-        <span className="text-gray-300">/</span>
-        <Link href={`/panel/complejos/${id}/canchas`} className="text-sm text-gray-500 hover:text-gray-700">{venue.name}</Link>
-        <span className="text-gray-300">/</span>
-        <h1 className="text-xl font-semibold text-gray-900">Nueva cancha</h1>
+        <Link href="/panel/complejos" className="text-sm text-ink-muted hover:text-ink">← Complejos</Link>
+        <span className="text-ink-muted">/</span>
+        <Link href={`/panel/complejos/${id}/canchas`} className="text-sm text-ink-muted hover:text-ink">{venue.name}</Link>
+        <span className="text-ink-muted">/</span>
+        <h1 className="text-xl font-semibold text-ink">Nueva cancha</h1>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 max-w-lg">
+      <div className="bg-surface rounded-2xl border border-line p-6 max-w-lg">
         <CourtForm action={boundAction} sports={sports} submitLabel="Crear cancha" />
       </div>
     </div>

@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño D1 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño D2 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 271 | ✓ verde (2026-11-24, rama `rediseno` D1) |
-| E2E | Playwright | 73 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` D1 + ajustes) |
+| Unitarios + integración | Vitest | 271 | ✓ verde (2026-11-24, rama `rediseno` D2) |
+| E2E | Playwright | 77 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` D2) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -121,7 +121,17 @@ Rediseño D0 (paleta, fuente, modo claro/oscuro):
 - `tests/unit/theme-contrast.test.ts` lee `globals.css` y exige AA (4.5:1) para cada par texto/fondo en los dos modos; además que el lima no sea color de texto.
 - Modo: `src/lib/theme.ts` (`THEME_SCRIPT` inline en el `<head>`, sin parpadeo): automático sigue al celular; el botón `components/theme-toggle.tsx` (encabezado público) cicla Automático → Claro → Oscuro y guarda solo `turnazo-theme` en localStorage. Actualiza el color de la barra del celular. Tests: `tests/unit/theme.test.ts` (ejecuta el mismo script con un navegador simulado) y `tests/e2e/theme.spec.ts`.
 - Fuente Outfit (500 texto, 800 títulos) con `next/font`.
-- Pantallas todavía sin migrar quedan forzadas en claro con `data-theme="light"`: panel, login y registro (hasta D2).
+- Desde D2 no queda ninguna pantalla forzada en claro.
+
+Rediseño D2 (panel del dueño, login y registro):
+- Todo el panel, login y registro con los colores por función (modo oscuro completo). El botón "Conectar Mercado Pago" pasó de `#009ee3` (3.1:1 con blanco) a `#0072a8` (5.3:1).
+- Menú: barra lateral en escritorio; en el celular, barra arriba con "Menú" / "Cerrar menú" que despliega los links (44 px), el tema, notificaciones y cerrar sesión. La agenda usa todo el ancho (antes la barra lateral fija dejaba ~140 px). Dentro de la agenda de un complejo el ítem activo es "Agenda".
+- `/panel` entra directo a la agenda (antes a Complejos).
+- Agenda: "← Anterior", "Siguiente →", "Hoy" (si no es hoy) y selector de fecha, todos de 44 px. Columnas con encabezado de 44 px y botón "+" de 44 px. Turnos confirmados en lima; pendientes en warning; textos de 11–14 px (antes 9–10 px).
+- Acciones de un turno: tocar la tarjeta abre una hoja (abajo en el celular, centrada en escritorio; `role="dialog"`, Escape o tocar afuera la cierra) con botones de ancho completo y 44 px: WhatsApp, Marcar pagado, Marcar ausente, Cancelar turno (con el aviso de devolución), Bloquear teléfono, Cerrar. Mismos textos que antes (los E2E existentes no cambiaron).
+- Bloqueo manual: campos y botón de 44 px.
+- `tests/e2e/panel-movil.spec.ts` (390 px): entrada a la agenda, menú cerrado/abierto, ítem activo, "Hoy" y selector de fecha, hoja de acciones con 44 px y dentro de la pantalla. Reserva propia "E2E Rediseño Panel" (sábado 9+ días) que se borra al final.
+- Capturas 390 px claro/oscuro: agenda, menú abierto y acciones de un turno (reservas "Captura D2", borradas).
 
 Rediseño D1 (pantallas públicas):
 - Inicio, localidad, complejos, complejo, reservar, pago, mi turno y cancelación usan solo los colores por función: en oscuro cambia todo el contenido, no solo el encabezado. Turnos libres en tarjeta neutra (surface, borde line, hora en ink 800, precio en ink-muted, 44 px o más; ajuste del revisor: en lima quedaba "una pared amarilla"). El lima queda para el turno elegido, "Confirmado" y los botones principales; éxito con lima de fondo; errores en `danger`; pendiente en `warning`. "Cancelar turno" pasó a botón con contorno rojo (se lee en los dos modos).

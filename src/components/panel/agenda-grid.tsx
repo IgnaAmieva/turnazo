@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { AgendaBooking, AgendaCourt } from "@/lib/supabase/panel-queries";
 import type { PanelActionState } from "@/app/actions/panel";
 import { buildWhatsAppUrl } from "@/lib/phone";
@@ -66,11 +67,11 @@ function fmtTime(isoUtc: string): string {
 // ---------------------------------------------------------------------------
 
 const BOOKING_STYLE: Record<string, string> = {
-  confirmed: "bg-green-100 border-green-300 text-green-900",
-  hold:      "bg-amber-100 border-amber-300 text-amber-900",
-  completed: "bg-blue-100  border-blue-300  text-blue-900",
-  no_show:   "bg-gray-200  border-gray-400  text-gray-600",
-  cancelled: "bg-gray-100  border-gray-300  text-gray-400 opacity-60",
+  confirmed: "bg-accent border-transparent text-on-accent",
+  hold:      "bg-warning-soft border-warning/40 text-warning",
+  completed: "bg-surface-2 border-line text-ink",
+  no_show:   "bg-surface-2 border-line text-ink-muted",
+  cancelled: "bg-surface-2 border-line text-ink-muted opacity-60",
 };
 const STATUS_LABEL: Record<string, string> = {
   confirmed: "Confirmado",
@@ -79,23 +80,28 @@ const STATUS_LABEL: Record<string, string> = {
   no_show:   "Ausente",
   cancelled: "Cancelado",
 };
-const BLOCK_STYLE = "bg-gray-200 border-gray-400 text-gray-700";
+const BLOCK_STYLE = "bg-surface-2 border-dashed border-ink-muted text-ink";
+
+/** Botones de la barra de fecha (44 px). */
+const NAV_BTN = "inline-flex min-h-11 items-center gap-1 rounded-full border border-line bg-surface px-4 text-sm text-ink hover:bg-surface-2";
+/** Botones de la hoja de acciones (44 px, ancho completo). */
+const ACTION_BTN = "flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition-opacity hover:opacity-90 disabled:opacity-50";
 
 function PaymentBadge({ status, total, paid }: { status: string; total: number; paid: number }) {
   if (status === "paid") {
-    return <span className="rounded px-1 bg-green-600 text-white text-[9px]">✓ Pagado</span>;
+    return <span className="rounded px-1.5 py-0.5 bg-surface text-ink border border-line text-[11px]">✓ Pagado</span>;
   }
   if (status === "deposit_paid") {
     const remaining = total - paid;
     return (
-      <span className="rounded px-1 bg-amber-500 text-white text-[9px]">
+      <span className="rounded px-1.5 py-0.5 bg-warning-soft text-warning text-[11px]">
         Señado — falta ${remaining.toLocaleString("es-AR")}
       </span>
     );
   }
   // unpaid
   return (
-    <span className="rounded px-1 bg-red-100 text-red-700 text-[9px]">
+    <span className="rounded px-1.5 py-0.5 bg-danger-soft text-danger text-[11px]">
       Sin pagar ${total.toLocaleString("es-AR")}
     </span>
   );
@@ -175,7 +181,7 @@ export default function AgendaGrid({
 
   if (courts.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-300 p-10 text-center text-gray-400">
+      <div className="rounded-xl border border-dashed border-line p-10 text-center text-ink-muted">
         No hay canchas activas.
       </div>
     );
@@ -183,22 +189,38 @@ export default function AgendaGrid({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Top bar: date nav + sport filter */}
+      {/* Top bar: fecha + filtro de deporte */}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={() => changeDate(-1)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
-          ← Anterior
+        <button onClick={() => changeDate(-1)} className={NAV_BTN}>
+          <span aria-hidden="true">←</span> Anterior
         </button>
-        <span className="font-medium text-gray-800 capitalize text-sm">{dateLabel}</span>
-        <button onClick={() => changeDate(1)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
-          Siguiente →
+        <button onClick={() => changeDate(1)} className={NAV_BTN}>
+          Siguiente <span aria-hidden="true">→</span>
         </button>
+        {date !== todayMendoza && (
+          <button onClick={() => router.push(`?fecha=${todayMendoza}`)} className={NAV_BTN}>
+            Hoy
+          </button>
+        )}
+        <label className="flex min-h-11 items-center gap-2 rounded-full border border-line bg-surface px-3 text-sm text-ink">
+          <span className="sr-only">Elegir fecha</span>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => e.target.value && router.push(`?fecha=${e.target.value}`)}
+            className="bg-transparent text-ink outline-none"
+          />
+        </label>
+        <span className="w-full font-extrabold text-ink sm:w-auto">
+          {dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}
+        </span>
 
         {sports.length > 1 && (
-          <div className="flex items-center gap-1 ml-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <button
               onClick={() => setSportFilter(null)}
-              className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                sportFilter === null ? "bg-gray-800 text-white border-gray-800" : "border-gray-200 text-gray-600 hover:bg-gray-50"
+              className={`min-h-11 rounded-full px-4 text-sm border transition-colors ${
+                sportFilter === null ? "bg-primary text-on-primary border-transparent font-extrabold" : "border-line text-ink hover:bg-surface-2"
               }`}
             >
               Todos
@@ -207,8 +229,8 @@ export default function AgendaGrid({
               <button
                 key={s.id}
                 onClick={() => setSportFilter(sportFilter === s.id ? null : s.id)}
-                className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                  sportFilter === s.id ? "bg-green-700 text-white border-green-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                className={`min-h-11 rounded-full px-4 text-sm border transition-colors ${
+                  sportFilter === s.id ? "bg-primary text-on-primary border-transparent font-extrabold" : "border-line text-ink hover:bg-surface-2"
                 }`}
               >
                 {s.name}
@@ -219,16 +241,16 @@ export default function AgendaGrid({
       </div>
 
       {/* Grid */}
-      <div className="overflow-auto rounded-xl border border-gray-200 bg-white" style={{ maxHeight: "75vh" }}>
+      <div className="overflow-auto rounded-xl border border-line bg-surface" style={{ maxHeight: "75vh" }}>
         <div className="flex">
           {/* Time axis (sticky left) */}
-          <div className="sticky left-0 z-20 bg-white border-r border-gray-200 shrink-0 w-14">
-            <div className="h-9 border-b border-gray-200" />
+          <div className="sticky left-0 z-20 bg-surface border-r border-line shrink-0 w-14">
+            <div className="h-11 border-b border-line" />
             <div className="relative" style={{ height: gridHeightPx }}>
               {ticks.filter((t) => t.isHour).map((t) => (
                 <span
                   key={t.label}
-                  className="absolute right-1.5 text-[10px] text-gray-400"
+                  className="absolute right-1.5 text-xs text-ink-muted"
                   style={{ top: t.topPx - 6 }}
                 >
                   {t.label}
@@ -291,15 +313,15 @@ function CourtColumn({
   const [showBlockForm, setShowBlockForm] = useState(false);
 
   return (
-    <div className="shrink-0 border-r border-gray-200 last:border-r-0" style={{ minWidth: 220, width: 240 }}>
+    <div className="shrink-0 border-r border-line last:border-r-0" style={{ minWidth: 220, width: 240 }}>
       {/* Header */}
-      <div className="h-9 border-b border-gray-200 flex items-center justify-between px-2.5 bg-gray-50 sticky top-0 z-10">
-        <span className="text-xs font-semibold text-gray-700 truncate">{court.name}</span>
+      <div className="h-11 border-b border-line flex items-center justify-between pl-2.5 bg-surface-2 sticky top-0 z-10">
+        <span className="text-sm font-extrabold text-ink truncate">{court.name}</span>
         {!isPastDate && (
           <button
             onClick={() => setShowBlockForm((v) => !v)}
             title="Agregar bloqueo"
-            className="text-xs text-gray-400 hover:text-gray-700 ml-1 shrink-0 font-bold"
+            className="flex h-11 w-11 shrink-0 items-center justify-center text-lg font-extrabold text-ink-muted hover:text-ink"
           >
             {showBlockForm ? "✕" : "+"}
           </button>
@@ -321,7 +343,7 @@ function CourtColumn({
         {ticks.map((t, i) => (
           <div
             key={i}
-            className={`absolute left-0 right-0 ${t.isHour ? "border-t border-gray-200" : "border-t border-gray-100"}`}
+            className={`absolute left-0 right-0 ${t.isHour ? "border-t border-line" : "border-t border-line/50"}`}
             style={{ top: t.topPx }}
           />
         ))}
@@ -373,7 +395,7 @@ function BookingCard({
 
   const isBlock     = booking.booking_kind === "block";
   const isCancelled = booking.status === "cancelled";
-  const style       = isBlock ? BLOCK_STYLE : (BOOKING_STYLE[booking.status] ?? "bg-gray-100 border-gray-300 text-gray-700");
+  const style       = isBlock ? BLOCK_STYLE : (BOOKING_STYLE[booking.status] ?? "bg-surface-2 border-line text-ink");
 
   const [expanded, setExpanded] = useState(false);
   const [pending,  setPending]  = useState(false);
@@ -413,117 +435,120 @@ function BookingCard({
     : null;
 
   const isCompact = heightPx < 48;
+  const canAct    = !isBlock && !isCancelled;
+  const timeLabel = `${fmtTime(booking.start)}–${fmtTime(booking.end)}`;
+
+  // Escape cierra la hoja de acciones
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setExpanded(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [expanded]);
 
   return (
     <div
       className={`absolute left-1 right-1 rounded-md border overflow-hidden ${style} ${pending ? "opacity-50" : ""}`}
-      style={{ top: topPx, height: expanded ? undefined : heightPx, zIndex: expanded ? 30 : 1 }}
+      style={{ top: topPx, height: heightPx, zIndex: 1 }}
     >
-      {/* Card header */}
+      {/* Tarjeta en la grilla: tocarla abre las acciones */}
       <div
-        className="px-1.5 py-1 cursor-pointer select-none"
-        onClick={() => !isBlock && !isCancelled && setExpanded((v) => !v)}
-        title={isBlock || isCancelled ? undefined : "Click para acciones"}
+        className={`h-full px-2 py-1 select-none ${canAct ? "cursor-pointer" : ""}`}
+        onClick={() => canAct && setExpanded(true)}
+        role={canAct ? "button" : undefined}
+        tabIndex={canAct ? 0 : undefined}
+        onKeyDown={(e) => { if (canAct && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setExpanded(true); } }}
+        title={canAct ? "Tocá para ver las acciones" : undefined}
       >
-        <div className="text-[10px] font-semibold truncate leading-tight">
+        <div className="text-xs font-extrabold truncate leading-tight">
           {isBlock ? `🔒 ${booking.customer_name ?? "Bloqueo"}` : (booking.customer_name ?? "Sin nombre")}
         </div>
         {!isCompact && (
-          <div className="text-[9px] opacity-75 leading-tight">{fmtTime(booking.start)}–{fmtTime(booking.end)}</div>
+          <div className="text-[11px] leading-tight">{timeLabel}</div>
         )}
         {!isCompact && !isBlock && (
-          <div className="mt-0.5 flex flex-wrap gap-0.5">
-            <span className="text-[9px] opacity-60">{STATUS_LABEL[booking.status] ?? booking.status}</span>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+            <span className="text-[11px]">{STATUS_LABEL[booking.status] ?? booking.status}</span>
             {!isCancelled && (
-              <PaymentBadge
-                status={booking.payment_status}
-                total={booking.price_total}
-                paid={booking.amount_paid}
-              />
+              <PaymentBadge status={booking.payment_status} total={booking.price_total} paid={booking.amount_paid} />
             )}
           </div>
         )}
       </div>
 
-      {/* Expanded actions */}
-      {expanded && !isBlock && !isCancelled && (
-        <div className="bg-white/95 border-t border-gray-200 p-1.5 flex flex-col gap-1">
-          {err && <p className="text-red-600 text-[9px]">{err}</p>}
+      {/* Hoja de acciones: abajo en el celular, centrada en pantallas grandes */}
+      {expanded && canAct && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Turno de ${booking.customer_name ?? "Sin nombre"}`}
+        >
+          <div aria-hidden="true" className="absolute inset-0 bg-black/50" onClick={() => setExpanded(false)} />
+          <div className="relative w-full max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-surface p-4 text-ink shadow-xl
+            pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-sm sm:rounded-2xl">
+            <p className="text-lg font-extrabold leading-tight">{booking.customer_name ?? "Sin nombre"}</p>
+            <p className="mt-0.5 text-sm text-ink-muted">
+              {courtName} · {timeLabel} · {STATUS_LABEL[booking.status] ?? booking.status}
+            </p>
+            <div className="mt-2">
+              <PaymentBadge status={booking.payment_status} total={booking.price_total} paid={booking.amount_paid} />
+            </div>
 
-          {waUrl && (
-            <a
-              href={waUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded bg-green-500 text-white text-[10px] px-2 py-1 font-medium hover:bg-green-600 text-center"
-            >
-              📱 WhatsApp
-            </a>
-          )}
-          {booking.payment_status !== "paid" && booking.status === "confirmed" && (
-            <button
-              onClick={() => runAction(onMarkPaid)}
-              disabled={pending}
-              className="rounded bg-blue-500 text-white text-[10px] px-2 py-1 font-medium hover:bg-blue-600 disabled:opacity-50"
-            >
-              💰 Marcar pagado
-            </button>
-          )}
-          {booking.status === "confirmed" && (
-            <button
-              onClick={() => runAction(onMarkNoShow)}
-              disabled={pending}
-              className="rounded bg-orange-500 text-white text-[10px] px-2 py-1 font-medium hover:bg-orange-600 disabled:opacity-50"
-            >
-              ✕ Marcar ausente
-            </button>
-          )}
-          {booking.status === "confirmed" && !confirmCancel && (
-            <button
-              onClick={() => (refundOnCancel ? setConfirmCancel(true) : runAction(onCancel))}
-              disabled={pending}
-              className="rounded bg-gray-500 text-white text-[10px] px-2 py-1 font-medium hover:bg-gray-600 disabled:opacity-50"
-            >
-              🗑 Cancelar turno
-            </button>
-          )}
-          {booking.status === "confirmed" && confirmCancel && (
-            <div className="rounded border border-amber-300 bg-amber-50 p-1.5 flex flex-col gap-1">
-              <p className="text-[10px] text-amber-900 leading-snug">
-                Se le devolverán <strong>${booking.online_paid.toLocaleString("es-AR")}</strong> al jugador por Mercado Pago.
-              </p>
-              <button
-                onClick={() => runAction(onCancel)}
-                disabled={pending}
-                className="rounded bg-red-600 text-white text-[10px] px-2 py-1 font-medium hover:bg-red-700 disabled:opacity-50"
-              >
-                Confirmar cancelación
-              </button>
-              <button
-                onClick={() => setConfirmCancel(false)}
-                disabled={pending}
-                className="rounded bg-gray-100 text-gray-600 text-[10px] px-2 py-1 hover:bg-gray-200"
-              >
-                Volver
+            {err && <p className="mt-3 rounded-xl border border-danger/40 bg-danger-soft p-3 text-sm text-danger">{err}</p>}
+
+            <div className="mt-4 flex flex-col gap-2">
+              {waUrl && (
+                <a href={waUrl} target="_blank" rel="noopener noreferrer" className={`${ACTION_BTN} bg-primary text-on-primary`}>
+                  📱 WhatsApp
+                </a>
+              )}
+              {booking.payment_status !== "paid" && booking.status === "confirmed" && (
+                <button onClick={() => runAction(onMarkPaid)} disabled={pending}
+                  className={`${ACTION_BTN} border border-line bg-surface-2 text-ink`}>
+                  💰 Marcar pagado
+                </button>
+              )}
+              {booking.status === "confirmed" && (
+                <button onClick={() => runAction(onMarkNoShow)} disabled={pending}
+                  className={`${ACTION_BTN} border border-warning/40 bg-warning-soft text-warning`}>
+                  ✕ Marcar ausente
+                </button>
+              )}
+              {booking.status === "confirmed" && !confirmCancel && (
+                <button onClick={() => (refundOnCancel ? setConfirmCancel(true) : runAction(onCancel))} disabled={pending}
+                  className={`${ACTION_BTN} border-2 border-danger bg-surface text-danger`}>
+                  🗑 Cancelar turno
+                </button>
+              )}
+              {booking.status === "confirmed" && confirmCancel && (
+                <div className="flex flex-col gap-2 rounded-xl border border-warning/40 bg-warning-soft p-3">
+                  <p className="text-sm text-warning leading-snug">
+                    Se le devolverán <strong>${booking.online_paid.toLocaleString("es-AR")}</strong> al jugador por Mercado Pago.
+                  </p>
+                  <button onClick={() => runAction(onCancel)} disabled={pending}
+                    className={`${ACTION_BTN} border-2 border-danger bg-surface text-danger`}>
+                    Confirmar cancelación
+                  </button>
+                  <button onClick={() => setConfirmCancel(false)} disabled={pending}
+                    className={`${ACTION_BTN} border border-line bg-surface text-ink`}>
+                    Volver
+                  </button>
+                </div>
+              )}
+              {booking.customer_phone && (
+                <button onClick={() => runAction(onBlockPhone, { phone: booking.customer_phone! })} disabled={pending}
+                  className={`${ACTION_BTN} border border-danger/40 bg-surface text-danger`}>
+                  🚫 Bloquear teléfono
+                </button>
+              )}
+              <button onClick={() => setExpanded(false)} className={`${ACTION_BTN} text-ink-muted`}>
+                Cerrar
               </button>
             </div>
-          )}
-          {booking.customer_phone && (
-            <button
-              onClick={() => runAction(onBlockPhone, { phone: booking.customer_phone! })}
-              disabled={pending}
-              className="rounded bg-red-500 text-white text-[10px] px-2 py-1 font-medium hover:bg-red-600 disabled:opacity-50"
-            >
-              🚫 Bloquear teléfono
-            </button>
-          )}
-          <button
-            onClick={() => setExpanded(false)}
-            className="rounded bg-gray-100 text-gray-600 text-[10px] px-2 py-1 hover:bg-gray-200"
-          >
-            Cerrar
-          </button>
-        </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -555,39 +580,38 @@ function BlockForm({
     else onDone();
   }
 
+  const input = "min-h-11 rounded-lg border border-line bg-surface px-2 text-sm text-ink";
+
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-b border-gray-200 bg-gray-50 p-2 flex flex-col gap-1.5"
+      className="border-b border-line bg-surface-2 p-2 flex flex-col gap-2"
     >
       <input type="hidden" name="venue_id" value={venueId}  />
       <input type="hidden" name="court_id" value={court.id} />
       <input type="hidden" name="date"     value={date}     />
 
-      <p className="text-[10px] font-semibold text-gray-700">Nuevo bloqueo</p>
+      <p className="text-sm font-extrabold text-ink">Nuevo bloqueo</p>
 
       <label className="flex flex-col gap-0.5">
-        <span className="text-[10px] text-gray-500">Inicio</span>
-        <input type="datetime-local" name="start" defaultValue={`${date}T08:00`}
-          className="rounded border border-gray-300 px-1.5 py-0.5 text-[10px]" required />
+        <span className="text-xs text-ink-muted">Inicio</span>
+        <input type="datetime-local" name="start" defaultValue={`${date}T08:00`} className={input} required />
       </label>
 
       <label className="flex flex-col gap-0.5">
-        <span className="text-[10px] text-gray-500">Fin</span>
-        <input type="datetime-local" name="end" defaultValue={`${date}T10:00`}
-          className="rounded border border-gray-300 px-1.5 py-0.5 text-[10px]" required />
+        <span className="text-xs text-ink-muted">Fin</span>
+        <input type="datetime-local" name="end" defaultValue={`${date}T10:00`} className={input} required />
       </label>
 
       <label className="flex flex-col gap-0.5">
-        <span className="text-[10px] text-gray-500">Nota (opcional)</span>
-        <input type="text" name="note" placeholder="Mantenimiento…"
-          className="rounded border border-gray-300 px-1.5 py-0.5 text-[10px]" />
+        <span className="text-xs text-ink-muted">Nota (opcional)</span>
+        <input type="text" name="note" placeholder="Mantenimiento…" className={`${input} placeholder-ink-muted`} />
       </label>
 
-      {err && <p className="text-red-600 text-[9px]">{err}</p>}
+      {err && <p className="text-danger text-xs">{err}</p>}
 
       <button type="submit" disabled={pending}
-        className="rounded bg-gray-700 text-white text-[10px] px-2 py-1 font-medium hover:bg-gray-800 disabled:opacity-50">
+        className="min-h-11 rounded-xl bg-primary text-on-primary text-sm font-extrabold hover:opacity-90 disabled:opacity-50">
         {pending ? "Guardando…" : "Guardar bloqueo"}
       </button>
     </form>

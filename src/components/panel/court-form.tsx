@@ -15,7 +15,7 @@ interface CourtFormProps {
 
 function FieldError({ errors }: { errors?: string[] }) {
   if (!errors?.length) return null;
-  return <p className="mt-1 text-xs text-red-600">{errors[0]}</p>;
+  return <p className="mt-1 text-xs text-danger">{errors[0]}</p>;
 }
 
 export function CourtForm({ action, sports, court, submitLabel = "Guardar" }: CourtFormProps) {
@@ -24,26 +24,26 @@ export function CourtForm({ action, sports, court, submitLabel = "Guardar" }: Co
   return (
     <form action={formAction} className="space-y-5 max-w-md">
       {state?.error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg bg-danger-soft border border-danger/40 px-4 py-3 text-sm text-danger">
           {state.error}
         </div>
       )}
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la cancha</label>
+        <label className="block text-sm font-medium text-ink mb-1">Nombre de la cancha</label>
         <input
           type="text" name="name" defaultValue={court?.name ?? ""}
           placeholder="Cancha 1"
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+          className="w-full rounded-lg border border-line px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
         />
         <FieldError errors={state?.fieldErrors?.name} />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Deporte</label>
+        <label className="block text-sm font-medium text-ink mb-1">Deporte</label>
         <select
           name="sport_id" defaultValue={court?.sport_id ?? ""}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+          className="w-full rounded-lg border border-line px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
         >
           <option value="">Seleccioná un deporte…</option>
           {sports.map((s) => (
@@ -54,12 +54,12 @@ export function CourtForm({ action, sports, court, submitLabel = "Guardar" }: Co
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Duración del turno (minutos)</label>
+        <label className="block text-sm font-medium text-ink mb-1">Duración del turno (minutos)</label>
         <input
           type="number" name="slot_minutes"
           defaultValue={court?.slot_minutes ?? 90}
           min={30} max={240} step={15}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+          className="w-full rounded-lg border border-line px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
         />
         <FieldError errors={state?.fieldErrors?.slot_minutes} />
       </div>
@@ -68,15 +68,15 @@ export function CourtForm({ action, sports, court, submitLabel = "Guardar" }: Co
         <input
           type="checkbox" name="active" id="active"
           defaultChecked={court?.active ?? true}
-          className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+          className="h-4 w-4 rounded border-line text-brand focus:ring-primary/25"
         />
-        <label htmlFor="active" className="text-sm text-gray-700">Cancha activa (visible al público)</label>
+        <label htmlFor="active" className="text-sm text-ink">Cancha activa (visible al público)</label>
       </div>
 
       <div>
         <button
           type="submit" disabled={pending}
-          className="rounded-xl bg-green-600 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 disabled:opacity-60 transition-colors"
+          className="rounded-xl bg-primary px-5 py-2 text-sm font-medium text-on-primary shadow-sm hover:opacity-90 disabled:opacity-60 transition-colors"
         >
           {pending ? "Guardando…" : submitLabel}
         </button>

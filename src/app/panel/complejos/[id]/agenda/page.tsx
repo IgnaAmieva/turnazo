@@ -30,11 +30,11 @@ export default async function AgendaPage({ params, searchParams }: Props) {
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4 shrink-0">
-        <Link href="/panel/agenda" className="text-sm text-gray-500 hover:text-gray-700">
+        <Link href="/panel/agenda" className="inline-flex min-h-11 items-center text-sm text-ink-muted hover:text-ink">
           ← Agenda
         </Link>
-        <span className="text-gray-300">/</span>
-        <h1 className="text-lg font-semibold text-gray-900">{data.venueName}</h1>
+        <span className="text-ink-muted">/</span>
+        <h1 className="text-lg font-semibold text-ink">{data.venueName}</h1>
       </div>
 
       <AgendaGrid

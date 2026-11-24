@@ -39,23 +39,23 @@ export function MpConnectSection({ venueId, mpConnection }: MpConnectSectionProp
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Mercado Pago</h2>
+    <div className="bg-surface rounded-2xl border border-line p-6">
+      <h2 className="text-lg font-semibold text-ink mb-4">Mercado Pago</h2>
 
       {mpStatus === "connected" && (
-        <div className="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
+        <div className="mb-4 rounded-lg bg-accent border border-transparent px-4 py-3 text-sm text-on-accent">
           Cuenta de Mercado Pago conectada exitosamente.
         </div>
       )}
 
       {mpErrorMessage && (
-        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-lg bg-danger-soft border border-danger/40 px-4 py-3 text-sm text-danger">
           {mpErrorMessage}
         </div>
       )}
 
       {state?.error && (
-        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-lg bg-danger-soft border border-danger/40 px-4 py-3 text-sm text-danger">
           {state.error}
         </div>
       )}
@@ -63,25 +63,25 @@ export function MpConnectSection({ venueId, mpConnection }: MpConnectSectionProp
       {mpConnection ? (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
-            <span className="text-sm font-medium text-gray-900">Conectado</span>
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+            <span className="text-sm font-medium text-ink">Conectado</span>
           </div>
-          <div className="text-sm text-gray-600 space-y-1 mb-4">
+          <div className="text-sm text-ink-muted space-y-1 mb-4">
             {mpConnection.mp_email && <p>Cuenta: {mpConnection.mp_email}</p>}
-            <p className="text-xs text-gray-400">ID: {mpConnection.mp_user_id}</p>
+            <p className="text-xs text-ink-muted">ID: {mpConnection.mp_user_id}</p>
           </div>
 
           {!showConfirm ? (
             <button
               type="button"
               onClick={() => setShowConfirm(true)}
-              className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+              className="rounded-lg border border-danger/40 bg-surface px-4 py-2 text-sm text-danger hover:bg-danger-soft transition-colors"
             >
               Desconectar Mercado Pago
             </button>
           ) : (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm text-amber-800 mb-3">
+            <div className="rounded-lg border border-warning/40 bg-warning-soft p-4">
+              <p className="text-sm text-warning mb-3">
                 Al desconectar se desactivará el cobro de seña y pago online.
                 Las reservas pasarán a ser sin pago previo. ¿Confirmar?
               </p>
@@ -91,7 +91,7 @@ export function MpConnectSection({ venueId, mpConnection }: MpConnectSectionProp
                   <button
                     type="submit"
                     disabled={pending}
-                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
+                    className="rounded-lg border-2 border-danger bg-surface px-4 py-2 text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-60 transition-colors"
                   >
                     {pending ? "Desconectando…" : "Sí, desconectar"}
                   </button>
@@ -99,7 +99,7 @@ export function MpConnectSection({ venueId, mpConnection }: MpConnectSectionProp
                 <button
                   type="button"
                   onClick={() => setShowConfirm(false)}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="rounded-lg border border-line bg-surface px-4 py-2 text-sm text-ink-muted hover:bg-surface-2 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -109,12 +109,12 @@ export function MpConnectSection({ venueId, mpConnection }: MpConnectSectionProp
         </div>
       ) : (
         <div>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-ink-muted mb-4">
             Conectá tu cuenta de Mercado Pago para recibir pagos online de tus clientes.
           </p>
           <a
             href={`/api/mp/oauth/connect?venueId=${venueId}`}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#009ee3] px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#007eb5] transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0072a8] px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#005f8c] transition-colors"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.5 14.5h-9a.5.5 0 010-1h9a.5.5 0 010 1zm0-3h-9a.5.5 0 010-1h9a.5.5 0 010 1zm0-3h-9a.5.5 0 010-1h9a.5.5 0 010 1z" />

@@ -9,32 +9,32 @@ export default function LoginForm() {
   return (
     <form action={formAction} className="space-y-4">
       {state.error && (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-red-700 text-sm">
+        <div className="rounded-xl bg-danger-soft border border-danger/40 p-3 text-danger text-sm">
           {state.error}
         </div>
       )}
 
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+        <label htmlFor="email" className="block text-sm font-medium text-ink mb-1.5">Email</label>
         <input id="email" name="email" type="email" autoComplete="email" required disabled={isPending}
-          className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900
-            placeholder-gray-400 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2
-            focus:ring-green-100 disabled:opacity-50" />
-        {state.fieldErrors?.email && <p className="mt-1 text-xs text-red-600">{state.fieldErrors.email[0]}</p>}
+          className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink
+            placeholder-ink-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2
+            focus:ring-primary/25 disabled:opacity-50" />
+        {state.fieldErrors?.email && <p className="mt-1 text-xs text-danger">{state.fieldErrors.email[0]}</p>}
       </div>
 
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">Contraseña</label>
+        <label htmlFor="password" className="block text-sm font-medium text-ink mb-1.5">Contraseña</label>
         <input id="password" name="password" type="password" autoComplete="current-password" required disabled={isPending}
-          className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900
-            placeholder-gray-400 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2
-            focus:ring-green-100 disabled:opacity-50" />
-        {state.fieldErrors?.password && <p className="mt-1 text-xs text-red-600">{state.fieldErrors.password[0]}</p>}
+          className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink
+            placeholder-ink-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2
+            focus:ring-primary/25 disabled:opacity-50" />
+        {state.fieldErrors?.password && <p className="mt-1 text-xs text-danger">{state.fieldErrors.password[0]}</p>}
       </div>
 
       <button type="submit" disabled={isPending}
-        className="w-full rounded-xl bg-green-600 py-2.5 text-sm font-semibold text-white shadow-sm
-          hover:bg-green-700 active:bg-green-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-1">
+        className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-on-primary shadow-sm
+          hover:opacity-90 active:opacity-90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-1">
         {isPending ? 'Entrando…' : 'Entrar'}
       </button>
     </form>

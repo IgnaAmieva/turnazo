@@ -29,17 +29,17 @@ export default async function EditarCanchaPage({
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/panel/complejos" className="text-sm text-gray-500 hover:text-gray-700">← Complejos</Link>
-        <span className="text-gray-300">/</span>
-        <Link href={`/panel/complejos/${id}/canchas`} className="text-sm text-gray-500 hover:text-gray-700">{venue.name}</Link>
-        <span className="text-gray-300">/</span>
-        <h1 className="text-xl font-semibold text-gray-900 truncate">{court.name}</h1>
+        <Link href="/panel/complejos" className="text-sm text-ink-muted hover:text-ink">← Complejos</Link>
+        <span className="text-ink-muted">/</span>
+        <Link href={`/panel/complejos/${id}/canchas`} className="text-sm text-ink-muted hover:text-ink">{venue.name}</Link>
+        <span className="text-ink-muted">/</span>
+        <h1 className="text-xl font-semibold text-ink truncate">{court.name}</h1>
       </div>
 
       <div className="space-y-6">
         {/* Información básica */}
-        <section className="bg-white rounded-2xl border border-gray-200 p-6">
-          <h2 className="text-base font-semibold text-gray-800 mb-4">Información básica</h2>
+        <section className="bg-surface rounded-2xl border border-line p-6">
+          <h2 className="text-base font-semibold text-ink mb-4">Información básica</h2>
           <CourtForm
             action={boundUpdateCourt}
             sports={sports}
@@ -49,9 +49,9 @@ export default async function EditarCanchaPage({
         </section>
 
         {/* Horarios */}
-        <section className="bg-white rounded-2xl border border-gray-200 p-6">
-          <h2 className="text-base font-semibold text-gray-800 mb-1">Horarios de apertura</h2>
-          <p className="text-sm text-gray-500 mb-4">
+        <section className="bg-surface rounded-2xl border border-line p-6">
+          <h2 className="text-base font-semibold text-ink mb-1">Horarios de apertura</h2>
+          <p className="text-sm text-ink-muted mb-4">
             Cada tramo define un bloque de disponibilidad. Los horarios que cruzan la medianoche también son soportados (ej: 23:00 → 01:00).
           </p>
           <CourtHoursEditor
@@ -62,9 +62,9 @@ export default async function EditarCanchaPage({
         </section>
 
         {/* Precios */}
-        <section className="bg-white rounded-2xl border border-gray-200 p-6">
-          <h2 className="text-base font-semibold text-gray-800 mb-1">Precios por franja</h2>
-          <p className="text-sm text-gray-500 mb-4">
+        <section className="bg-surface rounded-2xl border border-line p-6">
+          <h2 className="text-base font-semibold text-ink mb-1">Precios por franja</h2>
+          <p className="text-sm text-ink-muted mb-4">
             Cada fila define el precio de una franja horaria de un día de la semana.
           </p>
           <CourtPricesEditor
