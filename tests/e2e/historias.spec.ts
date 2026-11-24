@@ -59,6 +59,29 @@ test("la imagen de cada estilo es un PNG 1080×1920 que no queda en cachés comp
   expect(dl.headers()["content-disposition"]).toMatch(/^attachment; filename="turnos-padel-.*-pizarra\.png"$/);
 });
 
+test("la imagen muestra siempre el día elegido (hora de Mendoza): por defecto hoy, y el que se elija", async ({ page, request }) => {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Mendoza" }).format(new Date());
+  await page.goto(`/panel/complejos/${VENUE_ID}/historia`);
+  const day = page.getByLabel("Día");
+  await expect(day).toHaveValue(today);
+  await expect(day.locator("option:checked")).toHaveText(/^Hoy · /);
+
+  const srcOf = async () => (await page.getByRole("img", { name: "Vista previa: Pizarra" }).getAttribute("src"))!;
+  const drawnDay = async (src: string) => (await request.get(src)).headers()["x-historia-fecha"];
+  expect(new URL(await srcOf(), "http://x").searchParams.get("fecha")).toBe(today);
+  expect(await drawnDay(await srcOf())).toBe(today);
+
+  // Elegir el tercer día: la vista previa y la descarga piden ese día, y la imagen lo dibuja
+  const third = await day.locator("option").nth(2).getAttribute("value");
+  await day.selectOption(third!);
+  await expect.poll(async () => new URL(await srcOf(), "http://x").searchParams.get("fecha")).toBe(third);
+  expect(await drawnDay(await srcOf())).toBe(third);
+  expect(new URL((await page.getByTestId("descargar-historia").getAttribute("href"))!, "http://x").searchParams.get("fecha")).toBe(third);
+
+  // Un día pasado no se dibuja: vuelve a hoy
+  expect(await drawnDay(`${IMG}?fecha=2020-01-01`)).toBe(today);
+});
+
 test.describe("sin sesión", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test("no se puede generar: la imagen y la página piden iniciar sesión", async ({ page, request }) => {

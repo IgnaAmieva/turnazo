@@ -46,6 +46,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const headers = new Headers(image.headers);
   headers.set('Cache-Control', 'private, no-store');
+  // El día que se dibujó (YYYY-MM-DD, hora de Mendoza): el panel y los tests lo comparan con el elegido
+  headers.set('X-Historia-Fecha', data.date);
   if (q.get('descargar') === '1') {
     headers.set('Content-Disposition', `attachment; filename="turnos-${data.sport.slug}-${data.date}-${style}.png"`);
   }

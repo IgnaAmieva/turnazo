@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 348 | ✓ verde (2026-11-24, rama `rediseno` historias) |
-| E2E | Playwright | 132 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` historias, --workers=1 en 4 tandas por archivo: la corrida entera se cortó por memoria del sistema) |
+| Unitarios + integración | Vitest | 349 | ✓ verde (2026-11-24, rama `rediseno` historias + 024 escrita) |
+| E2E | Playwright | 133 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` historias, --workers=1 en 4 tandas por archivo: la corrida entera se cortó por memoria del sistema) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -130,7 +130,9 @@ Historias de turnos libres (panel; diseño en diseno/historias.png, fuera del re
 - Link en la imagen: {host}/c/{primeros 8 del id}/{deporte} (src/app/c/[code]/[sport]/route.ts) redirige a la página del complejo; busca por rango de uuid entre los complejos aprobados y, si no hay exactamente uno, va al inicio.
 - Tests: tests/e2e/historias.spec.ts (agenda → elegir → vistas previas → descarga PNG 1080×1920; sin sesión → login; complejo de otro dueño → 404; link corto) y tests/unit/stories.test.ts.
 
-Propuesta (no aplicada): logo del club
+- Día de la imagen: la ruta responde `X-Historia-Fecha` con el día dibujado (hora de Mendoza). E2E: por defecto es hoy, al elegir otro día la vista previa, la descarga y la imagen usan ese día, y un día pasado vuelve a hoy; unit: "hoy" cerca de medianoche (02:30 UTC = 23:30 del día anterior en Mendoza). El "Martes 1" de las capturas anteriores era una imagen pedida a mano con ?fecha= de otro día, no un error.
+
+Logo del club: migración `supabase/migrations/024_venue_logos.sql` ESCRITA, SIN APLICAR (para revisar). Propuesta original:
 - Columna: `ALTER TABLE public.venues ADD COLUMN logo_path text;` (ruta dentro del bucket, no URL; NULL = sin logo → iniciales). GRANT SELECT (logo_path) a anon y authenticated; GRANT UPDATE (logo_path) a authenticated (el dueño edita su complejo por updateVenueAction + RLS, como el resto de las columnas).
 - Storage: bucket público `venue-logos` (lectura pública para la web y la historia), con límite de tamaño (ej. 512 KB) y tipos image/png, image/jpeg, image/webp (allowed_mime_types). Ruta `{venue_id}/logo.{ext}`.
 - Políticas en storage.objects para el bucket: SELECT para todos; INSERT/UPDATE/DELETE solo authenticated cuyo `(storage.foldername(name))[1]::uuid` sea un venue con owner_id = auth.uid(). Así nadie puede subir ni pisar el logo de otro complejo.
@@ -534,3 +536,38 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
 - El resto igual. Si el INSERT falla, la transacción se revierte y el hold sigue a su nombre (no pierde el turno).
 - La acción de pago tendría que dejar de liberar el hold en los errores de MP y devolver su `cancel_token` (solo al cliente que lo creó) para pasarlo a `create_booking`; la orden de MP, si llegó a crearse, se cancela como en `cancelHoldAction`.
 - Grants: los mismos (solo service_role).
+
+## Antes del merge de `rediseno` a `main` (lista, 2026-11-24; NO mergeado)
+
+Ramas y orden
+- [ ] `main` local tiene `d27ec19` (cierre de S1) sin push: revisarlo y pushearlo primero. `rediseno` sale de ese commit (no hay commits en `main` que falten en `rediseno`), así que después el merge es directo.
+- [ ] `s2-captcha` (S2: Turnstile + límites de intentos) NO está en `rediseno` y no se pushea. Decidir si va antes o después del rediseño. Si va después, al integrarlo:
+  - el captcha va en el lugar reservado del pie de la hoja y de /reservar (`data-captcha-slot`);
+  - `ABUSE_MESSAGES.tooMany` tiene que salir del catálogo (`bookingError("too_many_attempts").message`); hoy el catálogo reconoce el texto viejo como alias;
+  - migración 022 y claves de Cloudflare Turnstile (sitio + secreta) en Vercel: todavía no existen.
+- [ ] Merge sin squash, para conservar un commit por etapa.
+
+Base de datos (es la misma para Preview y producción)
+- [x] 023 (etiquetas de cancha) aplicada por el revisor; `main` no la usa, no rompe nada.
+- [ ] 024 (logo del club) escrita, sin aplicar. El código que la usa todavía no existe: se puede mergear sin ella.
+- [ ] Pendiente S5 (`p_replace_hold_token`), migración aparte: no bloquea el merge.
+- [ ] Datos: futmates no tiene precio de 22:00 a 00:00 (lo carga el dueño; el panel ya lo avisa). El "Complejo Padelero Tunuyán" de prueba está aprobado y se ve en producción (inicio, "Lo antes posible", lista): decidir si se deja visible.
+- [ ] Antes de mergear, verificar que no queden datos de prueba: 14 reservas, 0 teléfonos bloqueados, cancha de prueba sin etiquetas, cobro del complejo de prueba solo "en el lugar".
+
+Vercel
+- [x] Los deploys de Preview de `rediseno` construyen (READY hasta `4a47cfe`).
+- [ ] Probar a mano en el Preview la imagen de la historia (`/panel/complejos/{id}/historia/imagen`): en Vercel lee las fuentes con fs (`outputFileTracingIncludes`). En local anda; en Vercel falta confirmarlo.
+- [ ] Variables: el rediseño no agrega ninguna. Producción ya tiene `NEXT_PUBLIC_APP_URL` y las `MP_*`. En Preview falta `NEXT_PUBLIC_APP_URL` (el pago online no funciona ahí; no se agrega a Preview por decisión anterior).
+- [ ] Los links de Mi turno, el .ics y la historia usan el host del pedido: en producción salen con el dominio final.
+
+Cambios de comportamiento a tener presentes
+- [ ] Reservar desde el complejo ahora son 3 toques con datos recordados (turno → Reservar → Confirmar).
+- [ ] `/[localidad]` redirige al inicio con la localidad; los links viejos a `/tunuyan/padel` y a los complejos siguen andando.
+- [ ] "Seguir en…" ya no existe (lo reemplaza la portada del inicio, que abre la búsqueda recordada).
+- [ ] Turnos sin precio ya no se ofrecen como libres ("Consultá").
+- [ ] `?_now=` solo funciona fuera de producción (NODE_ENV): confirmado en el código.
+
+Calidad
+- [ ] `pnpm test` y `pnpm test:e2e --workers=1` en verde sobre la rama final (si la corrida entera se corta por memoria, por tandas de archivos).
+- [ ] Lint: quedan 3 errores viejos de `react-hooks/set-state-in-effect` (payment-status-panel, botón de push, guía de PWA), anteriores al rediseño. `next build` no corre lint, así que no bloquean el deploy.
+- [ ] CLAUDE.md quedó desactualizado (dice Next 15 y 65/28 tests): actualizarlo después del merge.
