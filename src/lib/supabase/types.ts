@@ -267,31 +267,43 @@ export type Database = {
       courts: {
         Row: {
           active: boolean
+          covered: boolean
           created_at: string
+          has_locker_room: boolean
           id: string
+          lit: boolean
           name: string
           slot_minutes: number
           sport_id: string
+          surface: string | null
           updated_at: string
           venue_id: string
         }
         Insert: {
           active?: boolean
+          covered?: boolean
           created_at?: string
+          has_locker_room?: boolean
           id?: string
+          lit?: boolean
           name: string
           slot_minutes: number
           sport_id: string
+          surface?: string | null
           updated_at?: string
           venue_id: string
         }
         Update: {
           active?: boolean
+          covered?: boolean
           created_at?: string
+          has_locker_room?: boolean
           id?: string
+          lit?: boolean
           name?: string
           slot_minutes?: number
           sport_id?: string
+          surface?: string | null
           updated_at?: string
           venue_id?: string
         }

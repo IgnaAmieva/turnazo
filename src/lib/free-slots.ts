@@ -45,7 +45,7 @@ export const getVenuesForList = cache(async (localityId: string, sportId: string
   const { data, error } = await supabase
     .from('venues')
     .select(`id, name, address, lat, lng,
-      courts!inner(id, name, slot_minutes, sport_id, active,
+      courts!inner(id, name, slot_minutes, sport_id, active, surface, covered, lit, has_locker_room,
         court_hours(weekday, open_time, close_time),
         court_prices(weekday, from_time, to_time, price))`)
     .eq('locality_id', localityId)
@@ -59,10 +59,12 @@ export const getVenuesForList = cache(async (localityId: string, sportId: string
     id: v.id, name: v.name, address: v.address, lat: v.lat, lng: v.lng,
     courts: ((v.courts ?? []) as unknown as {
       id: string; name: string; slot_minutes: number; sport_id: string;
+      surface: string | null; covered: boolean; lit: boolean; has_locker_room: boolean;
       court_hours: CourtWithSchedule['hours'] | null; court_prices: CourtWithSchedule['prices'] | null;
     }[])
       .map((c) => ({
         id: c.id, name: c.name, slot_minutes: c.slot_minutes, sport_id: c.sport_id,
+        surface: c.surface, covered: c.covered, lit: c.lit, has_locker_room: c.has_locker_room,
         hours: c.court_hours ?? [], prices: (c.court_prices ?? []).map((p) => ({ ...p, price: Number(p.price) })),
       }))
       .sort((a, b) => a.name.localeCompare(b.name, 'es')),

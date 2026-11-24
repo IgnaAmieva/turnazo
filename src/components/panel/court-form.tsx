@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import type { PanelActionState } from "@/app/actions/panel";
+import { SURFACES } from "@/lib/court-tags";
 
 interface Sport { id: string; name: string; default_slot_minutes: number }
 interface CourtFormProps {
@@ -9,6 +10,7 @@ interface CourtFormProps {
   sports: Sport[];
   court?: {
     name: string; sport_id: string; slot_minutes: number; active: boolean;
+    surface?: string | null; covered?: boolean; lit?: boolean; has_locker_room?: boolean;
   };
   submitLabel?: string;
 }
@@ -63,6 +65,37 @@ export function CourtForm({ action, sports, court, submitLabel = "Guardar" }: Co
         />
         <FieldError errors={state?.fieldErrors?.slot_minutes} />
       </div>
+
+      {/* Etiquetas (migración 023): se ven en la lista y en la portada del complejo */}
+      <fieldset className="space-y-3">
+        <legend className="block text-sm font-medium text-ink mb-1">Cómo es la cancha</legend>
+        <div>
+          <label htmlFor="surface" className="block text-sm text-ink mb-1">Superficie</label>
+          <select
+            id="surface" name="surface" defaultValue={court?.surface ?? ""}
+            className="w-full min-h-11 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
+          >
+            <option value="">Sin indicar</option>
+            {SURFACES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <FieldError errors={state?.fieldErrors?.surface} />
+        </div>
+        {([
+          ["covered", "Techada", court?.covered],
+          ["lit", "Iluminada", court?.lit],
+          ["has_locker_room", "Vestuario", court?.has_locker_room],
+        ] as const).map(([name, label, value]) => (
+          <label key={name} className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3">
+            <span className="text-sm text-ink">{label}</span>
+            <input type="checkbox" role="switch" name={name} defaultChecked={value ?? false} className="peer sr-only" />
+            <span aria-hidden="true"
+              className="relative h-7 w-12 shrink-0 rounded-full bg-line transition-colors peer-checked:bg-primary
+                peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring
+                after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-surface after:shadow after:transition-transform
+                peer-checked:after:translate-x-5" />
+          </label>
+        ))}
+      </fieldset>
 
       <div className="flex items-center gap-2">
         <input

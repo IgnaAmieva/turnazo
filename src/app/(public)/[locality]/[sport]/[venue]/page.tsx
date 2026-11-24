@@ -16,6 +16,7 @@ import { CourtLines } from "@/components/sport-art";
 import { MiniMap } from "@/components/mini-map";
 import { VenueDistance } from "@/components/venue-distance";
 import { ScrollIntoViewOnMount } from "@/components/scroll-into-view";
+import { venueTagsLine } from "@/lib/court-tags";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Breadcrumbs from "@/components/breadcrumbs";
@@ -47,8 +48,6 @@ function dayChip(date: string, today: string) {
   return { top: date === today ? "Hoy" : wd.charAt(0).toUpperCase() + wd.slice(1), day: String(d) };
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
 export default async function VenuePage({ params, searchParams }: Props) {
   const { locality: lSlug, sport: sSlug, venue: venueId } = await params;
   const { fecha, _now, cancha, inicio, c } = await searchParams;
@@ -60,7 +59,8 @@ export default async function VenuePage({ params, searchParams }: Props) {
       : undefined;
 
   const today = todayInMendoza(nowUtc);
-  const date = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : today;
+  // Nunca un día pasado: la fila de días arranca en "Hoy" y una fecha vieja abre hoy
+  const date = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) && fecha > today ? fecha : today;
 
   const [locality, sport, venue] = await Promise.all([
     getLocalityBySlug(lSlug),
@@ -120,7 +120,8 @@ export default async function VenuePage({ params, searchParams }: Props) {
     venue.courts.find((ct) => ct.id === (initialSlot?.courtId ?? c)) ?? venue.courts[0];
 
   const minutes = [...new Set(venue.courts.map((ct) => ct.slot_minutes))].sort((a, b) => a - b);
-  const subtitle = [sport.name, plural(venue.courts.length, "cancha", "canchas")].join(" · ");
+  // Etiquetas (023): "Pádel · Sintético · Techada", o "Pádel · 2 canchas · turnos de 90 min" si no hay nada cargado
+  const subtitle = `${sport.name} · ${venueTagsLine(venue.courts)}`;
 
   const days: string[] = [];
   for (let d = today, i = 0; i < BOOKING_DAYS; i++, d = nextDate(d)) days.push(d);
@@ -157,7 +158,7 @@ export default async function VenuePage({ params, searchParams }: Props) {
           </Link>
           <div>
             <h1 className="text-[2rem] font-extrabold leading-tight">{venue.name}</h1>
-            <p className="text-sm">{subtitle}</p>
+            <p className="text-sm" data-testid="etiquetas">{subtitle}</p>
           </div>
         </div>
       </header>

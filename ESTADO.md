@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño V2c en la rama `rediseno`; migración 023 escrita, sin aplicar; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño: etiquetas 023 en la rama `rediseno`; 023 aplicada por el revisor; migración 023 escrita, sin aplicar; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 332 | ✓ verde (2026-11-24, rama `rediseno` V2c) |
-| E2E | Playwright | 121 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` V2c, --workers=1) |
+| Unitarios + integración | Vitest | 342 | ✓ verde (2026-11-24, rama `rediseno` etiquetas 023) |
+| E2E | Playwright | 124 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` etiquetas 023, --workers=1) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -128,7 +128,9 @@ Rediseño V2 (diseño aprobado "versión 2"; la imagen de referencia está en di
 - lib/free-slots.ts: canchas de una localidad+deporte en UNA consulta; disponibilidad con get_court_availability una vez por cancha y fecha por request (React cache), tope MAX_COURTS = 24 canchas; solo hoy y, si hace falta, mañana.
 - V2b · Lista de complejos: franjas de hoy Ahora · 18–20 · 20–22 · 22+ (?franja=, lib/franjas.ts con test). Cada complejo en tarjeta: mapa chiquito ESQUEMÁTICO en SVG (components/mini-map.tsx: calles dibujadas y pin con las variables del tema; sin tiles ni pedidos externos; la ubicación real queda en "Ir"/"Cómo llegar"), nombre, dirección, distancia solo si el jugador YA dio permiso de ubicación (nunca se pide; components/venue-distance.tsx), etiquetas con lo que existe ("2 canchas · turnos de 90 min") y los próximos 4 horarios libres con precio de la franja en chips lima (horarios distintos), que abren el complejo con la hoja de ese turno. Primero los que tienen lugar; "N complejos con lugar". El mapa grande (Leaflet + OSM, con su atribución) sale de arriba y se carga recién con "Ver todos en el mapa". La lista acepta ?_now= solo fuera de producción (igual que el complejo) para los tests.
 - V2c · Complejo: portada verde (~200 px, clase .cover) con las líneas de cancha del deporte, flecha de volver de 44 px (en escritorio siguen las migas), nombre grande y "Pádel · 2 canchas". Tarjeta flotante con dirección, mapa chiquito esquemático (el mismo de V2b) y "Ir" (Google Maps con el pin real). Días en una fila deslizable (Hoy, Mar 25…, los 30 días reservables; el elegido se centra). Pestañas por cancha (?c=, links: funcionan sin JavaScript) y "Turnos de 90 min". Grilla de 4 columnas: libre en tarjeta neutra con precio, elegido en lima con borde primary, ocupado punteado y tachado, sin precio "Consultá". Tocar un turno lo ELIGE y aparece la barra fija "Hoy 19:00 · Cancha 1 · $10.000" + "Reservar", que abre la hoja de M2 (con datos recordados: turno → Reservar → Confirmar = 3 toques; antes 2). Sin JavaScript el turno sigue siendo un link a /reservar. Se quitó DateNavigator (lo reemplaza la fila de días).
-- Migración 023 (supabase/migrations/023_court_features.sql), ESCRITA Y SIN APLICAR, para revisar: courts.surface (CHECK sintetico/pasto/cemento/polvo_ladrillo/blindex o NULL), covered, lit, has_locker_room (boolean NOT NULL DEFAULT false); SELECT a anon y authenticated de esas columnas, INSERT/UPDATE a authenticated (el dueño edita la cancha con UPDATE directo + RLS courts_owner_all; no hay RPC panel_* de canchas). La app todavía no la usa.
+- Etiquetas (023, APLICADA por el revisor el 2026-11-24): en el panel, el formulario de la cancha tiene "Superficie" (select con las 5 opciones o "Sin indicar") y tres interruptores (role=switch, 44 px): Techada, Iluminada, Vestuario; createCourtAction/updateCourtAction los guardan (zod valida la superficie). La lista y la portada del complejo muestran lo cargado ("Sintético · Techada · Iluminada", lib/court-tags.ts); si no hay nada, "2 canchas · turnos de 90 min". tests/integration/court-features.test.ts: el dueño edita sus canchas; no puede editar las de otro dueño (ni por la API ni por updateCourtAction); anon lee y no escribe; el CHECK rechaza superficies inventadas. E2E: tests/e2e/etiquetas.spec.ts (deja la cancha de prueba como estaba).
+- Fila de días del complejo: el primero siempre es "Hoy" y nunca hay días pasados; una ?fecha= vieja abre hoy.
+- Migración 023 (supabase/migrations/023_court_features.sql), aplicada por el revisor: courts.surface (CHECK sintetico/pasto/cemento/polvo_ladrillo/blindex o NULL), covered, lit, has_locker_room (boolean NOT NULL DEFAULT false); SELECT a anon y authenticated de esas columnas, INSERT/UPDATE a authenticated (el dueño edita la cancha con UPDATE directo + RLS courts_owner_all; no hay RPC panel_* de canchas). La app todavía no la usa.
 - Editor de precios: "Agregar franja" propone el tramo abierto que falta cubrir (futmates: 22:00 a 00:00) o el horario de apertura de la cancha; ya no 08:00–22:00 fijo (defaultPriceRow en lib/price-coverage.ts, con test).
 - Bug de futmates (22:00 y 23:00 sin precio): la cancha abre de 10:00 a 00:00 y el precio está cargado de 08:00 a 22:00 (la fila que propone el editor por defecto). No es un error de cálculo: falta la franja de precio. La base rechaza esas reservas (price_not_set). Arreglo: la grilla ya no ofrece como libre un turno sin precio ("Consultá al complejo", sin link), "Lo antes posible" y la lista los saltean, y el panel de la cancha avisa "Hay turnos sin precio: 22:00 a 00:00 · todos los días" (lib/price-coverage.ts + tests/unit/price-coverage.test.ts). Los datos de futmates no se tocaron: el dueño tiene que agregar la franja 22:00–00:00.
 

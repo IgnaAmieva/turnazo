@@ -12,6 +12,7 @@ import { RememberSearch } from "@/components/player-memory-ui";
 import { MiniMap } from "@/components/mini-map";
 import { VenueDistance } from "@/components/venue-distance";
 import { VenuesMapToggle } from "@/components/venues-map-toggle";
+import { venueTagsLine } from "@/lib/court-tags";
 
 type Props = {
   params: Promise<{ locality: string; sport: string }>;
@@ -106,7 +107,6 @@ export default async function VenuesPage({ params, searchParams }: Props) {
 
       <ul className="grid gap-3">
         {rows.map(({ v, next }) => {
-          const minutes = [...new Set(v.courts.map((c) => c.slot_minutes))].sort((a, b) => a - b);
           return (
             <li key={v.id} data-testid="complejo" className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
               <div className="flex gap-3">
@@ -118,10 +118,8 @@ export default async function VenuesPage({ params, searchParams }: Props) {
                   <p className="text-sm text-ink-muted">
                     {v.address}<VenueDistance lat={v.lat} lng={v.lng} />
                   </p>
-                  {/* Etiquetas: hasta que exista la migración 023, solo lo que hay */}
-                  <p className="mt-1 text-xs text-ink-muted" data-testid="etiquetas">
-                    {plural(v.courts.length, "cancha", "canchas")} · turnos de {minutes.join(" y ")} min
-                  </p>
+                  {/* Etiquetas (023): lo cargado, o "2 canchas · turnos de 90 min" */}
+                  <p className="mt-1 text-xs text-ink-muted" data-testid="etiquetas">{venueTagsLine(v.courts)}</p>
                 </div>
               </div>
 

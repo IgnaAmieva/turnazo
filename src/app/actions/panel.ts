@@ -349,7 +349,23 @@ const CourtSchema = z.object({
   sport_id:     z.string().uuid("Seleccioná un deporte"),
   slot_minutes: z.coerce.number().min(30).max(240),
   active:       z.coerce.boolean().default(true),
+  // Migración 023: etiquetas de la cancha ("" = sin indicar)
+  surface:         z.enum(["sintetico", "pasto", "cemento", "polvo_ladrillo", "blindex"]).nullable(),
+  covered:         z.boolean(),
+  lit:             z.boolean(),
+  has_locker_room: z.boolean(),
 });
+
+/** Etiquetas del formulario: superficie (select) y tres interruptores. */
+function courtFeaturesFrom(formData: FormData) {
+  const surface = String(formData.get("surface") ?? "");
+  return {
+    surface:         surface === "" ? null : surface,
+    covered:         formData.get("covered") !== null,
+    lit:             formData.get("lit") !== null,
+    has_locker_room: formData.get("has_locker_room") !== null,
+  };
+}
 
 export async function createCourtAction(
   venueId: string,
@@ -365,6 +381,7 @@ export async function createCourtAction(
     sport_id:     formData.get("sport_id"),
     slot_minutes: formData.get("slot_minutes"),
     active:       formData.get("active") !== null,
+    ...courtFeaturesFrom(formData),
   };
   const parsed = CourtSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
@@ -377,6 +394,10 @@ export async function createCourtAction(
       sport_id:     parsed.data.sport_id,
       slot_minutes: parsed.data.slot_minutes,
       active:       parsed.data.active,
+      surface:         parsed.data.surface,
+      covered:         parsed.data.covered,
+      lit:             parsed.data.lit,
+      has_locker_room: parsed.data.has_locker_room,
     })
     .select("id")
     .single();
@@ -434,6 +455,7 @@ export async function updateCourtAction(
     sport_id:     formData.get("sport_id"),
     slot_minutes: formData.get("slot_minutes"),
     active:       formData.get("active") !== null,
+    ...courtFeaturesFrom(formData),
   };
   const parsed = CourtSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
@@ -445,6 +467,10 @@ export async function updateCourtAction(
       sport_id:     parsed.data.sport_id,
       slot_minutes: parsed.data.slot_minutes,
       active:       parsed.data.active,
+      surface:         parsed.data.surface,
+      covered:         parsed.data.covered,
+      lit:             parsed.data.lit,
+      has_locker_room: parsed.data.has_locker_room,
     })
     .eq("id", courtId)
     .eq("venue_id", venueId);

@@ -58,6 +58,18 @@ test("días deslizables (Hoy primero) y pestañas por cancha", async ({ page }) 
   }
 });
 
+test("la fila de días arranca en 'Hoy' y nunca muestra días pasados (una fecha vieja abre hoy)", async ({ page }) => {
+  const yesterday = new Date(Date.now() - 24 * 3600 * 1000);
+  const y = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Mendoza" }).format(yesterday);
+  await page.goto(`${VENUE_PATH}?fecha=${y}`);
+  const days = page.getByTestId("dia");
+  await expect(days.first()).toHaveText(/^Hoy\s*\d+$/);
+  await expect(days.first()).toHaveAttribute("aria-current", "date");
+  await expect(days.first()).toBeInViewport();
+  const box = (await days.first().boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0); // la fila arranca en Hoy, sin días antes
+});
+
 test("grilla de 4 columnas: tocar un turno lo elige (lima, borde primary) y 'Reservar' abre la hoja", async ({ page }) => {
   await page.goto(`${URL_}&c=${COURT_ID}`);
   const slots = page.getByTestId("slot-free");

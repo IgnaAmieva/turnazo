@@ -143,6 +143,11 @@ export type CourtWithSchedule = {
   name: string;
   slot_minutes: number;
   sport_id: string;
+  /** Migración 023 (etiquetas) */
+  surface: string | null;
+  covered: boolean;
+  lit: boolean;
+  has_locker_room: boolean;
   hours: { weekday: number; open_time: string; close_time: string }[];
   prices: { weekday: number; from_time: string; to_time: string; price: number }[];
 };
@@ -173,7 +178,7 @@ export async function getVenueWithCourts(
   const { data: courts, error: courtsErr } = await supabase
     .from("courts")
     .select(
-      `id, name, slot_minutes, sport_id,
+      `id, name, slot_minutes, sport_id, surface, covered, lit, has_locker_room,
        court_hours(weekday, open_time, close_time),
        court_prices(weekday, from_time, to_time, price)`
     )
@@ -191,6 +196,7 @@ export async function getVenueWithCourts(
       name: c.name,
       slot_minutes: c.slot_minutes,
       sport_id: c.sport_id,
+      surface: c.surface, covered: c.covered, lit: c.lit, has_locker_room: c.has_locker_room,
       hours: (c.court_hours as { weekday: number; open_time: string; close_time: string }[]) ?? [],
       prices: (c.court_prices as { weekday: number; from_time: string; to_time: string; price: number }[]) ?? [],
     })),
