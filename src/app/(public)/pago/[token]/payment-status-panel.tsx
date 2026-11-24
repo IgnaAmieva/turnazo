@@ -68,13 +68,14 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
 
   if (status.state === 'confirmada') {
     return (
-      <div className="rounded-2xl border border-green-200 bg-green-50 p-6 text-center">
-        <p className="text-green-800 text-xl font-bold mb-2">¡Pago confirmado!</p>
-        <p className="text-green-700 text-sm mb-5">Tu turno quedó reservado.</p>
+      <div className="rounded-2xl border border-line bg-surface p-6 text-center">
+        <span aria-hidden="true" className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent text-on-accent text-2xl font-extrabold">✓</span>
+        <p className="text-ink text-xl font-extrabold mb-2">¡Pago confirmado!</p>
+        <p className="text-ink-muted text-sm mb-5">Tu turno quedó reservado.</p>
         <Link
           href={`/turnos/${token}`}
-          className="inline-block rounded-2xl bg-green-600 px-6 py-3 text-sm font-semibold text-white
-            shadow-sm hover:bg-green-700"
+          className="inline-block rounded-2xl bg-primary px-6 py-3 text-sm font-extrabold text-on-primary
+            shadow-sm hover:opacity-90"
         >
           Ver mi turno
         </Link>
@@ -85,31 +86,31 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
   if (status.state === 'pendiente') {
     const cancelWithToken = cancelHoldAction.bind(null, token);
     return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
-        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-amber-300 border-t-amber-700" />
-        <p className="text-amber-900 text-xl font-bold mb-2">Estamos confirmando tu pago</p>
-        <p className="text-amber-800 text-sm">
+      <div className="rounded-2xl border border-warning/40 bg-warning-soft p-6 text-center">
+        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-warning/30 border-t-warning" />
+        <p className="text-warning text-xl font-bold mb-2">Estamos confirmando tu pago</p>
+        <p className="text-warning text-sm">
           Apenas Mercado Pago nos avise, tu turno queda confirmado. No cierres esta pantalla.
         </p>
-        <p className="mt-4 text-amber-900 text-sm">
+        <p className="mt-4 text-warning text-sm">
           El turno queda reservado para vos durante{' '}
           <span className="font-mono font-semibold tabular-nums" data-testid="countdown">
             {countdown}
           </span>
         </p>
         {status.amount !== undefined && (
-          <p className="mt-1 text-amber-800 text-xs">
+          <p className="mt-1 text-warning text-xs">
             Monto: ${status.amount.toLocaleString('es-AR')}
           </p>
         )}
         <form action={cancelWithToken} className="mt-5">
           <button
             type="submit"
-            className="text-sm text-amber-900 underline underline-offset-2 hover:text-amber-700"
+            className="text-sm text-warning underline underline-offset-2 hover:text-warning"
           >
             Cancelar y elegir otro horario
           </button>
-          <p className="mt-1 text-xs text-amber-700">
+          <p className="mt-1 text-xs text-warning">
             Si todavía no pagaste, el horario se libera al instante.
           </p>
         </form>
@@ -119,13 +120,13 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
 
   if (status.state === 'vencida') {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">
-        <p className="text-gray-800 text-xl font-bold mb-2">Se venció el tiempo para pagar</p>
-        <p className="text-gray-600 text-sm">
+      <div className="rounded-2xl border border-line bg-surface-2 p-6 text-center">
+        <p className="text-ink text-xl font-bold mb-2">Se venció el tiempo para pagar</p>
+        <p className="text-ink-muted text-sm">
           El turno se liberó. Si llegaste a pagar, Mercado Pago te devuelve el dinero
           automáticamente. Podés volver a elegir un horario.
         </p>
-        <Link href="/" className="mt-5 inline-block text-sm text-green-700 hover:underline">
+        <Link href="/" className="mt-5 inline-block text-sm text-brand hover:underline">
           Buscar otro turno
         </Link>
       </div>
@@ -134,9 +135,9 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
 
   if (status.state === 'cancelada') {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">
-        <p className="text-gray-800 text-xl font-bold mb-2">Este turno fue cancelado</p>
-        <Link href="/" className="mt-3 inline-block text-sm text-green-700 hover:underline">
+      <div className="rounded-2xl border border-line bg-surface-2 p-6 text-center">
+        <p className="text-ink text-xl font-bold mb-2">Este turno fue cancelado</p>
+        <Link href="/" className="mt-3 inline-block text-sm text-brand hover:underline">
           Buscar otro turno
         </Link>
       </div>
@@ -144,9 +145,9 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">
-      <p className="text-gray-600 text-lg mb-3">Pago no encontrado.</p>
-      <Link href="/" className="text-sm text-green-700 hover:underline">
+    <div className="rounded-2xl border border-line bg-surface-2 p-6 text-center">
+      <p className="text-ink-muted text-lg mb-3">Pago no encontrado.</p>
+      <Link href="/" className="text-sm text-brand hover:underline">
         Volver al inicio
       </Link>
     </div>

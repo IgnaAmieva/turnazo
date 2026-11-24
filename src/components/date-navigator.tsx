@@ -51,32 +51,33 @@ export default function DateNavigator({ date, basePath }: Props) {
   }
 
   return (
-    <div className="flex items-center justify-center gap-4 py-3">
+    <div className="flex items-center justify-between gap-2 py-3 sm:justify-center sm:gap-4">
       <button
         onClick={() => navigate(addDays(date, -1))}
         disabled={isPast}
-        className="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-          disabled:opacity-30 disabled:cursor-not-allowed
-          hover:bg-gray-100 active:bg-gray-200"
-        aria-label="Ir al dia anterior"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface
+          text-xl text-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed
+          hover:bg-surface-2 active:bg-line"
+        aria-label="Día anterior"
+        title="Día anterior"
       >
-        Ayer
+        <span aria-hidden="true">‹</span>
       </button>
 
-      <span className="font-bold text-gray-900 min-w-[200px] text-center">
+      <span className="font-extrabold text-ink text-center sm:min-w-[200px]">
         {formatLabel(date)}
       </span>
 
       <button
         onClick={() => navigate(addDays(date, 1))}
         disabled={isLast}
-        title={isLast ? `Se puede reservar hasta ${BOOKING_DAYS} días adelante` : undefined}
-        className="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-          disabled:opacity-30 disabled:cursor-not-allowed
-          hover:bg-gray-100 active:bg-gray-200"
-        aria-label="Ir al dia siguiente"
+        title={isLast ? `Se puede reservar hasta ${BOOKING_DAYS} días adelante` : 'Día siguiente'}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface
+          text-xl text-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed
+          hover:bg-surface-2 active:bg-line"
+        aria-label="Día siguiente"
       >
-        Manana
+        <span aria-hidden="true">›</span>
       </button>
     </div>
   );

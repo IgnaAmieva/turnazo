@@ -13,8 +13,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           <ThemeToggle />
         </div>
       </header>
-      {/* Rediseño D0: el contenido sigue en claro hasta migrar las pantallas (D1). */}
-      <div data-theme="light" className="bg-bg text-ink min-h-[calc(100dvh-3.5rem)]">
+
+      <div className="bg-bg text-ink min-h-[calc(100dvh-3.5rem)]">
         <main className="max-w-5xl mx-auto px-4 py-6">{children}</main>
       </div>
     </>

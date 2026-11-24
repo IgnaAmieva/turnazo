@@ -100,7 +100,8 @@ export default async function ReservarPage({ params, searchParams }: Props) {
   // Labels de fecha y hora
   const startLabel = formatTimeMendoza(startDate);
   const endLabel   = formatTimeMendoza(endDate);
-  const dateLabel  = formatDateMendoza(startDate);
+  const dateRaw    = formatDateMendoza(startDate);
+  const dateLabel  = dateRaw.charAt(0).toUpperCase() + dateRaw.slice(1);
 
   const isPast = startDate <= new Date();
 
@@ -120,58 +121,58 @@ export default async function ReservarPage({ params, searchParams }: Props) {
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
       {/* Breadcrumb */}
-      <nav className="text-sm text-gray-400 mb-6 flex flex-wrap gap-1 items-center">
-        <Link href="/" className="hover:text-green-600">Inicio</Link>
+      <nav className="text-sm text-ink-muted mb-6 flex flex-wrap gap-1 items-center">
+        <Link href="/" className="hover:text-ink">Inicio</Link>
         <span>/</span>
-        <Link href={`/${lSlug}`} className="hover:text-green-600">{locality.name}</Link>
+        <Link href={`/${lSlug}`} className="hover:text-ink">{locality.name}</Link>
         <span>/</span>
-        <Link href={`/${lSlug}/${sSlug}`} className="hover:text-green-600">{sport.name}</Link>
+        <Link href={`/${lSlug}/${sSlug}`} className="hover:text-ink">{sport.name}</Link>
         <span>/</span>
-        <Link href={`/${lSlug}/${sSlug}/${venueId}`} className="hover:text-green-600">{venue.name}</Link>
+        <Link href={`/${lSlug}/${sSlug}/${venueId}`} className="hover:text-ink">{venue.name}</Link>
         <span>/</span>
-        <span className="text-gray-700">Reservar</span>
+        <span className="text-ink">Reservar</span>
       </nav>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-5">Confirmar reserva</h1>
+      <h1 className="text-2xl font-bold text-ink mb-5">Confirmar reserva</h1>
 
       {/* Resumen del turno */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm mb-6">
-        <p className="font-semibold text-gray-900 text-lg">{venue.name}</p>
-        <p className="text-gray-500 text-sm mt-0.5">{venue.address}</p>
-        <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
-          <p className="text-sm text-gray-700">
+      <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm mb-6">
+        <p className="font-semibold text-ink text-lg">{venue.name}</p>
+        <p className="text-ink-muted text-sm mt-0.5">{venue.address}</p>
+        <div className="mt-3 pt-3 border-t border-line space-y-1">
+          <p className="text-sm text-ink">
             <span className="font-medium">Cancha:</span> {court.name}
           </p>
-          <p className="text-sm text-gray-700 capitalize">
+          <p className="text-sm text-ink">
             <span className="font-medium">Día:</span> {dateLabel}
           </p>
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-ink">
             <span className="font-medium">Horario:</span> {startLabel} – {endLabel}
           </p>
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-ink">
             <span className="font-medium">Precio:</span>{' '}
             {displayPrice !== null
               ? `$${displayPrice.toLocaleString('es-AR')}`
-              : <span className="text-gray-400 italic">Consultar precio</span>}
+              : <span className="text-ink-muted italic">Consultar precio</span>}
           </p>
         </div>
       </div>
 
       {/* Estado: horario pasado */}
       {isPast ? (
-        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5 text-center">
-          <p className="text-amber-800 font-medium mb-3">Este horario ya pasó.</p>
+        <div className="rounded-2xl bg-warning-soft border border-warning/40 p-5 text-center">
+          <p className="text-warning font-medium mb-3">Este horario ya pasó.</p>
           <Link
             href={`/${lSlug}/${sSlug}/${venueId}`}
-            className="text-sm text-green-700 hover:underline"
+            className="text-sm text-brand hover:underline"
           >
             Volver al complejo
           </Link>
         </div>
       ) : paymentOptions.length === 0 ? (
         /* No debería pasar (la base exige al menos una forma de pago) */
-        <div className="rounded-2xl bg-blue-50 border border-blue-200 p-5">
-          <p className="text-blue-800 font-medium">
+        <div className="rounded-2xl bg-surface-2 border border-line p-5">
+          <p className="text-ink font-medium">
             Este complejo no tiene habilitada ninguna forma de pago por ahora.
           </p>
         </div>

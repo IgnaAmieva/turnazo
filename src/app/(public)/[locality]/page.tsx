@@ -30,21 +30,21 @@ export default async function LocalityPage({ params }: Props) {
 
   return (
     <div className="max-w-lg mx-auto">
-      <nav className="text-sm text-gray-400 mb-6">
-        <Link href="/" className="hover:text-green-600">Inicio</Link>
+      <nav className="text-sm text-ink-muted mb-6">
+        <Link href="/" className="hover:text-ink">Inicio</Link>
         <span className="mx-2">/</span>
-        <span className="text-gray-700">{locality.name}</span>
+        <span className="text-ink">{locality.name}</span>
       </nav>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">{locality.name}</h1>
-      <p className="text-gray-500 mb-8">¿Qué deporte querés jugar?</p>
+      <h1 className="text-2xl font-bold text-ink mb-1">{locality.name}</h1>
+      <p className="text-ink-muted mb-8">¿Qué deporte querés jugar?</p>
 
       {availableSports.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 p-12 text-center">
-          <p className="text-gray-400 text-sm">
+        <div className="rounded-2xl border border-dashed border-line p-12 text-center">
+          <p className="text-ink-muted text-sm">
             Todavía no hay complejos disponibles en {locality.name}.
           </p>
-          <p className="text-gray-400 text-xs mt-1">Volvé pronto.</p>
+          <p className="text-ink-muted text-xs mt-1">Volvé pronto.</p>
         </div>
       ) : (
         <>
@@ -56,20 +56,20 @@ export default async function LocalityPage({ params }: Props) {
                   {hasVenues ? (
                     <Link
                       href={`/${locality.slug}/${sport.slug}`}
-                      className="block rounded-2xl border border-gray-200 bg-white p-6 text-center
-                        shadow-sm hover:border-green-400 hover:shadow-md transition-all"
+                      className="block rounded-2xl border border-line bg-surface p-6 text-center
+                        shadow-sm hover:border-primary hover:shadow-md transition-all"
                     >
                       <div className="text-4xl mb-2">{SPORT_ICON[sport.slug] ?? "🏅"}</div>
-                      <span className="text-lg font-semibold text-gray-800 block">{sport.name}</span>
-                      <span className="text-xs text-gray-400 mt-1 block">
+                      <span className="text-lg font-semibold text-ink block">{sport.name}</span>
+                      <span className="text-xs text-ink-muted mt-1 block">
                         {sport.venueCount} complejo{sport.venueCount !== 1 ? "s" : ""}
                       </span>
                     </Link>
                   ) : (
-                    <div className="block rounded-2xl border border-gray-100 bg-gray-50 p-6 text-center opacity-40 cursor-not-allowed">
+                    <div className="block rounded-2xl border border-line bg-surface-2 p-6 text-center opacity-40 cursor-not-allowed">
                       <div className="text-4xl mb-2 grayscale">{SPORT_ICON[sport.slug] ?? "🏅"}</div>
-                      <span className="text-lg font-semibold text-gray-400 block">{sport.name}</span>
-                      <span className="text-xs text-gray-400 mt-1 block">Sin complejos</span>
+                      <span className="text-lg font-semibold text-ink-muted block">{sport.name}</span>
+                      <span className="text-xs text-ink-muted mt-1 block">Sin complejos</span>
                     </div>
                   )}
                 </li>

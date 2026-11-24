@@ -31,14 +31,14 @@ export default function CancelForm({
   // Sin pago online: igual que siempre (solo hasta cancel_limit_hours antes).
   if (!refundAvailable && !withinWindow) {
     return (
-      <div className="rounded-2xl bg-gray-50 border border-gray-200 p-4 text-sm text-gray-500">
+      <div className="rounded-2xl bg-surface-2 border border-line p-4 text-sm text-ink-muted">
         No es posible cancelar (límite de {cancelLimitHours}h antes del turno alcanzado).
       </div>
     );
   }
   if (refundAvailable && started) {
     return (
-      <div className="rounded-2xl bg-gray-50 border border-gray-200 p-4 text-sm text-gray-500">
+      <div className="rounded-2xl bg-surface-2 border border-line p-4 text-sm text-ink-muted">
         No es posible cancelar: el turno ya empezó.
       </div>
     );
@@ -46,7 +46,7 @@ export default function CancelForm({
 
   if (state.success) {
     return (
-      <div className="rounded-2xl bg-green-50 border border-green-200 p-4 text-sm text-green-800 font-medium">
+      <div className="rounded-2xl bg-accent border border-transparent p-4 text-sm text-on-accent font-medium">
         {state.refund === 'refunded' && `Tu turno fue cancelado. Te devolvimos $${(state.refundAmount ?? 0).toLocaleString('es-AR')} por Mercado Pago.`}
         {state.refund === 'pending' && `Tu turno fue cancelado. La devolución de $${(state.refundAmount ?? 0).toLocaleString('es-AR')} está en proceso.`}
         {(!state.refund || state.refund === 'none') && 'Tu turno fue cancelado exitosamente.'}
@@ -60,23 +60,23 @@ export default function CancelForm({
   return (
     <div>
       {state.error && (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-red-700 text-sm mb-4">
+        <div className="rounded-xl bg-danger-soft border border-danger/40 p-4 text-danger text-sm mb-4">
           {state.error}
         </div>
       )}
 
       {refundDue && (
-        <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800 mb-4">
+        <div className="rounded-xl bg-accent border border-transparent p-4 text-sm text-on-accent mb-4">
           Si cancelás ahora, te devolvemos <strong>{amountLabel}</strong> a tu medio de pago de Mercado Pago.
         </div>
       )}
 
       {noRefund && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900 mb-4 space-y-2">
+        <div className="rounded-xl bg-warning-soft border border-warning/40 p-4 text-sm text-warning mb-4 space-y-2">
           <p>
             <strong>Si cancelás ahora, NO se te devuelve lo que pagaste ({amountLabel}).</strong>
           </p>
-          <p className="text-amber-800">
+          <p className="text-warning">
             {refundPolicy === 'none'
               ? 'Este complejo no hace devoluciones por cancelación.'
               : `Pasó el plazo para cancelar con devolución (hasta ${cancelLimitHours} h antes del turno).`}
@@ -86,7 +86,7 @@ export default function CancelForm({
               type="checkbox"
               checked={acknowledged}
               onChange={(e) => setAcknowledged(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-amber-400 text-amber-700 focus:ring-amber-500"
+              className="mt-0.5 h-4 w-4 rounded border-warning text-warning focus:ring-warning"
             />
             <span>Entiendo que no hay devolución.</span>
           </label>
@@ -97,8 +97,8 @@ export default function CancelForm({
         <button
           type="submit"
           disabled={isPending || (noRefund && !acknowledged)}
-          className="w-full rounded-2xl bg-red-600 py-3.5 text-sm font-semibold text-white
-            shadow-sm hover:bg-red-700 active:bg-red-800 transition-colors
+          className="w-full rounded-2xl border-2 border-danger bg-surface py-3.5 text-sm font-extrabold text-danger
+            shadow-sm hover:bg-danger-soft active:bg-danger-soft transition-colors
             disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isPending
@@ -110,7 +110,7 @@ export default function CancelForm({
                 : 'Cancelar turno'}
         </button>
 
-        <p className="mt-2 text-xs text-gray-400 text-center">
+        <p className="mt-2 text-xs text-ink-muted text-center">
           Esta acción no se puede deshacer.
         </p>
       </form>

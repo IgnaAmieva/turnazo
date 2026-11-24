@@ -67,27 +67,27 @@ export default async function VenuePage({ params, searchParams }: Props) {
 
   return (
     <div>
-      <nav className="text-sm text-gray-400 mb-6">
-        <Link href="/" className="hover:text-green-600">Inicio</Link>
+      <nav className="text-sm text-ink-muted mb-6">
+        <Link href="/" className="hover:text-ink">Inicio</Link>
         <span className="mx-2">/</span>
-        <Link href={`/${lSlug}`} className="hover:text-green-600">{locality.name}</Link>
+        <Link href={`/${lSlug}`} className="hover:text-ink">{locality.name}</Link>
         <span className="mx-2">/</span>
-        <Link href={`/${lSlug}/${sSlug}`} className="hover:text-green-600">{sport.name}</Link>
+        <Link href={`/${lSlug}/${sSlug}`} className="hover:text-ink">{sport.name}</Link>
         <span className="mx-2">/</span>
-        <span className="text-gray-700">{venue.name}</span>
+        <span className="text-ink">{venue.name}</span>
       </nav>
 
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{venue.name}</h1>
-          <p className="text-sm text-gray-500 mt-1">{venue.address}</p>
+          <h1 className="text-2xl font-bold text-ink">{venue.name}</h1>
+          <p className="text-sm text-ink-muted mt-1">{venue.address}</p>
         </div>
         <a
           href={`https://maps.google.com/?q=${venue.lat},${venue.lng}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm bg-blue-50 text-blue-700 border border-blue-200
-            rounded-full px-4 py-2 hover:bg-blue-100 transition-colors whitespace-nowrap"
+          className="text-sm bg-surface text-ink border border-line
+            rounded-full px-4 py-2 hover:bg-surface-2 transition-colors whitespace-nowrap"
         >
           Cómo llegar
         </a>
@@ -96,7 +96,7 @@ export default async function VenuePage({ params, searchParams }: Props) {
       <DateNavigator date={date} basePath={basePath} />
 
       {venue.courts.length === 0 ? (
-        <p className="text-center text-gray-400 py-16">
+        <p className="text-center text-ink-muted py-16">
           No hay canchas de {sport.name} disponibles en este complejo.
         </p>
       ) : (
@@ -104,8 +104,8 @@ export default async function VenuePage({ params, searchParams }: Props) {
           {venue.courts.map((court) => (
             <section key={court.id}>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold text-gray-800">{court.name}</h2>
-                <span className="text-xs text-gray-400">{court.slot_minutes} min</span>
+                <h2 className="text-lg font-semibold text-ink">{court.name}</h2>
+                <span className="text-xs text-ink-muted">{court.slot_minutes} min</span>
               </div>
 
               <CourtCalendar

@@ -62,7 +62,7 @@ export default function CourtCalendar({
 
   if (allSlots.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 p-6 text-center text-gray-500 text-sm">
+      <div className="rounded-xl border border-line p-6 text-center text-ink-muted text-sm">
         Sin horario este día
       </div>
     );
@@ -71,7 +71,7 @@ export default function CourtCalendar({
   if (slots.length === 0) {
     // Had hours but all slots are in the past
     return (
-      <div className="rounded-xl border border-gray-200 p-6 text-center text-gray-500 text-sm">
+      <div className="rounded-xl border border-line p-6 text-center text-ink-muted text-sm">
         No quedan turnos para hoy
       </div>
     );
@@ -88,12 +88,12 @@ export default function CourtCalendar({
           return (
             <div
               key={startIso}
-              className="rounded-lg border border-gray-200 bg-gray-100 p-3 flex flex-col items-center gap-1 cursor-not-allowed"
+              className="rounded-lg border border-line bg-surface-2 p-3 flex flex-col items-center gap-1 cursor-not-allowed"
             >
-              <span className="text-sm font-medium text-gray-400 line-through">
+              <span className="text-sm font-medium text-ink-muted line-through">
                 {label}
               </span>
-              <span className="text-xs text-gray-400">Ocupado</span>
+              <span className="text-xs text-ink-muted">Ocupado</span>
             </div>
           );
         }
@@ -104,12 +104,12 @@ export default function CourtCalendar({
           <Link
             key={startIso}
             href={href}
-            className="rounded-lg border border-green-200 bg-green-50 p-3 flex flex-col items-center gap-1
-              hover:bg-green-100 hover:border-green-300 active:bg-green-200 transition-colors"
+            className="rounded-lg border border-transparent bg-accent p-3 flex flex-col items-center gap-1
+              hover:brightness-95 active:brightness-90 transition-colors"
           >
-            <span className="text-sm font-semibold text-green-900">{label}</span>
+            <span className="text-sm font-extrabold text-on-accent">{label}</span>
             {slot.price !== null && (
-              <span className="text-xs text-green-700">
+              <span className="text-xs text-on-accent">
                 ${slot.price.toLocaleString('es-AR')}
               </span>
             )}

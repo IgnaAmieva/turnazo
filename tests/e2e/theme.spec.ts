@@ -47,6 +47,18 @@ test("el botón cicla Automático → Claro → Oscuro y queda guardado al recar
   expect(await page.evaluate(() => localStorage.getItem("turnazo-theme"))).toBeNull();
 });
 
+test("D1: en oscuro el contenido público también cambia (no solo el encabezado)", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+  const colors = await page.evaluate(() => {
+    const h1 = document.querySelector("main h1")!;
+    const main = document.querySelector("main")!.parentElement!;
+    return { h1: getComputedStyle(h1).color, bg: getComputedStyle(main).backgroundColor };
+  });
+  expect(colors.h1).toBe("rgb(246, 243, 234)"); // #F6F3EA
+  expect(colors.bg).toBe("rgb(11, 61, 46)");    // #0B3D2E
+});
+
 test("el botón mide al menos 44 px", async ({ page }) => {
   await page.goto("/");
   const box = await page.getByTestId("theme-toggle").boundingBox();

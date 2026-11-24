@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño D0 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño D1 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 271 | ✓ verde (2026-11-24, rama `rediseno` D0) |
-| E2E | Playwright | 68 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` D0) |
+| Unitarios + integración | Vitest | 271 | ✓ verde (2026-11-24, rama `rediseno` D1) |
+| E2E | Playwright | 69 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` D1) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -121,7 +121,14 @@ Rediseño D0 (paleta, fuente, modo claro/oscuro):
 - `tests/unit/theme-contrast.test.ts` lee `globals.css` y exige AA (4.5:1) para cada par texto/fondo en los dos modos; además que el lima no sea color de texto.
 - Modo: `src/lib/theme.ts` (`THEME_SCRIPT` inline en el `<head>`, sin parpadeo): automático sigue al celular; el botón `components/theme-toggle.tsx` (encabezado público) cicla Automático → Claro → Oscuro y guarda solo `turnazo-theme` en localStorage. Actualiza el color de la barra del celular. Tests: `tests/unit/theme.test.ts` (ejecuta el mismo script con un navegador simulado) y `tests/e2e/theme.spec.ts`.
 - Fuente Outfit (500 texto, 800 títulos) con `next/font`.
-- Pantallas todavía sin migrar quedan forzadas en claro con `data-theme="light"`: contenido público (hasta D1), panel, login y registro (hasta D2).
+- Pantallas todavía sin migrar quedan forzadas en claro con `data-theme="light"`: panel, login y registro (hasta D2).
+
+Rediseño D1 (pantallas públicas):
+- Inicio, localidad, complejos, complejo, reservar, pago, mi turno y cancelación usan solo los colores por función: en oscuro cambia todo el contenido, no solo el encabezado. Turnos libres en lima con texto verde oscuro; éxito con lima de fondo; errores en `danger`; pendiente en `warning`. "Cancelar turno" pasó a botón con contorno rojo (se lee en los dos modos).
+- Días: los botones "Ayer"/"Manana" (que en realidad iban al día anterior/siguiente) pasan a ‹ › de 44 px con `aria-label` "Día anterior"/"Día siguiente".
+- `/turnos/[token]` ya no muestra el estado interno en inglés (`hold`, `expired`…): "Esperando el pago", "Vencido", "Jugado". La fecha se ve "Martes, 8 de diciembre" (antes `capitalize` ponía "De Diciembre").
+- `/pago` confirmado: tarjeta neutra con tilde en lima (antes el botón quedaba lima sobre lima en oscuro).
+- Capturas en celular (390 px, claro y oscuro) tomadas con una spec temporal contra el complejo de prueba; la reserva "Captura D1" se borró.
 - Preview: comparte la base de producción; reservar ahí crea reservas reales.
 
 Fase 7 S1 (seguridad) — CERRADO (2026-11-19):
