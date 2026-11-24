@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño M4 en la rama `rediseno`; 023 aplicada por el revisor; migración 023 escrita, sin aplicar; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño: historias de turnos libres en la rama `rediseno`; 023 aplicada por el revisor; migración 023 escrita, sin aplicar; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 345 | ✓ verde (2026-11-24, rama `rediseno` M4) |
-| E2E | Playwright | 127 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` M4, --workers=1) |
+| Unitarios + integración | Vitest | 348 | ✓ verde (2026-11-24, rama `rediseno` historias) |
+| E2E | Playwright | 132 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` historias, --workers=1 en 4 tandas por archivo: la corrida entera se cortó por memoria del sistema) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -122,6 +122,19 @@ Rediseño D0 (paleta, fuente, modo claro/oscuro):
 - Modo: `src/lib/theme.ts` (`THEME_SCRIPT` inline en el `<head>`, sin parpadeo): automático sigue al celular; el botón `components/theme-toggle.tsx` (encabezado público) cicla Automático → Claro → Oscuro y guarda solo `turnazo-theme` en localStorage. Actualiza el color de la barra del celular. Tests: `tests/unit/theme.test.ts` (ejecuta el mismo script con un navegador simulado) y `tests/e2e/theme.spec.ts`.
 - Fuente Outfit (500 texto, 800 títulos) con `next/font`.
 - Desde D2 no queda ninguna pantalla forzada en claro.
+
+Historias de turnos libres (panel; diseño en diseno/historias.png, fuera del repo):
+- Agenda del complejo → "Compartir turnos libres" (/panel/complejos/{id}/historia): día (hoy + 6), deporte (si el club tiene varios) y estilo Pizarra / Invitación / Urgencia con la vista previa de los 3 (la misma imagen que se descarga). "Descargar" (Content-Disposition attachment) y "Compartir" (navigator.share con el archivo si el navegador puede; si no, avisa que use Descargar).
+- Imagen: GET /panel/complejos/{id}/historia/imagen?fecha=&deporte=&estilo=[&descargar=1] → PNG 1080×1920 con next/og (ImageResponse), Outfit 500/800 (src/assets/fonts, OFL; outputFileTracingIncludes en next.config). Contenido: círculo con las iniciales del club (no hay logo todavía), nombre y localidad, DEPORTE en una pastilla grande, el día, hasta 6 horarios libres con precio (los mismos que ve el jugador: libres, con precio, sin los que ya empezaron), el link y la marca Turnazo. Cache-Control private, no-store.
+- Solo el dueño: getStoryData (lib/stories.ts) verifica la sesión y venues.owner_id con el cliente del dueño; si no es el dueño, 404 (sin decir si el complejo existe). /panel/* sin sesión va al login (middleware).
+- Link en la imagen: {host}/c/{primeros 8 del id}/{deporte} (src/app/c/[code]/[sport]/route.ts) redirige a la página del complejo; busca por rango de uuid entre los complejos aprobados y, si no hay exactamente uno, va al inicio.
+- Tests: tests/e2e/historias.spec.ts (agenda → elegir → vistas previas → descarga PNG 1080×1920; sin sesión → login; complejo de otro dueño → 404; link corto) y tests/unit/stories.test.ts.
+
+Propuesta (no aplicada): logo del club
+- Columna: `ALTER TABLE public.venues ADD COLUMN logo_path text;` (ruta dentro del bucket, no URL; NULL = sin logo → iniciales). GRANT SELECT (logo_path) a anon y authenticated; GRANT UPDATE (logo_path) a authenticated (el dueño edita su complejo por updateVenueAction + RLS, como el resto de las columnas).
+- Storage: bucket público `venue-logos` (lectura pública para la web y la historia), con límite de tamaño (ej. 512 KB) y tipos image/png, image/jpeg, image/webp (allowed_mime_types). Ruta `{venue_id}/logo.{ext}`.
+- Políticas en storage.objects para el bucket: SELECT para todos; INSERT/UPDATE/DELETE solo authenticated cuyo `(storage.foldername(name))[1]::uuid` sea un venue con owner_id = auth.uid(). Así nadie puede subir ni pisar el logo de otro complejo.
+- La app: subir desde el formulario del complejo, guardar logo_path y usarlo en la historia (fetch del PNG desde la URL pública del bucket) y, si se quiere, en la portada.
 
 Rediseño M4 (Mi turno):
 - "Guardá este link" arriba de todo (borde primary): el link de Mi turno en un campo de solo lectura y "Copiar link" (44 px; sin permiso de portapapeles queda seleccionado para copiar a mano).

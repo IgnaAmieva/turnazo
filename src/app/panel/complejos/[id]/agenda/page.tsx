@@ -29,12 +29,19 @@ export default async function AgendaPage({ params, searchParams }: Props) {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4 shrink-0">
+      <div className="flex flex-wrap items-center gap-3 mb-4 shrink-0">
         <Link href="/panel/agenda" className="inline-flex min-h-11 items-center text-sm text-ink-muted hover:text-ink">
           ← Agenda
         </Link>
         <span className="text-ink-muted">/</span>
-        <h1 className="text-lg font-semibold text-ink">{data.venueName}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-ink">{data.venueName}</h1>
+        <Link
+          href={`/panel/complejos/${venueId}/historia`}
+          data-testid="compartir-turnos"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-primary px-4 text-sm font-extrabold text-on-primary shadow-sm hover:opacity-90"
+        >
+          Compartir turnos libres
+        </Link>
       </div>
 
       <AgendaGrid
