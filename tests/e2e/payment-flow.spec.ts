@@ -316,7 +316,7 @@ test.describe("opciones de pago en la pantalla de reserva", () => {
     await page.locator('[name="customer_name"]').fill("E2E Pago Online 2");
     await page.locator('[name="customer_phone"]').fill("2622 777004");
     await page.locator('[name="customer_email"]').fill("e2e.pago2@turnazo.test");
-    await page.getByRole("button", { name: /ir a pagar con mercado pago/i }).click({ force: true });
+    await page.getByRole("button", { name: /reintentar el pago/i }).click({ force: true });
     // El mensaje del primer intento sigue en pantalla: esperar la fila nueva en la base
     await expect
       .poll(async () => (await bookingsNamed(request, "E2E Pago Online 2")).map((r) => r.status), { timeout: 20_000 })

@@ -11,6 +11,7 @@
  */
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import BookingForm from '@/app/(public)/[locality]/[sport]/[venue]/reservar/booking-form';
@@ -73,6 +74,7 @@ function formatDay(date: string) {
 
 function BookingSheet({ venue, slot, onClose }: { venue: SheetVenue; slot: SheetSlot; onClose: () => void }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const options = buildPaymentOptions(venue, slot.price);
   const bound = { court_id: slot.courtId, venue_id: venue.id, start: slot.start, end: slot.end };
 
@@ -131,7 +133,12 @@ function BookingSheet({ venue, slot, onClose }: { venue: SheetVenue; slot: Sheet
           {options.length === 0 ? (
             <p className="pb-4 text-sm text-ink">Este complejo no tiene habilitada ninguna forma de pago por ahora.</p>
           ) : (
-            <BookingForm action={action} options={options} variant="sheet" />
+            <BookingForm
+              action={action}
+              options={options}
+              variant="sheet"
+              onOtherTimes={() => { onClose(); router.refresh(); }}
+            />
           )}
         </div>
       </div>

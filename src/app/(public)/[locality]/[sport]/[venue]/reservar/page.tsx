@@ -147,7 +147,11 @@ export default async function ReservarPage({ params, searchParams }: Props) {
         </div>
       ) : (
         /* Formulario de reserva */
-        <BookingForm action={bookingAction} options={paymentOptions} />
+        <BookingForm
+          action={bookingAction}
+          options={paymentOptions}
+          otherTimesHref={`/${lSlug}/${sSlug}/${venueId}?fecha=${fecha}`}
+        />
       )}
     </div>
   );

@@ -15,11 +15,11 @@ export function RememberSearch({
 }
 
 /** Botón "No soy yo": borra nombre, celular, localidad y deporte recordados. */
-export function NotMeButton({ className = '' }: { className?: string }) {
+export function NotMeButton({ className = '', onForget }: { className?: string; onForget?: () => void }) {
   return (
     <button
       type="button"
-      onClick={forgetPlayer}
+      onClick={() => { forgetPlayer(); onForget?.(); }}
       data-testid="no-soy-yo"
       className={`inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface px-4
         text-sm font-extrabold text-ink hover:bg-surface-2 ${className}`}

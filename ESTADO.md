@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño M2 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño M3 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 274 | ✓ verde (2026-11-24, rama `rediseno` M2) |
-| E2E | Playwright | 99 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` M2) |
+| Unitarios + integración | Vitest | 305 | ✓ verde (2026-11-24, rama `rediseno` M3) |
+| E2E | Playwright | 101 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` M3) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -122,6 +122,15 @@ Rediseño D0 (paleta, fuente, modo claro/oscuro):
 - Modo: `src/lib/theme.ts` (`THEME_SCRIPT` inline en el `<head>`, sin parpadeo): automático sigue al celular; el botón `components/theme-toggle.tsx` (encabezado público) cicla Automático → Claro → Oscuro y guarda solo `turnazo-theme` en localStorage. Actualiza el color de la barra del celular. Tests: `tests/unit/theme.test.ts` (ejecuta el mismo script con un navegador simulado) y `tests/e2e/theme.spec.ts`.
 - Fuente Outfit (500 texto, 800 títulos) con `next/font`.
 - Desde D2 no queda ninguna pantalla forzada en claro.
+
+Rediseño M3 (errores con acción) y ajuste de datos recordados:
+- Datos recordados (hoja y /reservar): una línea "Juan Pérez · 2622 123456" con "Cambiar" (44 px, despliega los campos) y "No soy yo". Sin datos recordados, los campos como antes. Nombre y celular son campos controlados: lo escrito no se borra cuando la reserva vuelve con error. Solo se recuerda un celular con 8+ dígitos y un nombre de 2+ letras (antes se guardaba un celular mal escrito).
+- `src/lib/booking-errors.ts`: catálogo único código → mensaje corto + acción. `lib/booking-messages.ts` ahora sale de ahí (las server actions no cambiaron; devuelven los mensajes nuevos). Acciones: `other_times` (turno tomado / pasado / fuera de grilla → "Ver otros horarios" reemplaza a Confirmar; en la hoja cierra y recarga el día; en /reservar vuelve al complejo con la fecha), `field` (nombre / celular → se marca el campo con `aria-invalid`, mensaje debajo y foco), `none` (límite de 3 turnos, teléfono bloqueado, complejo/cancha no disponible, sin precio → solo el mensaje, sin botón), `wait` (pago en curso; rate limit de S2: "Esperá un minuto y probá de nuevo"), `pay_at_venue_or_retry` (Mercado Pago → "Pagar en el lugar" si el complejo lo permite —cambia la opción y reserva en un toque— y "Reintentar el pago"), `change_payment`, `retry` (genérico).
+- La validación del servidor (zod) devolvía textos genéricos en inglés para nombre/celular: el formulario muestra los del catálogo.
+- Al mergear S2: `ABUSE_MESSAGES.tooMany` debería usar `bookingError("too_many_attempts").message` (mientras tanto el catálogo reconoce el texto actual de S2 como alias).
+- `tests/integration/booking-errors.test.ts`: lee de las migraciones la definición vigente de `create_booking`, `create_booking_hold` y `_validate_booking_slot` (más los códigos propios de la acción de pago) y exige que cada código tenga mensaje (≤ 110 caracteres) y acción; contra la base real, la server action devuelve errores del catálogo. Encontró `invalid_period`, que antes caía en el mensaje genérico.
+- E2E: `errores.spec.ts` (celular inválido marca el campo y no se borra; teléfono bloqueado sin reintento) y `hoja.spec.ts` (turno tomado → "Ver otros horarios" recarga el día; error de MP → "Pagar en el lugar" reserva en un toque).
+- Capturas: `13-hoja-recordada`, `14-error-tomado`, `15-error-celular`, `16-error-bloqueado` (claro/oscuro).
 
 Rediseño M2 (reserva en la hoja del complejo):
 - `src/components/booking-sheet.tsx`: tocar un turno libre abre una hoja (abajo en el celular, centrada en escritorio) con el mismo `BookingForm` y las MISMAS server actions que /reservar (online → `startPaymentAction` → Mercado Pago; en el lugar → `createBookingAction` → /turnos/…). Las server actions no cambiaron. Con datos recordados: turno → Confirmar = 2 toques.

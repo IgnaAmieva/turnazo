@@ -47,7 +47,8 @@ test("con datos recordados: turno → Confirmar = 2 toques y queda reservado", a
   const sheet = page.getByRole("dialog");
   await expect(sheet).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${VENUE_PATH}\\?`)); // no navegó a /reservar
-  await expect(sheet.getByLabel("Tu nombre")).toHaveValue(NAME);
+  await expect(sheet.getByTestId("datos-recordados")).toContainText(`${NAME} · ${MEM.celular}`);
+  await expect(sheet.getByLabel("Tu nombre")).toBeHidden(); // sin campos: una sola línea
   await expect(sheet.getByRole("radio", { name: /pagar en el lugar/i })).toBeChecked();
 
   const confirm = sheet.getByRole("button", { name: "Confirmar reserva" });
@@ -64,7 +65,7 @@ test("con datos recordados: turno → Confirmar = 2 toques y queda reservado", a
   await expect(page.getByText(NAME)).toBeVisible();
 });
 
-test("si el turno se ocupa mientras la hoja está abierta, el error aparece pegado al botón", async ({ page, request }) => {
+test("turno tomado con la hoja abierta: error pegado y 'Ver otros horarios' reemplaza a Confirmar", async ({ page, request }) => {
   await remember(page);
   await page.goto(venueUrl);
   await slotAt(page, "18:30").click();
@@ -74,16 +75,23 @@ test("si el turno se ocupa mientras la hoja está abierta, el error aparece pega
   // Otra persona lo reserva antes
   expect(await createTestBooking(request, FECHA, 18, 30, "E2E Hoja Otro", "2622000998")).toBeTruthy();
 
-  const confirm = sheet.getByRole("button", { name: "Confirmar reserva" });
-  await confirm.click();
+  await sheet.getByRole("button", { name: "Confirmar reserva" }).click();
   const err = sheet.getByTestId("reserva-error");
   await expect(err).toContainText("ya fue reservado");
+  await expect(err).toHaveAttribute("data-error-code", "slot_taken");
+  await expect(sheet.getByRole("button", { name: "Confirmar reserva" })).toHaveCount(0);
+  const otros = sheet.getByRole("button", { name: "Ver otros horarios" });
   const e = (await err.boundingBox())!;
-  const b = (await confirm.boundingBox())!;
+  const b = (await otros.boundingBox())!;
   expect(b.y - (e.y + e.height)).toBeGreaterThanOrEqual(0);
   expect(b.y - (e.y + e.height)).toBeLessThanOrEqual(24);   // pegado
-  expect(b.y + b.height).toBeLessThanOrEqual(844);          // botón sigue a la vista
-  await expect(sheet.getByLabel("Tu nombre")).toHaveValue(NAME); // no se pierden los datos
+  expect(b.y + b.height).toBeLessThanOrEqual(844);          // a la vista
+
+  // Cierra la hoja y recarga la disponibilidad del mismo día: 18:30 ya figura ocupado
+  await otros.click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(page).toHaveURL(new RegExp(`fecha=${FECHA}`));
+  await expect(page.locator("section").first().getByTestId("slot-taken").filter({ hasText: "18:30" })).toBeVisible({ timeout: 10_000 });
 });
 
 test("Cerrar y Escape cierran la hoja sin reservar", async ({ page }) => {
@@ -126,7 +134,7 @@ async function mpRows(request: APIRequestContext) {
   return (await r.json()) as { mp_user_id: string }[];
 }
 
-test("pago online desde la hoja: va por el mismo camino que /reservar (error de MP pegado al botón)", async ({ page, request }) => {
+test("pago online desde la hoja: error de MP pegado y 'Pagar en el lugar' reserva sin volver a cargar nada", async ({ page, request }) => {
   const original = await getSettings(request);
   const hadMp = (await mpRows(request)).length > 0;
   try {
@@ -149,13 +157,20 @@ test("pago online desde la hoja: va por el mismo camino que /reservar (error de 
     const sheet = page.getByRole("dialog");
     await sheet.getByRole("radio", { name: /pagar el total online/i }).check();
     await sheet.getByLabel("Tu email").fill("e2e-hoja@turnazo.test");
-    const pay = sheet.getByRole("button", { name: "Ir a pagar con Mercado Pago" });
-    await pay.click();
+    await sheet.getByRole("button", { name: "Ir a pagar con Mercado Pago" }).click();
     const err = sheet.getByTestId("reserva-error");
     await expect(err).toContainText(/No pudimos acceder a la cuenta de Mercado Pago del complejo/, { timeout: 20_000 });
+    const venueBtn = sheet.getByRole("button", { name: "Pagar en el lugar" });
+    await expect(sheet.getByRole("button", { name: "Reintentar el pago" })).toBeVisible();
     const e = (await err.boundingBox())!;
-    const b = (await pay.boundingBox())!;
+    const b = (await venueBtn.boundingBox())!;
     expect(b.y - (e.y + e.height)).toBeLessThanOrEqual(24);
+
+    // Un toque: cambia a "pagar en el lugar" y reserva (el hold de MP ya se liberó)
+    const nav = page.waitForURL(/\/turnos\//, { timeout: 25_000 });
+    await venueBtn.click();
+    await nav;
+    await expect(page.getByText(/confirmado/i)).toBeVisible();
   } finally {
     await setSettings(request, original);
     if (!hadMp) {
