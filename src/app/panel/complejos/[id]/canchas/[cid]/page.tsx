@@ -97,6 +97,8 @@ export default async function EditarCanchaPage({
             action={boundSavePrices}
             initialPrices={court.prices}
             otherCourts={otherCourts}
+            courtHours={court.hours}
+            slotMinutes={court.slot_minutes}
           />
         </section>
       </div>

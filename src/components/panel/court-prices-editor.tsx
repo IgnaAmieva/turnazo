@@ -2,6 +2,8 @@
 
 import { useActionState, useState } from "react";
 import type { PanelActionState } from "@/app/actions/panel";
+import type { CourtHour } from "@/lib/slots";
+import { defaultPriceRow } from "@/lib/price-coverage";
 
 const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -22,13 +24,16 @@ interface CourtPricesEditorProps {
   action: (state: PanelActionState, formData: FormData) => Promise<PanelActionState>;
   initialPrices: PriceRow[];
   otherCourts?: OtherCourt[];
+  /** Horario de apertura y duración de turno: la fila por defecto cubre lo abierto sin precio. */
+  courtHours?: CourtHour[];
+  slotMinutes?: number;
 }
 
 function normalizeTime(t: string) {
   return t.slice(0, 5);
 }
 
-export function CourtPricesEditor({ action, initialPrices, otherCourts = [] }: CourtPricesEditorProps) {
+export function CourtPricesEditor({ action, initialPrices, otherCourts = [], courtHours = [], slotMinutes = 60 }: CourtPricesEditorProps) {
   const [rows, setRows] = useState<PriceRow[]>(
     initialPrices.map((p) => ({
       weekday:   p.weekday,
@@ -40,7 +45,8 @@ export function CourtPricesEditor({ action, initialPrices, otherCourts = [] }: C
   const [state, formAction, pending] = useActionState(action, null);
 
   function addRow() {
-    setRows((prev) => [...prev, { weekday: 1, from_time: "08:00", to_time: "22:00", price: 0 }]);
+    // Propone el tramo abierto que falta cubrir (no 08:00–22:00 fijo: así quedó futmates sin precio de 22 a 00)
+    setRows((prev) => [...prev, { ...defaultPriceRow(courtHours, prev, slotMinutes), price: 0 }]);
   }
 
   function removeRow(idx: number) {

@@ -87,8 +87,8 @@ test("/tunuyan/padel loads without errors", async ({ page }) => {
 
   // The venue should appear
   await expect(page.getByText("Complejo Padelero Tunuyán")).toBeVisible();
-  // "Cómo llegar" link must exist without crashing
-  await expect(page.getByRole("link", { name: /cómo llegar/i })).toBeVisible();
+  // V2b: cada complejo con su mapa chiquito (la ubicación real está en "Ir" del complejo)
+  await expect(page.getByTestId("mapa-mini").first()).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------

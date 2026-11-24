@@ -70,8 +70,10 @@ test("todo el flujo público tiene objetivos táctiles de 44 px o más", async (
   await check("inicio", "/");
   await check("inicio con localidad y deporte", "/?localidad=tunuyan&deporte=padel");
   await page.goto("/tunuyan/padel");
-  await page.locator(".leaflet-control-zoom").waitFor(); // el mapa carga después
   await check("complejos");
+  await page.getByRole("button", { name: "Ver todos en el mapa" }).click();
+  await page.locator(".leaflet-control-zoom").waitFor(); // el mapa carga al tocar el botón
+  await check("complejos con el mapa");
   await check("complejo", `${VENUE_PATH}?fecha=${FECHA}`);
   const href = await page.locator('a[href*="/reservar?"]').first().getAttribute("href");
   await check("reservar", href!);

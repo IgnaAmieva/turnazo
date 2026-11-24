@@ -89,7 +89,7 @@ export function nextDate(date: string): string {
  */
 export async function freeSlots(venues: VenueForList[], date: string, now = new Date()): Promise<FreeSlot[]> {
   const weekday = weekdayInMendoza(date);
-  const cutoff = date <= todayInMendoza() ? now : undefined;
+  const cutoff = date <= todayInMendoza(now) ? now : undefined;
   const courts = venues.flatMap((v) => v.courts.map((c) => ({ v, c }))).slice(0, MAX_COURTS);
 
   const perCourt = await Promise.all(courts.map(async ({ v, c }) => {
