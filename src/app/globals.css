@@ -1,26 +1,105 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Paleta de Turnazo: el único lugar con colores.
+ * Las pantallas usan nombres por función (bg-surface, text-ink, bg-primary…),
+ * nunca colores sueltos, así el modo oscuro no toca cada pantalla.
+ *
+ * Reglas:
+ * - El lima (accent) va solo de FONDO, con texto on-accent encima. Nunca como texto.
+ * - En oscuro el botón principal (primary) es lima: el verde oscuro es el fondo.
+ * - Todo par texto/fondo pasa AA (4.5:1): tests/unit/theme-contrast.test.ts.
+ *
+ * data-theme lo pone el script del <head> (src/lib/theme.ts). Un bloque con
+ * data-theme="light" fuerza el modo claro adentro (pantallas sin migrar).
+ */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F3F5F1;
+  --surface: #FFFFFF;
+  --surface-2: #F6F3EA;
+  --ink: #14201B;
+  --ink-muted: #5C6B63;
+  --line: #E3E8E2;
+  --brand: #0B3D2E;
+  --primary: #0B3D2E;
+  --on-primary: #F6F3EA;
+  --accent: #D4F34A;
+  --on-accent: #0B3D2E;
+  --danger: #A3382B;
+  --danger-soft: #F9E8E5;
+  --warning: #7A5200;
+  --warning-soft: #FAF0D7;
+  --ring: #0B3D2E;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0B3D2E;
+  --surface: #14523F;
+  --surface-2: #14523F;
+  --ink: #F6F3EA;
+  --ink-muted: #B9C9BF;
+  --line: #2A6B55;
+  --brand: #F6F3EA;
+  --primary: #D4F34A;
+  --on-primary: #0B3D2E;
+  --accent: #D4F34A;
+  --on-accent: #0B3D2E;
+  --danger: #F6B8AE;
+  --danger-soft: #4A2620;
+  --warning: #F0D188;
+  --warning-soft: #3B3214;
+  --ring: #D4F34A;
 }
 
+/* Sin JavaScript: seguir al celular. (Con JS el script ya puso data-theme.) */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0B3D2E;
+    --surface: #14523F;
+    --surface-2: #14523F;
+    --ink: #F6F3EA;
+    --ink-muted: #B9C9BF;
+    --line: #2A6B55;
+    --brand: #F6F3EA;
+    --primary: #D4F34A;
+    --on-primary: #0B3D2E;
+    --accent: #D4F34A;
+    --on-accent: #0B3D2E;
+    --danger: #F6B8AE;
+    --danger-soft: #4A2620;
+    --warning: #F0D188;
+    --warning-soft: #3B3214;
+    --ring: #D4F34A;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Outfit: 500 para texto, 800 para títulos (solo se cargan esos dos pesos). */
+@layer base {
+  h1, h2, h3 {
+    font-weight: 800;
+  }
 }

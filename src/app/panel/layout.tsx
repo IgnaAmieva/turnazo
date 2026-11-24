@@ -11,7 +11,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div data-theme="light" className="flex min-h-screen bg-gray-50 text-gray-900">
       <PanelNav email={user.email ?? ''} />
       <main className="flex-1 overflow-auto p-6">
         {children}

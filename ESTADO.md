@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-19 (Fase 7 S1 cerrado: 021 aplicada, todo verde)
+Última actualización: 2026-11-24 (rediseño D0 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 227 | ✓ verde (2026-11-19, con 021 aplicada) |
-| E2E | Playwright | 65 (incluye el setup de login) | ✓ verde (2026-11-19, con 021 aplicada) |
+| Unitarios + integración | Vitest | 271 | ✓ verde (2026-11-24, rama `rediseno` D0) |
+| E2E | Playwright | 68 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` D0) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -111,6 +111,18 @@ Archivos E2E:
 - `payment-settings.spec.ts` — 10 tests de configuración de cobro, sin MP y con una cuenta MP falsa (lee `SUPABASE_SERVICE_ROLE_KEY` de `.env.local` para crearla y borrarla); incluye la pantalla pública de reserva en modo "solo pago online" (ahora: ofrece solo "Pagar el total online")
 - `cancellation.spec.ts` — 5 tests (Bloque 5): panel "Cancelaciones" (guarda plazo + política, persiste al recargar, rechaza fuera de rango), panel agenda: cancelar una reserva con pago online muestra "Se le devolverán $X al jugador", pide confirmar, cancela y deja la devolución en proceso (`refund_failed`, sin token de MP en local), y jugador con pago online (devolución total dentro del plazo → avisa el monto, cancela, devolución "en proceso"; política `none` → aviso, checkbox obligatorio, cancela sin devolver). Los 2 del jugador se saltean si la 020 no está aplicada. La limpieza busca las reservas `E2E Cancel*` por nombre (no por ids en memoria: si un test falla, Playwright reinicia el worker y vuelve a correr `beforeAll`), borra primero `payments` y `audit_log`, después reservas y outbox; restaura la política original.
 - `payment-flow.spec.ts` — 8 tests del pago del jugador (Bloques 3 y 4): opciones según configuración, "pagar en el lugar" sigue usando `create_booking`, pago online con cuenta MP falsa → error claro y hold liberado, pantalla `/pago/[token]` (pendiente con cuenta regresiva → confirmada al cambiar la base; botón "Cancelar y elegir otro horario" → hold `expired` y vuelve a `/reservar` del mismo horario; vencida; cancelada; token inexistente). Nunca llama a Mercado Pago. Limpia bookings `E2E Pago*`, la cuenta MP falsa y restaura el cobro original.
+
+Ramas (2026-11-24):
+- `s2-captcha`: Fase 7 S2 (Turnstile + límites, migración 022 sin aplicar). **Sin push**: las claves de Turnstile no están en Vercel y romperían las reservas en producción.
+- `rediseno`: rediseño visual por etapas (D0–D2 visual, M1–M7 usabilidad), un commit por etapa. Se mergea a `main` solo con OK del revisor.
+
+Rediseño D0 (paleta, fuente, modo claro/oscuro):
+- Colores en un solo lugar: variables CSS en `src/app/globals.css` (claro en `:root`, oscuro en `[data-theme="dark"]` y en un bloque `prefers-color-scheme` para cuando no hay JS) expuestas a Tailwind con `@theme inline`: `bg`, `surface`, `surface-2`, `ink`, `ink-muted`, `line`, `brand`, `primary`/`on-primary`, `accent`/`on-accent`, `danger`(`-soft`), `warning`(`-soft`), `ring`. En oscuro `primary` es lima (el verde oscuro es el fondo). El lima va solo de fondo.
+- `tests/unit/theme-contrast.test.ts` lee `globals.css` y exige AA (4.5:1) para cada par texto/fondo en los dos modos; además que el lima no sea color de texto.
+- Modo: `src/lib/theme.ts` (`THEME_SCRIPT` inline en el `<head>`, sin parpadeo): automático sigue al celular; el botón `components/theme-toggle.tsx` (encabezado público) cicla Automático → Claro → Oscuro y guarda solo `turnazo-theme` en localStorage. Actualiza el color de la barra del celular. Tests: `tests/unit/theme.test.ts` (ejecuta el mismo script con un navegador simulado) y `tests/e2e/theme.spec.ts`.
+- Fuente Outfit (500 texto, 800 títulos) con `next/font`.
+- Pantallas todavía sin migrar quedan forzadas en claro con `data-theme="light"`: contenido público (hasta D1), panel, login y registro (hasta D2).
+- Preview: comparte la base de producción; reservar ahí crea reservas reales.
 
 Fase 7 S1 (seguridad) — CERRADO (2026-11-19):
 - Con la 021 aplicada: Vitest 227/227 y Playwright 65/65; la base quedó igual que antes de correr (3 complejos, 3 usuarios, 14 reservas, 0 teléfonos bloqueados).

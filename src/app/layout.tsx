@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 import { APP_NAME } from "@/lib/constants";
+import { THEME_BAR_COLORS, THEME_SCRIPT } from "@/lib/theme";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
+const outfit = Outfit({ subsets: ["latin"], weight: ["500", "800"], variable: "--font-outfit" });
 
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s — ${APP_NAME}` },
@@ -13,15 +14,23 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#16a34a",
+  // El script del tema los pisa con el modo elegido; esto es sin JavaScript.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_BAR_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_BAR_COLORS.dark },
+  ],
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${geist.variable} h-full`} style={{ colorScheme: 'light' }}>
-      <body className="min-h-full bg-gray-50 font-[family-name:var(--font-geist)] antialiased">
+    // data-theme lo pone el script antes de hidratar: no es un error de hidratación.
+    <html lang="es" className={`${outfit.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
+      <body className="min-h-full bg-bg text-ink font-sans font-medium antialiased">
         {children}
       </body>
     </html>

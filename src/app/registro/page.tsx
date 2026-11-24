@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Crear cuenta' };
 
 export default function RegistroPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div data-theme="light" className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <a href="/" className="text-green-700 font-bold text-2xl tracking-tight">Turnazo</a>
