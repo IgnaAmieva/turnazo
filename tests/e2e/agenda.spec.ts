@@ -63,7 +63,7 @@ test("venue agenda page loads courts grid", async ({ page }) => {
 
   await expect(page.getByRole("button", { name: /anterior/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /siguiente/i })).toBeVisible();
-  await expect(page.getByText(/cancha/i).first()).toBeVisible();
+  await expect(page.getByText(/cancha/i).filter({ visible: true }).first()).toBeVisible(); // en escritorio las pestañas del celular están ocultas
 
   expect(errors).toHaveLength(0);
 });

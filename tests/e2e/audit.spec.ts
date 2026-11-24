@@ -98,6 +98,7 @@ test("cancel booking writes audit_log row (entity=booking, action=cancel)", asyn
   await page.getByText(SLOTS.cancel.name).first().click();
   await expect(page.getByRole("button", { name: /cancelar turno/i })).toBeVisible({ timeout: 3_000 });
   await page.getByRole("button", { name: /cancelar turno/i }).click();
+  await page.getByRole("button", { name: "Confirmar cancelación" }).click(); // pide confirmar (rediseño D2)
   await page.waitForTimeout(2_000);
 
   const after      = await countAuditRows(request, "cancel", "booking");
@@ -158,6 +159,7 @@ test("block phone writes audit_log row (entity=blocked_phone, action=create)", a
   await page.getByText(SLOTS.blockPhone.name).first().click();
   await expect(page.getByRole("button", { name: /bloquear teléfono/i })).toBeVisible({ timeout: 3_000 });
   await page.getByRole("button", { name: /bloquear teléfono/i }).click();
+  await page.getByRole("button", { name: "Confirmar bloqueo" }).click(); // pide confirmar (rediseño D2)
   await page.waitForTimeout(2_000);
 
   const after      = await countAuditRows(request, "create", "blocked_phone");

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import type { AgendaBooking, AgendaCourt } from "@/lib/supabase/panel-queries";
 import type { PanelActionState } from "@/app/actions/panel";
@@ -66,8 +66,10 @@ function fmtTime(isoUtc: string): string {
 // Status / payment styling
 // ---------------------------------------------------------------------------
 
+/** Confirmados: lima si ya pagó (total o seña); tarjeta neutra si no pagó nada. */
+const PAID_STYLE   = "bg-accent border-transparent text-on-accent";
+const UNPAID_STYLE = "bg-surface border-line text-ink";
 const BOOKING_STYLE: Record<string, string> = {
-  confirmed: "bg-accent border-transparent text-on-accent",
   hold:      "bg-warning-soft border-warning/40 text-warning",
   completed: "bg-surface-2 border-line text-ink",
   no_show:   "bg-surface-2 border-line text-ink-muted",
@@ -82,6 +84,46 @@ const STATUS_LABEL: Record<string, string> = {
 };
 const BLOCK_STYLE = "bg-surface-2 border-dashed border-ink-muted text-ink";
 
+function bookingStyle(b: AgendaBooking): string {
+  if (b.booking_kind === "block") return BLOCK_STYLE;
+  if (b.status === "confirmed") {
+    return b.payment_status === "paid" || b.payment_status === "deposit_paid" ? PAID_STYLE : UNPAID_STYLE;
+  }
+  return BOOKING_STYLE[b.status] ?? "bg-surface-2 border-line text-ink";
+}
+
+// Íconos de línea (estilo lucide, SVG inline: sin dependencias nuevas)
+const ICON_PATHS = {
+  whatsapp: <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />,
+  paid:     <><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></>,
+  noShow:   <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="m17 8 5 5" /><path d="m22 8-5 5" /></>,
+  trash:    <><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></>,
+  ban:      <><circle cx="12" cy="12" r="10" /><path d="m4.9 4.9 14.2 14.2" /></>,
+  close:    <><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>,
+  plus:     <><path d="M5 12h14" /><path d="M12 5v14" /></>,
+  lock:     <><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
+} as const;
+
+function Icon({ name, size = 18 }: { name: keyof typeof ICON_PATHS; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+      {ICON_PATHS[name]}
+    </svg>
+  );
+}
+
+// Cancha elegida en el celular (pestañas), recordada por complejo en este dispositivo
+const COURT_EVENT = "turnazo-agenda-cancha";
+function subscribeCourt(cb: () => void) {
+  window.addEventListener(COURT_EVENT, cb);
+  window.addEventListener("storage", cb);
+  return () => { window.removeEventListener(COURT_EVENT, cb); window.removeEventListener("storage", cb); };
+}
+function readStored(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
 /** Botones de la barra de fecha (44 px). */
 const NAV_BTN = "inline-flex min-h-11 items-center gap-1 rounded-full border border-line bg-surface px-4 text-sm text-ink hover:bg-surface-2";
 /** Botones de la hoja de acciones (44 px, ancho completo). */
@@ -89,19 +131,19 @@ const ACTION_BTN = "flex min-h-11 w-full items-center justify-center gap-2 round
 
 function PaymentBadge({ status, total, paid }: { status: string; total: number; paid: number }) {
   if (status === "paid") {
-    return <span className="rounded px-1.5 py-0.5 bg-surface text-ink border border-line text-[11px]">✓ Pagado</span>;
+    return <span data-testid="badge-pago" className="rounded px-1.5 py-0.5 bg-surface text-ink border border-line text-[11px]">Pagado</span>;
   }
   if (status === "deposit_paid") {
     const remaining = total - paid;
     return (
-      <span className="rounded px-1.5 py-0.5 bg-warning-soft text-warning text-[11px]">
-        Señado — falta ${remaining.toLocaleString("es-AR")}
+      <span data-testid="badge-pago" className="rounded px-1.5 py-0.5 bg-surface text-ink border border-line text-[11px]">
+        Señado · falta ${remaining.toLocaleString("es-AR")}
       </span>
     );
   }
   // unpaid
   return (
-    <span className="rounded px-1.5 py-0.5 bg-danger-soft text-danger text-[11px]">
+    <span data-testid="badge-pago" className="rounded px-1.5 py-0.5 bg-warning-soft text-warning border border-warning/40 text-[11px]">
       Sin pagar ${total.toLocaleString("es-AR")}
     </span>
   );
@@ -144,6 +186,15 @@ export default function AgendaGrid({
   ).map(([id, name]) => ({ id, name }));
   const [sportFilter, setSportFilter] = useState<string | null>(null);
   const visibleCourts = sportFilter ? courts.filter((c) => c.sport_id === sportFilter) : courts;
+
+  // Celular (< 640 px): una cancha a la vez, con pestañas; la elegida queda recordada.
+  const courtKey = `turnazo-agenda-cancha:${venueId}`;
+  const storedCourt = useSyncExternalStore(subscribeCourt, () => readStored(courtKey), () => null);
+  const activeCourtId = visibleCourts.some((c) => c.id === storedCourt) ? storedCourt : visibleCourts[0]?.id;
+  function pickCourt(id: string) {
+    try { localStorage.setItem(courtKey, id); } catch { /* sin almacenamiento: no se recuerda */ }
+    window.dispatchEvent(new Event(COURT_EVENT));
+  }
 
   // Date navigation
   function changeDate(offset: number) {
@@ -240,6 +291,28 @@ export default function AgendaGrid({
         )}
       </div>
 
+      {/* Pestañas por cancha: solo en el celular */}
+      {visibleCourts.length > 1 && (
+        <div role="tablist" aria-label="Canchas" className="flex gap-2 overflow-x-auto sm:hidden">
+          {visibleCourts.map((c) => {
+            const selected = c.id === activeCourtId;
+            return (
+              <button
+                key={c.id}
+                role="tab"
+                aria-selected={selected}
+                onClick={() => pickCourt(c.id)}
+                className={`min-h-11 shrink-0 rounded-full border px-4 text-sm transition-colors ${
+                  selected ? "bg-primary text-on-primary border-transparent font-extrabold" : "bg-surface border-line text-ink hover:bg-surface-2"
+                }`}
+              >
+                {c.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Grid */}
       <div className="overflow-auto rounded-xl border border-line bg-surface" style={{ maxHeight: "75vh" }}>
         <div className="flex">
@@ -264,6 +337,7 @@ export default function AgendaGrid({
             <CourtColumn
               key={court.id}
               court={court}
+              hiddenOnMobile={court.id !== activeCourtId}
               date={date}
               venueId={venueId}
               whatsappTemplate={whatsappTemplate}
@@ -291,10 +365,11 @@ export default function AgendaGrid({
 // ---------------------------------------------------------------------------
 
 function CourtColumn({
-  court, date, venueId, whatsappTemplate, bookings, ticks, gridHeightPx, startMin,
+  court, hiddenOnMobile, date, venueId, whatsappTemplate, bookings, ticks, gridHeightPx, startMin,
   isPastDate, onCancel, onMarkPaid, onMarkNoShow, onBlockPhone, onCreateBlock, onRefresh,
 }: {
   court: AgendaCourt;
+  hiddenOnMobile: boolean;
   date: string;
   venueId: string;
   whatsappTemplate: string | null;
@@ -313,7 +388,11 @@ function CourtColumn({
   const [showBlockForm, setShowBlockForm] = useState(false);
 
   return (
-    <div className="shrink-0 border-r border-line last:border-r-0" style={{ minWidth: 220, width: 240 }}>
+    <div
+      data-testid="court-column"
+      className={`${hiddenOnMobile ? "hidden sm:block" : ""} min-w-0 flex-1 border-r border-line last:border-r-0
+        sm:w-[240px] sm:min-w-[220px] sm:flex-none sm:shrink-0`}
+    >
       {/* Header */}
       <div className="h-11 border-b border-line flex items-center justify-between pl-2.5 bg-surface-2 sticky top-0 z-10">
         <span className="text-sm font-extrabold text-ink truncate">{court.name}</span>
@@ -321,9 +400,10 @@ function CourtColumn({
           <button
             onClick={() => setShowBlockForm((v) => !v)}
             title="Agregar bloqueo"
-            className="flex h-11 w-11 shrink-0 items-center justify-center text-lg font-extrabold text-ink-muted hover:text-ink"
+            aria-label={showBlockForm ? "Cerrar bloqueo" : "Agregar bloqueo"}
+            className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-muted hover:text-ink"
           >
-            {showBlockForm ? "✕" : "+"}
+            <Icon name={showBlockForm ? "close" : "plus"} />
           </button>
         )}
       </div>
@@ -395,13 +475,13 @@ function BookingCard({
 
   const isBlock     = booking.booking_kind === "block";
   const isCancelled = booking.status === "cancelled";
-  const style       = isBlock ? BLOCK_STYLE : (BOOKING_STYLE[booking.status] ?? "bg-surface-2 border-line text-ink");
+  const style       = bookingStyle(booking);
 
   const [expanded, setExpanded] = useState(false);
   const [pending,  setPending]  = useState(false);
   const [err,      setErr]      = useState<string | null>(null);
-  // Cancelar una reserva con pago online devuelve la plata: pide confirmar antes.
-  const [confirmCancel, setConfirmCancel] = useState(false);
+  // Cancelar y bloquear siempre piden confirmar (con pago online avisa la devolución).
+  const [confirm, setConfirm] = useState<null | "cancel" | "block">(null);
   const refundOnCancel = booking.online_paid > 0;
 
   async function runAction(action: PanelAction, extra: Record<string, string> = {}) {
@@ -436,6 +516,7 @@ function BookingCard({
 
   const isCompact = heightPx < 48;
   const canAct    = !isBlock && !isCancelled;
+  function openSheet() { setConfirm(null); setErr(null); setExpanded(true); }
   const timeLabel = `${fmtTime(booking.start)}–${fmtTime(booking.end)}`;
 
   // Escape cierra la hoja de acciones
@@ -448,20 +529,24 @@ function BookingCard({
 
   return (
     <div
+      data-testid="booking-card"
+      data-pago={isBlock ? undefined : booking.payment_status}
       className={`absolute left-1 right-1 rounded-md border overflow-hidden ${style} ${pending ? "opacity-50" : ""}`}
       style={{ top: topPx, height: heightPx, zIndex: 1 }}
     >
       {/* Tarjeta en la grilla: tocarla abre las acciones */}
       <div
         className={`h-full px-2 py-1 select-none ${canAct ? "cursor-pointer" : ""}`}
-        onClick={() => canAct && setExpanded(true)}
+        onClick={() => canAct && openSheet()}
         role={canAct ? "button" : undefined}
         tabIndex={canAct ? 0 : undefined}
-        onKeyDown={(e) => { if (canAct && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setExpanded(true); } }}
+        onKeyDown={(e) => { if (canAct && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openSheet(); } }}
         title={canAct ? "Tocá para ver las acciones" : undefined}
       >
         <div className="text-xs font-extrabold truncate leading-tight">
-          {isBlock ? `🔒 ${booking.customer_name ?? "Bloqueo"}` : (booking.customer_name ?? "Sin nombre")}
+          {isBlock
+            ? <span className="inline-flex items-center gap-1"><Icon name="lock" size={12} />{booking.customer_name ?? "Bloqueo"}</span>
+            : (booking.customer_name ?? "Sin nombre")}
         </div>
         {!isCompact && (
           <div className="text-[11px] leading-tight">{timeLabel}</div>
@@ -500,50 +585,67 @@ function BookingCard({
             <div className="mt-4 flex flex-col gap-2">
               {waUrl && (
                 <a href={waUrl} target="_blank" rel="noopener noreferrer" className={`${ACTION_BTN} bg-primary text-on-primary`}>
-                  📱 WhatsApp
+                  <Icon name="whatsapp" /> WhatsApp
                 </a>
               )}
               {booking.payment_status !== "paid" && booking.status === "confirmed" && (
                 <button onClick={() => runAction(onMarkPaid)} disabled={pending}
                   className={`${ACTION_BTN} border border-line bg-surface-2 text-ink`}>
-                  💰 Marcar pagado
+                  <Icon name="paid" /> Marcar pagado
                 </button>
               )}
               {booking.status === "confirmed" && (
                 <button onClick={() => runAction(onMarkNoShow)} disabled={pending}
                   className={`${ACTION_BTN} border border-warning/40 bg-warning-soft text-warning`}>
-                  ✕ Marcar ausente
+                  <Icon name="noShow" /> Marcar ausente
                 </button>
               )}
-              {booking.status === "confirmed" && !confirmCancel && (
-                <button onClick={() => (refundOnCancel ? setConfirmCancel(true) : runAction(onCancel))} disabled={pending}
+              {booking.status === "confirmed" && confirm === null && (
+                <button onClick={() => setConfirm("cancel")} disabled={pending}
                   className={`${ACTION_BTN} border-2 border-danger bg-surface text-danger`}>
-                  🗑 Cancelar turno
+                  <Icon name="trash" /> Cancelar turno
                 </button>
               )}
-              {booking.status === "confirmed" && confirmCancel && (
+              {booking.status === "confirmed" && confirm === "cancel" && (
                 <div className="flex flex-col gap-2 rounded-xl border border-warning/40 bg-warning-soft p-3">
                   <p className="text-sm text-warning leading-snug">
-                    Se le devolverán <strong>${booking.online_paid.toLocaleString("es-AR")}</strong> al jugador por Mercado Pago.
+                    {refundOnCancel
+                      ? <>Se le devolverán <strong>${booking.online_paid.toLocaleString("es-AR")}</strong> al jugador por Mercado Pago.</>
+                      : <>¿Cancelar el turno de <strong>{booking.customer_name ?? "este jugador"}</strong>? El horario queda libre.</>}
                   </p>
                   <button onClick={() => runAction(onCancel)} disabled={pending}
                     className={`${ACTION_BTN} border-2 border-danger bg-surface text-danger`}>
                     Confirmar cancelación
                   </button>
-                  <button onClick={() => setConfirmCancel(false)} disabled={pending}
+                  <button onClick={() => setConfirm(null)} disabled={pending}
                     className={`${ACTION_BTN} border border-line bg-surface text-ink`}>
                     Volver
                   </button>
                 </div>
               )}
-              {booking.customer_phone && (
-                <button onClick={() => runAction(onBlockPhone, { phone: booking.customer_phone! })} disabled={pending}
+              {booking.customer_phone && confirm === null && (
+                <button onClick={() => setConfirm("block")} disabled={pending}
                   className={`${ACTION_BTN} border border-danger/40 bg-surface text-danger`}>
-                  🚫 Bloquear teléfono
+                  <Icon name="ban" /> Bloquear teléfono
                 </button>
               )}
+              {booking.customer_phone && confirm === "block" && (
+                <div className="flex flex-col gap-2 rounded-xl border border-warning/40 bg-warning-soft p-3">
+                  <p className="text-sm text-warning leading-snug">
+                    ¿Bloquear el <strong>{booking.customer_phone}</strong>? No va a poder reservar más en este complejo.
+                  </p>
+                  <button onClick={() => runAction(onBlockPhone, { phone: booking.customer_phone! })} disabled={pending}
+                    className={`${ACTION_BTN} border-2 border-danger bg-surface text-danger`}>
+                    Confirmar bloqueo
+                  </button>
+                  <button onClick={() => setConfirm(null)} disabled={pending}
+                    className={`${ACTION_BTN} border border-line bg-surface text-ink`}>
+                    Volver
+                  </button>
+                </div>
+              )}
               <button onClick={() => setExpanded(false)} className={`${ACTION_BTN} text-ink-muted`}>
-                Cerrar
+                <Icon name="close" /> Cerrar
               </button>
             </div>
           </div>

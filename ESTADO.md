@@ -97,7 +97,7 @@
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
 | Unitarios + integración | Vitest | 271 | ✓ verde (2026-11-24, rama `rediseno` D2) |
-| E2E | Playwright | 77 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` D2) |
+| E2E | Playwright | 84 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` D2 + ajustes) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -130,6 +130,13 @@ Rediseño D2 (panel del dueño, login y registro):
 - Agenda: "← Anterior", "Siguiente →", "Hoy" (si no es hoy) y selector de fecha, todos de 44 px. Columnas con encabezado de 44 px y botón "+" de 44 px. Turnos confirmados en lima; pendientes en warning; textos de 11–14 px (antes 9–10 px).
 - Acciones de un turno: tocar la tarjeta abre una hoja (abajo en el celular, centrada en escritorio; `role="dialog"`, Escape o tocar afuera la cierra) con botones de ancho completo y 44 px: WhatsApp, Marcar pagado, Marcar ausente, Cancelar turno (con el aviso de devolución), Bloquear teléfono, Cerrar. Mismos textos que antes (los E2E existentes no cambiaron).
 - Bloqueo manual: campos y botón de 44 px.
+- Ajustes del revisor (2026-11-24):
+  - Celular (< 640 px): pestañas por cancha, una columna a la vez a todo el ancho; la elegida queda en localStorage (`turnazo-agenda-cancha:<venue>`, solo el id de la cancha). Escritorio: grilla completa.
+  - Color por pago: confirmado con pago total o seña = lima; sin pagar = tarjeta neutra (surface + borde line) con etiqueta "Sin pagar $X" en warning. Pendiente de pago online (`hold`) sigue en warning.
+  - Íconos de línea SVG inline (estilo lucide; `lucide-react` no está instalado y no se sumó) en lugar de emojis: WhatsApp, Marcar pagado, Marcar ausente, Cancelar, Bloquear, Cerrar, "+" de bloqueo y candado de los bloqueos.
+  - "Cancelar turno" y "Bloquear teléfono" siempre piden confirmación ("Confirmar cancelación" / "Confirmar bloqueo" o "Volver"); antes solo pedía confirmar la cancelación con pago online. `audit.spec.ts` suma ese clic.
+  - `agenda.spec.ts`: el chequeo genérico de "cancha" busca solo elementos visibles (las pestañas del celular están ocultas en escritorio).
+  - Pendiente de decidir: en oscuro "Ocupado" y libre tienen el mismo fondo (surface-2 = surface); se distinguen por el tachado y la palabra "Ocupado".
 - `tests/e2e/panel-movil.spec.ts` (390 px): entrada a la agenda, menú cerrado/abierto, ítem activo, "Hoy" y selector de fecha, hoja de acciones con 44 px y dentro de la pantalla. Reserva propia "E2E Rediseño Panel" (sábado 9+ días) que se borra al final.
 - Capturas 390 px claro/oscuro: agenda, menú abierto y acciones de un turno (reservas "Captura D2", borradas).
 
