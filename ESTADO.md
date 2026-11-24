@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño M3 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño: pendientes de M3 en la rama `rediseno`; sigue V2; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 305 | ✓ verde (2026-11-24, rama `rediseno` M3) |
-| E2E | Playwright | 101 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` M3) |
+| Unitarios + integración | Vitest | 322 | ✓ verde (2026-11-24, rama `rediseno` pendientes M3) |
+| E2E | Playwright | 103 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` pendientes M3) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -122,6 +122,12 @@ Rediseño D0 (paleta, fuente, modo claro/oscuro):
 - Modo: `src/lib/theme.ts` (`THEME_SCRIPT` inline en el `<head>`, sin parpadeo): automático sigue al celular; el botón `components/theme-toggle.tsx` (encabezado público) cicla Automático → Claro → Oscuro y guarda solo `turnazo-theme` en localStorage. Actualiza el color de la barra del celular. Tests: `tests/unit/theme.test.ts` (ejecuta el mismo script con un navegador simulado) y `tests/e2e/theme.spec.ts`.
 - Fuente Outfit (500 texto, 800 títulos) con `next/font`.
 - Desde D2 no queda ninguna pantalla forzada en claro.
+
+Pendientes de M3:
+- Teléfono bloqueado (y todo error general): los datos vuelven a la línea recordada con "Cambiar" y "No soy yo"; con los campos abiertos, "No soy yo" va dentro de la misma tarjeta. Los errores sin reintento muestran "Cerrar" (44 px) donde iba Confirmar: en la hoja la cierra; en /reservar vuelve al complejo.
+- Celular siempre "característica + espacio + número" (`formatArgentinePhone` en lib/phone.ts, con la lista de características de 3 dígitos; "11" de 2; el resto de 4): línea recordada, campos (al salir del campo) y Mi turno. Se recuerda ya formateado.
+- Error de Mercado Pago → "Pagar en el lugar": `tests/integration/mp-pay-at-venue.test.ts` (complejo propio, MP simulado) confirma que el hold se libera antes de devolver el error y queda una sola reserva activa; dos toques → una reserva + slot_taken; si otro jugador toma el turno en el medio → slot_taken con "Ver otros horarios". Si no se pudo liberar el hold, la acción devuelve `mp_hold_not_released` ("el turno queda apartado a tu nombre 10 minutos") en vez de ofrecer "Pagar en el lugar". Propuesta de base (no aplicada): ver "Propuesta: create_booking que reemplaza el hold".
+- M4 (Mi turno: link, WhatsApp, .ics, Cómo llegar) quedó para después; el avance está fuera del repo.
 
 Rediseño M3 (errores con acción) y ajuste de datos recordados:
 - Datos recordados (hoja y /reservar): una línea "Juan Pérez · 2622 123456" con "Cambiar" (44 px, despliega los campos) y "No soy yo". Sin datos recordados, los campos como antes. Nombre y celular son campos controlados: lo escrito no se borra cuando la reserva vuelve con error. Solo se recuerda un celular con 8+ dígitos y un nombre de 2+ letras (antes se guardaba un celular mal escrito).
@@ -484,3 +490,15 @@ SELECT vault.create_secret('<mismo-valor-que-PUSH_SEND_SECRET>', 'push_secret');
 2. **No correr E2E contra la URL publicada** — los tests crean y cancelan bookings reales,
    borran outbox rows y bloquean teléfonos. Solo correr `pnpm test:e2e` contra
    `localhost:3001`.
+
+## Propuesta: create_booking que reemplaza el hold (no aplicada, para revisar)
+
+Hoy "Pagar en el lugar" después de un error de Mercado Pago hace dos pasos: la acción de pago libera el hold (`status = 'expired'`) y después el formulario llama a `create_booking`. La restricción `no_overlap` (holds + confirmadas) impide dos reservas activas, pero entre los dos pasos el turno queda libre unos segundos y otro jugador podría tomarlo (el jugador lo ve: "Este turno ya fue reservado" + "Ver otros horarios").
+
+Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma más un parámetro opcional):
+
+- `p_replace_hold_token text DEFAULT NULL`.
+- Si viene, en la misma transacción y antes del INSERT: `UPDATE bookings SET status = 'expired' WHERE cancel_token = p_replace_hold_token AND status = 'hold' AND court_id = p_court_id AND period = tstzrange(p_start, p_end, '[)') AND customer_phone = v_val.norm_phone`. Solo libera un hold del mismo jugador, la misma cancha y el mismo horario; si no coincide, no toca nada.
+- El resto igual. Si el INSERT falla, la transacción se revierte y el hold sigue a su nombre (no pierde el turno).
+- La acción de pago tendría que dejar de liberar el hold en los errores de MP y devolver su `cancel_token` (solo al cliente que lo creó) para pasarlo a `create_booking`; la orden de MP, si llegó a crearse, se cancela como en `cancelHoldAction`.
+- Grants: los mismos (solo service_role).

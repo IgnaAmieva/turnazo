@@ -312,7 +312,9 @@ test.describe("opciones de pago en la pantalla de reserva", () => {
     expect(rows[0].status).toBe("expired");
     expect(rows[0].mp_order_id).toBeNull();
 
-    // El mismo horario se puede reservar de nuevo (otro teléfono, otra persona)
+    // El mismo horario se puede reservar de nuevo (otro teléfono, otra persona).
+    // Tras un error general, los datos quedan en la línea recordada: "Cambiar" los abre.
+    await page.getByRole("button", { name: "Cambiar", exact: true }).click();
     await page.locator('[name="customer_name"]').fill("E2E Pago Online 2");
     await page.locator('[name="customer_phone"]').fill("2622 777004");
     await page.locator('[name="customer_email"]').fill("e2e.pago2@turnazo.test");

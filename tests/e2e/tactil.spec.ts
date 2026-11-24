@@ -55,6 +55,11 @@ async function smallTargets(page: Page): Promise<string[]> {
   });
 }
 
+test("Mi turno muestra el celular con el formato de siempre (área + espacio + número)", async ({ page }) => {
+  await page.goto(`/turnos/${token}`);
+  await expect(page.locator("p", { hasText: "Teléfono:" })).toContainText("Teléfono: 2622 000555");
+});
+
 test("todo el flujo público tiene objetivos táctiles de 44 px o más", async ({ page }) => {
   const report: Record<string, string[]> = {};
   const check = async (label: string, url?: string) => {

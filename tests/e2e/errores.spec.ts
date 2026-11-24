@@ -51,7 +51,7 @@ test("celular inválido: marca el campo, dice qué falta y Confirmar sigue", asy
   expect((await page.evaluate(() => localStorage.getItem("turnazo-jugador"))) ?? "").not.toContain("celular");
 });
 
-test("teléfono bloqueado: mensaje claro, sin botón para reintentar", async ({ page, request }) => {
+test("teléfono bloqueado: mensaje claro, sin reintento, datos en una línea y 'Cerrar' donde iba Confirmar", async ({ page, request }) => {
   const res = await request.post(`${SUPABASE_URL}/rest/v1/blocked_phones`, {
     headers: { ...serviceHeaders(), Prefer: "resolution=merge-duplicates" },
     data: { venue_id: VENUE_ID, phone: BLOCKED_DIGITS },
@@ -67,4 +67,33 @@ test("teléfono bloqueado: mensaje claro, sin botón para reintentar", async ({ 
   await expect(err).toHaveAttribute("data-error-code", "phone_blocked");
   await expect(err).toContainText("Consultá con el complejo");
   await expect(sheet.getByRole("button", { name: /confirmar|reintentar|ver otros/i })).toHaveCount(0);
+
+  // Los datos quedan en la línea recordada (con "Cambiar" y "No soy yo"), no sueltos
+  const line = sheet.getByTestId("datos-recordados");
+  await expect(line).toContainText("E2E Errores Bloqueado · 2622 000321");
+  await expect(line.getByTestId("no-soy-yo")).toBeVisible();
+  await expect(sheet.getByTestId("no-soy-yo")).toHaveCount(1);
+
+  // Salida: "Cerrar" de 44 px en el pie, cierra la hoja
+  const close = sheet.getByTestId("reserva-cerrar");
+  await expect(close).toHaveText("Cerrar");
+  expect((await close.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(sheet.getByTestId("reserva-pie").getByTestId("reserva-cerrar")).toBeVisible();
+  await close.click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+});
+
+test("con los campos abiertos ('Cambiar'), 'No soy yo' va dentro de la misma tarjeta", async ({ page }) => {
+  await page.goto(VENUE_PATH);
+  await page.evaluate(() => localStorage.setItem("turnazo-jugador", JSON.stringify({ nombre: "E2E Errores Juan", celular: "02622 15 123456" })));
+  const sheet = await openSheet(page, "14:00");
+  await expect(sheet.getByTestId("datos-recordados")).toContainText("E2E Errores Juan · 2622 123456");
+  await sheet.getByRole("button", { name: "Cambiar", exact: true }).click();
+  const card = sheet.getByTestId("datos-editando");
+  await expect(card.getByLabel("Tu teléfono")).toHaveValue("2622 123456");
+  await expect(card.getByTestId("no-soy-yo")).toBeVisible();
+  // Lo que se escribe se muestra con el mismo formato al salir del campo
+  await card.getByLabel("Tu teléfono").fill("0261-15-4123456");
+  await card.getByLabel("Tu nombre").focus();
+  await expect(card.getByLabel("Tu teléfono")).toHaveValue("261 4123456");
 });

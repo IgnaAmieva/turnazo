@@ -73,6 +73,9 @@ const CATALOG: Record<string, { message: string; action: BookingErrorAction; ali
   mp_not_connected:     { message: 'Este complejo no tiene Mercado Pago conectado.', action: { kind: 'pay_at_venue_or_retry' } },
   mp_token_unavailable: { message: 'No pudimos acceder a la cuenta de Mercado Pago del complejo. El turno quedó libre.', action: { kind: 'pay_at_venue_or_retry' } },
   mp_order_failed:      { message: 'No pudimos iniciar el pago con Mercado Pago. El turno quedó libre.', action: { kind: 'pay_at_venue_or_retry' } },
+  // Falló el pago y además no se pudo liberar el hold: el turno sigue apartado a su nombre
+  // hasta que venza; ofrecer "Pagar en el lugar" daría "turno ya reservado" (por su propio hold).
+  mp_hold_not_released: { message: 'No pudimos iniciar el pago. El turno queda apartado a tu nombre 10 minutos: probá de nuevo después.', action: { kind: 'wait' } },
 
   // Cualquier otro
   generic: {

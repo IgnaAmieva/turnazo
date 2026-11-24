@@ -47,7 +47,7 @@ test("con datos recordados: turno → Confirmar = 2 toques y queda reservado", a
   const sheet = page.getByRole("dialog");
   await expect(sheet).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${VENUE_PATH}\\?`)); // no navegó a /reservar
-  await expect(sheet.getByTestId("datos-recordados")).toContainText(`${NAME} · ${MEM.celular}`);
+  await expect(sheet.getByTestId("datos-recordados")).toContainText(`${NAME} · 2622 000999`);
   await expect(sheet.getByLabel("Tu nombre")).toBeHidden(); // sin campos: una sola línea
   await expect(sheet.getByRole("radio", { name: /pagar en el lugar/i })).toBeChecked();
 

@@ -58,3 +58,22 @@ export function buildWhatsAppUrl(
 
   return url;
 }
+
+/** Características de 3 dígitos (sin el 0). "11" es la única de 2; el resto, de 4. */
+const AREA_3 = new Set([
+  "220", "221", "223", "230", "236", "237", "249", "260", "261", "263", "264", "266",
+  "280", "291", "294", "297", "298", "299", "341", "342", "343", "345", "348", "351",
+  "353", "358", "362", "364", "370", "376", "379", "380", "381", "383", "385", "387", "388",
+]);
+
+/**
+ * Celular argentino para mostrar: característica + espacio + número
+ * ("2622 123456", "261 4123456", "11 51234567"). Acepta lo que escriba el
+ * jugador (con 0, 15, +54 9, guiones). Si no son 10 dígitos, lo devuelve tal cual.
+ */
+export function formatArgentinePhone(raw: string): string {
+  const digits = normalizeArgentinePhone(raw).slice(3);
+  if (digits.length !== 10) return raw.trim();
+  const area = digits.startsWith("11") ? 2 : AREA_3.has(digits.slice(0, 3)) ? 3 : 4;
+  return `${digits.slice(0, area)} ${digits.slice(area)}`;
+}

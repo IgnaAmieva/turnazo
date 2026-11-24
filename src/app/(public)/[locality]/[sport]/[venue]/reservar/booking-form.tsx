@@ -6,6 +6,7 @@ import { type BookingActionState } from '@/app/actions/booking';
 import { rememberPlayer, usePlayerMemory } from '@/lib/player-memory';
 import { NotMeButton } from '@/components/player-memory-ui';
 import { bookingError, bookingErrorFromMessage } from '@/lib/booking-errors';
+import { formatArgentinePhone } from '@/lib/phone';
 import type { PaymentOption } from '@/lib/payment-options';
 
 export type { PaymentOption };
@@ -19,6 +20,8 @@ type Props = {
   onOtherTimes?: () => void;
   /** …y en /reservar, vuelve al complejo en la misma fecha. */
   otherTimesHref?: string;
+  /** "Cerrar" cuando la reserva no se puede hacer (límite, teléfono bloqueado): en la hoja, la cierra. */
+  onClose?: () => void;
 };
 
 const initialState: BookingActionState = {};
@@ -30,7 +33,7 @@ const BTN_PRIMARY = `w-full min-h-11 rounded-2xl bg-primary py-3.5 text-sm font-
 const BTN_SECONDARY = `w-full min-h-11 rounded-2xl border border-line bg-surface py-3 text-sm font-extrabold text-ink
   hover:bg-surface-2 disabled:opacity-60`;
 
-export default function BookingForm({ action, options, variant = 'page', onOtherTimes, otherTimesHref }: Props) {
+export default function BookingForm({ action, options, variant = 'page', onOtherTimes, otherTimesHref, onClose }: Props) {
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [selected, setSelected] = useState<PaymentOption['value']>(options[0]?.value ?? 'venue');
   const formRef = useRef<HTMLFormElement>(null);
@@ -43,7 +46,10 @@ export default function BookingForm({ action, options, variant = 'page', onOther
   const savedName  = mem?.nombre ?? '';
   const savedPhone = mem?.celular ?? '';
   const remembered = Boolean(savedName && savedPhone);
-  const [editing, setEditing] = useState(false);
+  // "Cambiar" abre los campos para el intento actual: cuando la reserva vuelve
+  // con un error general (no de un campo), se ve de nuevo la línea recordada.
+  const [editingFor, setEditingFor] = useState<BookingActionState | null>(null);
+  const editing = editingFor === state;
   // Controlados: lo escrito no se borra cuando la reserva vuelve con un error.
   // null = todavía no tocó el campo → se muestra lo recordado.
   const [nameInput, setNameInput]   = useState<string | null>(null);
@@ -52,7 +58,7 @@ export default function BookingForm({ action, options, variant = 'page', onOther
   function forgetTyped() {
     setNameInput(null);
     setPhoneInput(null);
-    setEditing(false);
+    setEditingFor(null);
   }
 
   // Error devuelto por la reserva → mensaje + qué puede hacer el jugador (lib/booking-errors.ts)
@@ -86,9 +92,11 @@ export default function BookingForm({ action, options, variant = 'page', onOther
     const nombre  = String(fd.get('customer_name') ?? '').trim();
     const celular = String(fd.get('customer_phone') ?? '').trim();
     // Solo se recuerda algo con forma válida (un celular mal escrito no queda guardado)
-    if (nombre.length >= 2 && celular.replace(/\D/g, '').length >= 8) rememberPlayer({ nombre, celular });
-    // Si los estaba viendo, que sigan a la vista (no colapsar en medio de un error)
-    if (showFields) setEditing(true);
+    if (nombre.length >= 2 && celular.replace(/\D/g, '').length >= 8) {
+      rememberPlayer({ nombre, celular: formatArgentinePhone(celular) });
+    }
+    // Mientras se envía, los campos que estaban a la vista no se cierran
+    if (showFields) setEditingFor(state);
   }
 
   const confirmLabel = isPending
@@ -97,14 +105,14 @@ export default function BookingForm({ action, options, variant = 'page', onOther
 
   return (
     <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-5">
-      {/* Datos recordados: una línea con "Cambiar" y "No soy yo" (con los campos abiertos, solo "No soy yo") */}
+      {/* Datos recordados: una línea con "Cambiar" y "No soy yo" */}
       {remembered && !showFields && (
         <div className="rounded-2xl border border-line bg-surface-2 px-4 py-2" data-testid="datos-recordados">
           <p className="py-1.5 text-sm text-ink">
-            <strong className="font-extrabold">{savedName}</strong> · {savedPhone}
+            <strong className="font-extrabold">{savedName}</strong> · {formatArgentinePhone(savedPhone)}
           </p>
           <div className="flex flex-wrap gap-2 pb-1">
-            <button type="button" onClick={() => setEditing(true)}
+            <button type="button" onClick={() => setEditingFor(state)}
               className="inline-flex min-h-11 items-center rounded-full border border-line bg-surface px-4 text-sm font-extrabold text-ink hover:bg-surface-2">
               Cambiar
             </button>
@@ -112,14 +120,11 @@ export default function BookingForm({ action, options, variant = 'page', onOther
           </div>
         </div>
       )}
-      {remembered && showFields && (
-        <div className="flex justify-end">
-          <NotMeButton onForget={forgetTyped} />
-        </div>
-      )}
 
       {showFields ? (
-        <>
+        // Con datos recordados, los campos abiertos van en la misma tarjeta, con "No soy yo" abajo
+        <div className={remembered ? 'space-y-5 rounded-2xl border border-line bg-surface-2 p-4' : 'space-y-5'}
+          data-testid={remembered ? 'datos-editando' : undefined}>
           {/* Nombre */}
           <div>
             <label htmlFor="customer_name" className="block text-sm font-medium text-ink mb-1.5">
@@ -154,8 +159,9 @@ export default function BookingForm({ action, options, variant = 'page', onOther
               type="tel"
               placeholder="Ej: 2622 123456"
               autoComplete="tel"
-              value={phoneInput ?? savedPhone}
+              value={phoneInput ?? formatArgentinePhone(savedPhone)}
               onChange={(e) => setPhoneInput(e.target.value)}
+              onBlur={(e) => setPhoneInput(formatArgentinePhone(e.target.value))}
               aria-invalid={phoneError ? true : undefined}
               aria-describedby={phoneError ? 'customer_phone-error' : undefined}
               className={`${INPUT} ${phoneError ? 'border-danger' : 'border-line'}`}
@@ -165,7 +171,9 @@ export default function BookingForm({ action, options, variant = 'page', onOther
               <p id="customer_phone-error" data-testid="error-customer_phone" className="mt-1.5 text-sm text-danger">{phoneError}</p>
             )}
           </div>
-        </>
+
+          {remembered && <NotMeButton onForget={forgetTyped} />}
+        </div>
       ) : (
         <>
           <input type="hidden" name="customer_name" value={savedName} />
@@ -262,7 +270,17 @@ export default function BookingForm({ action, options, variant = 'page', onOther
               Ver otros horarios
             </Link>
           )
-        ) : kind === 'none' ? null : kind === 'pay_at_venue_or_retry' && canPayAtVenue ? (
+        ) : kind === 'none' ? (
+          // Sin reintento: la salida va donde estaba Confirmar
+          onClose ? (
+            <button type="button" onClick={onClose} data-testid="reserva-cerrar" className={BTN_SECONDARY}>Cerrar</button>
+          ) : (
+            <Link href={otherTimesHref ?? '/'} data-testid="reserva-cerrar"
+              className={`${BTN_SECONDARY} inline-flex items-center justify-center`}>
+              Cerrar
+            </Link>
+          )
+        ) : kind === 'pay_at_venue_or_retry' && canPayAtVenue ? (
           <>
             <button
               type="button"

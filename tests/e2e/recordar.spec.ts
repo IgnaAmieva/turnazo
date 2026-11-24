@@ -66,7 +66,7 @@ test("reservar guarda solo nombre y celular; la próxima vez vienen precargados;
 
   const mem = JSON.parse((await stored(page))!);
   expect(Object.keys(mem).sort()).toEqual(["celular", "deporte", "localidad", "nombre"]);
-  expect(mem).toMatchObject({ nombre: NAME, celular: PHONE });
+  expect(mem).toMatchObject({ nombre: NAME, celular: "2622 000666" }); // se guarda como se muestra: área + espacio + número
   expect(JSON.stringify(mem)).not.toContain("@");
   // Nada más del sitio en localStorage salvo esto (y el tema, si se eligió)
   const keys = await page.evaluate(() => Object.keys(localStorage));
@@ -74,13 +74,13 @@ test("reservar guarda solo nombre y celular; la próxima vez vienen precargados;
 
   // Otra reserva: una sola línea con los datos, "Cambiar" despliega los campos, "No soy yo" visible
   await page.goto(reservarUrl(20));
-  await expect(page.getByTestId("datos-recordados")).toContainText(`${NAME} · ${PHONE}`);
+  await expect(page.getByTestId("datos-recordados")).toContainText(`${NAME} · 2622 000666`);
   await expect(page.getByLabel("Tu nombre")).toBeHidden();
   const cambiar = page.getByRole("button", { name: "Cambiar", exact: true });
   expect((await cambiar.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await cambiar.click();
   await expect(page.getByLabel("Tu nombre")).toHaveValue(NAME);
-  await expect(page.getByLabel("Tu teléfono")).toHaveValue(PHONE);
+  await expect(page.getByLabel("Tu teléfono")).toHaveValue("2622 000666");
   const notMe = page.getByRole("button", { name: "No soy yo" });
   await expect(notMe).toBeVisible();
   expect((await notMe.boundingBox())!.height).toBeGreaterThanOrEqual(44);

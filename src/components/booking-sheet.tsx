@@ -138,6 +138,7 @@ function BookingSheet({ venue, slot, onClose }: { venue: SheetVenue; slot: Sheet
               options={options}
               variant="sheet"
               onOtherTimes={() => { onClose(); router.refresh(); }}
+              onClose={onClose}
             />
           )}
         </div>

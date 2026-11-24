@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Breadcrumbs from "@/components/breadcrumbs";
 import { createClient } from '@/lib/supabase/server';
 import { formatTimeMendoza, formatDateMendoza } from '@/lib/slots';
+import { formatArgentinePhone } from '@/lib/phone';
 import CancelForm from './cancel-form';
 import { cancelBookingAction, type CancelActionState } from '@/app/actions/booking';
 
@@ -147,7 +148,7 @@ export default async function TurnoPage({ params }: Props) {
           <Row label="Día"      value={dateLabel} />
           <Row label="Horario"  value={`${startLabel} – ${endLabel}`} />
           <Row label="A nombre" value={booking.customer_name} />
-          <Row label="Teléfono" value={booking.customer_phone} />
+          <Row label="Teléfono" value={formatArgentinePhone(booking.customer_phone)} />
         </div>
 
         {/* Precio */}

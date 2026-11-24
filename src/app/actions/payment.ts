@@ -110,15 +110,13 @@ export async function startPaymentAction(
     // No se loguea la respuesta completa: trae cancel_token.
     const missing = !bookingId ? 'booking_id' : !cancelToken ? 'cancel_token' : 'amount_to_pay';
     console.error('[pago] respuesta inválida de create_booking_hold', { booking_id: bookingId ?? null, missing });
-    await expireHold(bookingId);
-    return { error: PAYMENT_ERROR_MESSAGES.mp_order_failed };
+    return failAndRelease(bookingId, 'mp_order_failed');
   }
 
   // 2. Token del dueño (OAuth). Sin token no hay cobro: liberar el horario.
   const token = await getMpToken(data.venue_id);
   if (!token) {
-    await expireHold(bookingId);
-    return { error: PAYMENT_ERROR_MESSAGES.mp_token_unavailable };
+    return failAndRelease(bookingId, 'mp_token_unavailable');
   }
 
   // 3. Orden en Mercado Pago con el token del dueño, sin comisión de plataforma.
@@ -136,8 +134,7 @@ export async function startPaymentAction(
 
   if (!order.ok) {
     console.error('[pago] no se pudo crear la orden MP:', order.status, order.code, order.message);
-    await expireHold(bookingId);
-    return { error: PAYMENT_ERROR_MESSAGES.mp_order_failed };
+    return failAndRelease(bookingId, 'mp_order_failed');
   }
 
   // 4. Guardar mp_order_id en la reserva (solo si sigue en hold).
@@ -152,16 +149,26 @@ export async function startPaymentAction(
     // Si el jugador llegara a pagarla, el webhook la encuentra por
     // external_reference, ve la reserva vencida y la reembolsa.
     console.error('[pago] no se pudo guardar mp_order_id', bookingId, order.orderId, updError?.message);
-    await expireHold(bookingId);
-    return { error: PAYMENT_ERROR_MESSAGES.mp_order_failed };
+    return failAndRelease(bookingId, 'mp_order_failed');
   }
 
   redirect(order.checkoutUrl);
 }
 
+/**
+ * Falló el pago online: libera el horario ANTES de devolver el error, así
+ * "Pagar en el lugar" (create_booking) encuentra el turno libre. Si no se pudo
+ * liberar, el hold sigue a nombre del jugador hasta que venza: se avisa eso
+ * (mp_hold_not_released) en vez de ofrecer "Pagar en el lugar".
+ */
+async function failAndRelease(bookingId: string | undefined, code: 'mp_order_failed' | 'mp_token_unavailable'): Promise<BookingActionState> {
+  const released = await expireHold(bookingId);
+  return { error: PAYMENT_ERROR_MESSAGES[released ? code : 'mp_hold_not_released'] };
+}
+
 /** Libera el horario: pasa el hold a 'expired' (solo si todavía está en hold). */
-async function expireHold(bookingId: string | undefined) {
-  if (!bookingId) return;
+async function expireHold(bookingId: string | undefined): Promise<boolean> {
+  if (!bookingId) return true;
   const admin = createAdminClient();
   const { error } = await admin
     .from('bookings')
@@ -170,7 +177,9 @@ async function expireHold(bookingId: string | undefined) {
     .eq('status', 'hold');
   if (error) {
     console.error('[pago] no se pudo expirar el hold', bookingId, error.message);
+    return false;
   }
+  return true;
 }
 
 // ---------------------------------------------------------------------------

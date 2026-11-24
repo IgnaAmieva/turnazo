@@ -59,9 +59,12 @@ const DB_CODES = [...new Set([
   ...codesIn(latestDefinition("_validate_booking_slot")),
 ])].sort();
 
-const ACTION_CODES = [...new Set(
-  [...readFileSync(resolve(ROOT, "src/app/actions/payment.ts"), "utf8").matchAll(/PAYMENT_ERROR_MESSAGES\.([a-z_]+)/g)].map((m) => m[1]),
-)];
+const PAYMENT_SRC = readFileSync(resolve(ROOT, "src/app/actions/payment.ts"), "utf8");
+const ACTION_CODES = [...new Set([
+  ...[...PAYMENT_SRC.matchAll(/PAYMENT_ERROR_MESSAGES\.([a-z_]+)/g)].map((m) => m[1]),
+  // Códigos de Mercado Pago escritos como texto (failAndRelease(id, 'mp_…'), PAYMENT_ERROR_MESSAGES['mp_…'])
+  ...[...PAYMENT_SRC.matchAll(/'(mp_[a-z_]+)'/g)].map((m) => m[1]),
+])];
 
 const KINDS = ["other_times", "field", "none", "wait", "pay_at_venue_or_retry", "change_payment", "retry"];
 
@@ -70,7 +73,7 @@ describe("catálogo de errores de la reserva", () => {
     for (const c of ["slot_taken", "past_slot", "too_far_ahead", "invalid_phone", "too_many_bookings", "phone_blocked", "hold_limit_reached"]) {
       expect(DB_CODES).toContain(c);
     }
-    expect(ACTION_CODES).toEqual(expect.arrayContaining(["mp_order_failed", "mp_token_unavailable"]));
+    expect(ACTION_CODES).toEqual(expect.arrayContaining(["mp_order_failed", "mp_token_unavailable", "mp_hold_not_released"]));
   });
 
   it.each([...DB_CODES, ...ACTION_CODES, "too_many_attempts", "generic"])("'%s' tiene mensaje corto y acción", (code) => {
@@ -103,6 +106,8 @@ describe("catálogo de errores de la reserva", () => {
     for (const c of ["mp_order_failed", "mp_token_unavailable", "mp_not_connected"]) {
       expect(bookingError(c).action.kind).toBe("pay_at_venue_or_retry");
     }
+    // Si el hold no se liberó, NO se ofrece "Pagar en el lugar" (chocaría con su propio hold)
+    expect(bookingError("mp_hold_not_released").action.kind).toBe("wait");
   });
 });
 
