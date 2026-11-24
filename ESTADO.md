@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño D2 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño M1 en la rama `rediseno`; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -96,8 +96,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 271 | ✓ verde (2026-11-24, rama `rediseno` D2) |
-| E2E | Playwright | 84 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` D2 + ajustes) |
+| Unitarios + integración | Vitest | 274 | ✓ verde (2026-11-24, rama `rediseno` M1) |
+| E2E | Playwright | 91 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` M1) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -123,6 +123,14 @@ Rediseño D0 (paleta, fuente, modo claro/oscuro):
 - Fuente Outfit (500 texto, 800 títulos) con `next/font`.
 - Desde D2 no queda ninguna pantalla forzada en claro.
 
+Rediseño M1 (recordar al jugador, 44 px en el flujo público):
+- `src/lib/player-memory.ts`: localStorage `turnazo-jugador` con SOLO nombre, celular, última localidad y último deporte (`sanitizePlayerMemory` descarta cualquier otro campo, slugs raros y textos largos). Nunca el email ni nada del pago. `tests/unit/player-memory.test.ts`.
+- Nombre y celular se guardan al enviar el formulario de reserva; la próxima reserva viene precargada con "Reservás como Juan · No soy yo". Localidad y deporte se guardan al mirar la lista de complejos o un complejo.
+- Inicio: tarjeta "Hola, Juan" + "Seguir en Tunuyán · Pádel" + "No soy yo". "No soy yo" (44 px, en el inicio y al reservar) borra todo lo recordado.
+- 44 px en todo el flujo público: migas de pan, "Cómo llegar", links de texto ("Volver al inicio", "Buscar otro turno"…), casilla "Entiendo que no hay devolución" y los botones de zoom del mapa. `tests/e2e/tactil.spec.ts` recorre inicio → localidad → complejos → complejo → reservar → mi turno y las pantallas de error, y falla con la lista de lo que mida menos de 44 × 44.
+- `tests/e2e/recordar.spec.ts`: "Seguir en…", reserva real en el complejo de prueba (borrada al final) que guarda solo los 4 campos (sin email aunque se haya escrito), precarga, "No soy yo" en reservar y en el inicio, y un valor manipulado en localStorage que se ignora.
+- Capturas 390 px claro/oscuro: `9-inicio-seguir`, `10-reservar-recordado`, `2-complejo` (con el "Ocupado" nuevo).
+
 Rediseño D2 (panel del dueño, login y registro):
 - Todo el panel, login y registro con los colores por función (modo oscuro completo). El botón "Conectar Mercado Pago" pasó de `#009ee3` (3.1:1 con blanco) a `#0072a8` (5.3:1).
 - Menú: barra lateral en escritorio; en el celular, barra arriba con "Menú" / "Cerrar menú" que despliega los links (44 px), el tema, notificaciones y cerrar sesión. La agenda usa todo el ancho (antes la barra lateral fija dejaba ~140 px). Dentro de la agenda de un complejo el ítem activo es "Agenda".
@@ -136,7 +144,7 @@ Rediseño D2 (panel del dueño, login y registro):
   - Íconos de línea SVG inline (estilo lucide; `lucide-react` no está instalado y no se sumó) en lugar de emojis: WhatsApp, Marcar pagado, Marcar ausente, Cancelar, Bloquear, Cerrar, "+" de bloqueo y candado de los bloqueos.
   - "Cancelar turno" y "Bloquear teléfono" siempre piden confirmación ("Confirmar cancelación" / "Confirmar bloqueo" o "Volver"); antes solo pedía confirmar la cancelación con pago online. `audit.spec.ts` suma ese clic.
   - `agenda.spec.ts`: el chequeo genérico de "cancha" busca solo elementos visibles (las pestañas del celular están ocultas en escritorio).
-  - Pendiente de decidir: en oscuro "Ocupado" y libre tienen el mismo fondo (surface-2 = surface); se distinguen por el tachado y la palabra "Ocupado".
+  - "Ocupado" (decisión del revisor): sin fondo, borde punteado `line`, hora tachada en ink-muted; se distingue del libre en los dos modos. E2E en `rediseno.spec.ts`.
 - `tests/e2e/panel-movil.spec.ts` (390 px): entrada a la agenda, menú cerrado/abierto, ítem activo, "Hoy" y selector de fecha, hoja de acciones con 44 px y dentro de la pantalla. Reserva propia "E2E Rediseño Panel" (sábado 9+ días) que se borra al final.
 - Capturas 390 px claro/oscuro: agenda, menú abierto y acciones de un turno (reservas "Captura D2", borradas).
 

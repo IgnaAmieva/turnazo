@@ -22,7 +22,7 @@ export default async function PagoPage({ params }: Props) {
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
       <nav className="text-sm text-ink-muted mb-6">
-        <Link href="/" className="hover:text-ink">Inicio</Link>
+        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">Inicio</Link>
         <span className="mx-2">/</span>
         <span className="text-ink">Tu pago</span>
       </nav>

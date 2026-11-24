@@ -77,7 +77,7 @@ export default async function TurnoPage({ params }: Props) {
     return (
       <div className="max-w-lg mx-auto px-4 py-12 text-center">
         <p className="text-ink-muted text-lg mb-4">Turno no encontrado.</p>
-        <Link href="/" className="text-brand hover:underline text-sm">
+        <Link href="/" className="inline-flex min-h-11 items-center text-brand underline underline-offset-2 text-sm">
           Volver al inicio
         </Link>
       </div>
@@ -111,7 +111,7 @@ export default async function TurnoPage({ params }: Props) {
     <div className="max-w-lg mx-auto px-4 py-6">
       {/* Breadcrumb */}
       <nav className="text-sm text-ink-muted mb-6">
-        <Link href="/" className="hover:text-ink">Inicio</Link>
+        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">Inicio</Link>
         <span className="mx-2">/</span>
         <span className="text-ink">Mi turno</span>
       </nav>

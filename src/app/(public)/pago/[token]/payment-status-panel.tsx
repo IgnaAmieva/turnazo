@@ -126,7 +126,7 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
           El turno se liberó. Si llegaste a pagar, Mercado Pago te devuelve el dinero
           automáticamente. Podés volver a elegir un horario.
         </p>
-        <Link href="/" className="mt-5 inline-block text-sm text-brand hover:underline">
+        <Link href="/" className="mt-5 inline-flex min-h-11 items-center text-sm text-brand underline underline-offset-2">
           Buscar otro turno
         </Link>
       </div>
@@ -137,7 +137,7 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
     return (
       <div className="rounded-2xl border border-line bg-surface-2 p-6 text-center">
         <p className="text-ink text-xl font-bold mb-2">Este turno fue cancelado</p>
-        <Link href="/" className="mt-3 inline-block text-sm text-brand hover:underline">
+        <Link href="/" className="mt-3 inline-flex min-h-11 items-center text-sm text-brand underline underline-offset-2">
           Buscar otro turno
         </Link>
       </div>
@@ -147,7 +147,7 @@ export default function PaymentStatusPanel({ token, initial }: Props) {
   return (
     <div className="rounded-2xl border border-line bg-surface-2 p-6 text-center">
       <p className="text-ink-muted text-lg mb-3">Pago no encontrado.</p>
-      <Link href="/" className="text-sm text-brand hover:underline">
+      <Link href="/" className="inline-flex min-h-11 items-center text-sm text-brand underline underline-offset-2">
         Volver al inicio
       </Link>
     </div>

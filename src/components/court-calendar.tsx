@@ -88,9 +88,10 @@ export default function CourtCalendar({
           return (
             <div
               key={startIso}
-              className="rounded-lg border border-line bg-surface-2 p-3 flex flex-col items-center gap-1 cursor-not-allowed"
+              data-testid="slot-taken"
+              className="min-h-11 rounded-lg border border-dashed border-line bg-transparent p-3 flex flex-col items-center gap-1 cursor-not-allowed"
             >
-              <span className="text-sm font-medium text-ink-muted line-through">
+              <span className="text-base text-ink-muted line-through">
                 {label}
               </span>
               <span className="text-xs text-ink-muted">Ocupado</span>

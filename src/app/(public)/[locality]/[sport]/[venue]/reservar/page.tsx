@@ -122,13 +122,13 @@ export default async function ReservarPage({ params, searchParams }: Props) {
     <div className="max-w-lg mx-auto px-4 py-6">
       {/* Breadcrumb */}
       <nav className="text-sm text-ink-muted mb-6 flex flex-wrap gap-1 items-center">
-        <Link href="/" className="hover:text-ink">Inicio</Link>
+        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">Inicio</Link>
         <span>/</span>
-        <Link href={`/${lSlug}`} className="hover:text-ink">{locality.name}</Link>
+        <Link href={`/${lSlug}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{locality.name}</Link>
         <span>/</span>
-        <Link href={`/${lSlug}/${sSlug}`} className="hover:text-ink">{sport.name}</Link>
+        <Link href={`/${lSlug}/${sSlug}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{sport.name}</Link>
         <span>/</span>
-        <Link href={`/${lSlug}/${sSlug}/${venueId}`} className="hover:text-ink">{venue.name}</Link>
+        <Link href={`/${lSlug}/${sSlug}/${venueId}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{venue.name}</Link>
         <span>/</span>
         <span className="text-ink">Reservar</span>
       </nav>
@@ -164,7 +164,7 @@ export default async function ReservarPage({ params, searchParams }: Props) {
           <p className="text-warning font-medium mb-3">Este horario ya pasó.</p>
           <Link
             href={`/${lSlug}/${sSlug}/${venueId}`}
-            className="text-sm text-brand hover:underline"
+            className="inline-flex min-h-11 items-center text-sm text-brand underline underline-offset-2"
           >
             Volver al complejo
           </Link>

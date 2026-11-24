@@ -81,7 +81,7 @@ export default function CancelForm({
               ? 'Este complejo no hace devoluciones por cancelación.'
               : `Pasó el plazo para cancelar con devolución (hasta ${cancelLimitHours} h antes del turno).`}
           </p>
-          <label className="flex items-start gap-2 pt-1">
+          <label className="flex min-h-11 items-center gap-2 pt-1">
             <input
               type="checkbox"
               checked={acknowledged}

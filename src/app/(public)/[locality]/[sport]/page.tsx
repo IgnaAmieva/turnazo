@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import VenueMap from "@/components/venue-map-wrapper";
+import { RememberSearch } from "@/components/player-memory-ui";
 
 type Props = { params: Promise<{ locality: string; sport: string }> };
 
@@ -35,10 +36,14 @@ export default async function VenuesPage({ params }: Props) {
 
   return (
     <div>
+      <RememberSearch
+        localidad={{ slug: locality.slug, nombre: locality.name }}
+        deporte={{ slug: sport.slug, nombre: sport.name }}
+      />
       <nav className="text-sm text-ink-muted mb-6">
-        <Link href="/" className="hover:text-ink">Inicio</Link>
+        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">Inicio</Link>
         <span className="mx-2">/</span>
-        <Link href={`/${locality.slug}`} className="hover:text-ink">{locality.name}</Link>
+        <Link href={`/${locality.slug}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{locality.name}</Link>
         <span className="mx-2">/</span>
         <span className="text-ink">{sport.name}</span>
       </nav>
@@ -76,7 +81,7 @@ export default async function VenuesPage({ params }: Props) {
                       href={`https://maps.google.com/?q=${venue.lat},${venue.lng}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs bg-surface text-ink border border-line
+                      className="inline-flex min-h-11 items-center text-sm bg-surface text-ink border border-line
                         rounded-full px-3 py-1 hover:bg-surface-2 transition-colors whitespace-nowrap"
                     >
                       Cómo llegar

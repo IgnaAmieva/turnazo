@@ -2,6 +2,8 @@
 
 import { useActionState, useState } from 'react';
 import { type BookingActionState } from '@/app/actions/booking';
+import { rememberPlayer, usePlayerMemory } from '@/lib/player-memory';
+import { NotMeButton } from '@/components/player-memory-ui';
 
 export type PaymentOption = {
   value: 'deposit' | 'full' | 'venue';
@@ -24,8 +26,30 @@ export default function BookingForm({ action, options }: Props) {
 
   const paysOnline = selected !== 'venue';
 
+  // Nombre y celular recordados en este dispositivo (nunca el email ni el pago)
+  const mem = usePlayerMemory();
+  const savedName  = mem?.nombre ?? '';
+  const savedPhone = mem?.celular ?? '';
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    const fd = new FormData(e.currentTarget);
+    const nombre  = String(fd.get('customer_name') ?? '').trim();
+    const celular = String(fd.get('customer_phone') ?? '').trim();
+    if (nombre && celular) rememberPlayer({ nombre, celular });
+  }
+
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} onSubmit={handleSubmit} className="space-y-5">
+      {/* Datos recordados */}
+      {(savedName || savedPhone) && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface-2 px-4 py-2" data-testid="datos-recordados">
+          <p className="text-sm text-ink min-w-0">
+            Reservás como <strong className="font-extrabold">{savedName || savedPhone}</strong>
+          </p>
+          <NotMeButton />
+        </div>
+      )}
+
       {/* Error general */}
       {state.error && (
         <div className="rounded-xl bg-danger-soft border border-danger/40 p-4 text-danger text-sm">
@@ -47,7 +71,9 @@ export default function BookingForm({ action, options }: Props) {
           type="text"
           placeholder="Ej: Juan García"
           autoComplete="name"
-          className="w-full rounded-2xl border border-line bg-surface px-4 py-3 text-sm
+          key={`n-${savedName}`}
+          defaultValue={savedName}
+          className="w-full min-h-11 rounded-2xl border border-line bg-surface px-4 py-3 text-sm
             text-ink placeholder-ink-muted shadow-sm
             focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25
             disabled:opacity-50"
@@ -74,7 +100,9 @@ export default function BookingForm({ action, options }: Props) {
           type="tel"
           placeholder="Ej: 2622 123456"
           autoComplete="tel"
-          className="w-full rounded-2xl border border-line bg-surface px-4 py-3 text-sm
+          key={`t-${savedPhone}`}
+          defaultValue={savedPhone}
+          className="w-full min-h-11 rounded-2xl border border-line bg-surface px-4 py-3 text-sm
             text-ink placeholder-ink-muted shadow-sm
             focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25
             disabled:opacity-50"

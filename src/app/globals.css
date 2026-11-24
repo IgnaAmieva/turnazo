@@ -103,3 +103,11 @@
     font-weight: 800;
   }
 }
+
+/* Mapa (Leaflet): botones de zoom de 44 px para el dedo. */
+.leaflet-container .leaflet-control-zoom.leaflet-bar a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  font-size: 22px;
+}

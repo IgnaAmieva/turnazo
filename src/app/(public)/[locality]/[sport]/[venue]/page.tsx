@@ -8,6 +8,7 @@ import { todayInMendoza, mendozaToUtc, parseTstzrange } from "@/lib/slots";
 import CourtCalendar from "@/components/court-calendar";
 import AvailabilityWatcher from "@/components/availability-watcher";
 import DateNavigator from "@/components/date-navigator";
+import { RememberSearch } from "@/components/player-memory-ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -67,12 +68,16 @@ export default async function VenuePage({ params, searchParams }: Props) {
 
   return (
     <div>
+      <RememberSearch
+        localidad={{ slug: locality.slug, nombre: locality.name }}
+        deporte={{ slug: sport.slug, nombre: sport.name }}
+      />
       <nav className="text-sm text-ink-muted mb-6">
-        <Link href="/" className="hover:text-ink">Inicio</Link>
+        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">Inicio</Link>
         <span className="mx-2">/</span>
-        <Link href={`/${lSlug}`} className="hover:text-ink">{locality.name}</Link>
+        <Link href={`/${lSlug}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{locality.name}</Link>
         <span className="mx-2">/</span>
-        <Link href={`/${lSlug}/${sSlug}`} className="hover:text-ink">{sport.name}</Link>
+        <Link href={`/${lSlug}/${sSlug}`} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-ink">{sport.name}</Link>
         <span className="mx-2">/</span>
         <span className="text-ink">{venue.name}</span>
       </nav>
@@ -86,7 +91,7 @@ export default async function VenuePage({ params, searchParams }: Props) {
           href={`https://maps.google.com/?q=${venue.lat},${venue.lng}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm bg-surface text-ink border border-line
+          className="inline-flex min-h-11 items-center text-sm bg-surface text-ink border border-line
             rounded-full px-4 py-2 hover:bg-surface-2 transition-colors whitespace-nowrap"
         >
           Cómo llegar
