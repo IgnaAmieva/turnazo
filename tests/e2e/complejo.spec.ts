@@ -34,6 +34,14 @@ test("portada, ubicación con 'Ir' y mapa chiquito sin pedidos externos", async 
   await expect(ir).toHaveText("Ir");
   await expect(ir).toHaveAttribute("href", /google\.com\/maps\/dir\/\?api=1&destination=-?\d/);
   expect((await ir.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // El mapa chiquito también abre Google Maps, con el mismo pin que "Ir"
+  const map = loc.getByTestId("mapa-link");
+  await expect(map).toHaveAttribute("href", (await ir.getAttribute("href"))!);
+  await expect(map).toHaveAttribute("aria-label", "Ver ubicación de Complejo Padelero Tunuyán en el mapa");
+  await expect(map).toHaveAttribute("target", "_blank");
+  await expect(map).toHaveAttribute("rel", /noopener/);
+  const box = (await map.boundingBox())!;
+  expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(44);
   expect(external).toEqual([]);
   expect(errors).toEqual([]);
 });

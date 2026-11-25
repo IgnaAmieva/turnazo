@@ -24,6 +24,11 @@ export function byDistance<T extends LatLng>(from: LatLng, places: T[]): (T & { 
     .sort((a, b) => a.km - b.km);
 }
 
+/** Google Maps con el pin real del complejo (lo mismo que "Ir"). */
+export function mapsUrl(p: LatLng): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
+}
+
 /** Slug de una localidad: minúsculas, sin acentos, guiones. "Guaymallén" → "guaymallen". */
 export function slugify(name: string): string {
   return name

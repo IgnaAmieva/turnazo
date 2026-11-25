@@ -51,6 +51,28 @@ test("tarjeta: mapa chiquito sin pedidos externos, etiquetas que existen y 4 tur
   expect(errors).toEqual([]);
 });
 
+test("mapa chiquito: link a Google Maps con el pin real (44 px, pestaña nueva); el resto de la tarjeta lleva al complejo", async ({ page }) => {
+  await page.goto(`${LIST}?_now=${NOW}`);
+  const c = card(page);
+  const map = c.getByTestId("mapa-link");
+  await expect(map).toHaveAttribute("aria-label", "Ver ubicación de Complejo Padelero Tunuyán en el mapa");
+  await expect(map).toHaveAttribute("target", "_blank");
+  await expect(map).toHaveAttribute("rel", /noopener/);
+  await expect(map).toHaveAttribute("href", /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=-?\d+(\.\d+)?,-?\d+(\.\d+)?$/);
+  const box = (await map.boundingBox())!;
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  // Lo que se toca es el mapa (no el link de la tarjeta que está debajo)
+  const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest("a")?.getAttribute("data-testid"),
+    { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+  expect(hit).toBe("mapa-link");
+
+  // Tocar la dirección (resto de la tarjeta) abre el complejo
+  const addr = (await c.locator("p").first().boundingBox())!;
+  await page.mouse.click(addr.x + 10, addr.y + addr.height / 2);
+  await expect(page).toHaveURL(new RegExp(`${VENUE_PATH}$`));
+});
+
 test("franjas Ahora · 18–20 · 20–22 · 22+: filtran los turnos del día", async ({ page }) => {
   await page.goto(`${LIST}?_now=${NOW}`);
   const franjas = page.getByTestId("franja");

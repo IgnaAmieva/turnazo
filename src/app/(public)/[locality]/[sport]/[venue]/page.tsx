@@ -13,7 +13,8 @@ import AvailabilityWatcher from "@/components/availability-watcher";
 import { BookingSheetProvider, type SheetSlot } from "@/components/booking-sheet";
 import { RememberSearch } from "@/components/player-memory-ui";
 import { CourtLines } from "@/components/sport-art";
-import { MiniMap } from "@/components/mini-map";
+import { MiniMapLink } from "@/components/mini-map";
+import { mapsUrl } from "@/lib/geo";
 import { VenueDistance } from "@/components/venue-distance";
 import { ScrollIntoViewOnMount } from "@/components/scroll-into-view";
 import { venueTagsLine } from "@/lib/court-tags";
@@ -174,13 +175,13 @@ export default async function VenuePage({ params, searchParams }: Props) {
 
       {/* Tarjeta flotante: dirección, mapa chiquito e "Ir" */}
       <div className="relative z-10 -mt-12 flex items-center gap-3 rounded-3xl border border-line bg-surface p-3 shadow-md" data-testid="ubicacion">
-        <MiniMap id={venue.id} size={56} />
+        <MiniMapLink id={venue.id} name={venue.name} lat={venue.lat} lng={venue.lng} size={56} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-extrabold text-ink">{venue.address}</p>
           <p className="text-xs text-ink-muted">{locality.name}<VenueDistance lat={venue.lat} lng={venue.lng} /></p>
         </div>
         <a
-          href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`}
+          href={mapsUrl(venue)}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Ir: cómo llegar"

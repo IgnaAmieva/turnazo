@@ -214,6 +214,11 @@ Aclaraciones de la cancha (2026-11-25; 027):
 - Se muestran en la portada del complejo (debajo de las pestañas, la de la cancha elegida), en la hoja de reserva y en `/reservar`, como texto: React las escapa, no hay `dangerouslySetInnerHTML`. Probado con `<b>` y `<img onerror>`: se ve el texto literal y no se arma ningún elemento.
 - Tests: `tests/integration/court-format.test.ts` (acción: espacios, vacío → NULL, 201 → error, el HTML se guarda como texto); E2E `tests/e2e/aclaraciones.spec.ts` (usa la cancha de prueba y le deja `notes = NULL`).
 
+Mapa chiquito clickeable (2026-11-25, antes del merge):
+- En la tarjeta de la lista/inicio y en la tarjeta de dirección del complejo, el mapa chiquito es un `<a>` (`MiniMapLink`, 76 o 56 px) a Google Maps con el pin real, la misma URL que "Ir" (`mapsUrl` en `lib/geo.ts`), `target="_blank"`, `rel="noopener noreferrer"` y `aria-label="Ver ubicación de {complejo} en el mapa"`.
+- En la lista, el resto de la tarjeta lleva al complejo: el nombre es un link estirado (`after:absolute inset-0`) y el mapa y los turnos quedan por encima (z-10).
+- Tests: `lista.spec` (atributos, 44 px, que el toque caiga en el mapa y que tocar la dirección abra el complejo) y `complejo.spec` (mismo href que "Ir").
+
 Rediseño M4 (Mi turno):
 - "Guardá este link" arriba de todo (borde primary): el link de Mi turno en un campo de solo lectura y "Copiar link" (44 px; sin permiso de portapapeles queda seleccionado para copiar a mano).
 - Con el turno confirmado: "Compartir por WhatsApp" (wa.me/?text= con cancha, día, horario, dirección y "Cómo llegar"; SIN el link de Mi turno, porque con él se puede cancelar), "Agregar al calendario" (GET /turnos/{token}/calendario → turno.ics, RFC 5545, horas en UTC, Cache-Control private/no-store; 404 si el turno no existe o no está confirmado) y "Cómo llegar" (Google Maps con el pin del complejo; sin pin, nombre y dirección).

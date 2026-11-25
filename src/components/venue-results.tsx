@@ -11,7 +11,7 @@ import { FRANJAS, whenLabel, whenParams, type When } from '@/lib/franjas';
 import { rankVenues } from '@/lib/rank-venues';
 import { formatTimeMendoza } from '@/lib/slots';
 import { venueTagsLine } from '@/lib/court-tags';
-import { MiniMap } from '@/components/mini-map';
+import { MiniMapLink } from '@/components/mini-map';
 import { VenueDistance } from '@/components/venue-distance';
 import { HourSelect } from '@/components/hour-select';
 
@@ -77,11 +77,14 @@ export function VenueResults({ venues, slots, when, today, localitySlug, sportSl
 
       <ul className="grid gap-3">
         {rows.map(({ v, free, next }) => (
-          <li key={v.id} data-testid="complejo" data-libres={free} className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
+          <li key={v.id} data-testid="complejo" data-libres={free} className="relative rounded-3xl border border-line bg-surface p-4 shadow-sm">
             <div className="flex gap-3">
-              <MiniMap id={v.id} />
+              {/* El mapa chiquito abre Google Maps; el resto de la tarjeta, el complejo */}
+              <MiniMapLink id={v.id} name={v.name} lat={v.lat} lng={v.lng} />
               <div className="min-w-0 flex-1">
-                <Link href={`/${localitySlug}/${sportSlug}/${v.id}`} className="inline-flex min-h-11 items-center text-lg font-extrabold text-ink hover:underline">
+                <Link href={`/${localitySlug}/${sportSlug}/${v.id}`} data-testid="complejo-link"
+                  className="inline-flex min-h-11 items-center text-lg font-extrabold text-ink hover:underline
+                    after:absolute after:inset-0 after:rounded-3xl after:content-['']">
                   {v.name}
                 </Link>
                 <p className="text-sm text-ink-muted">
@@ -95,7 +98,7 @@ export function VenueResults({ venues, slots, when, today, localitySlug, sportSl
             <p className="mt-3 text-xs font-extrabold text-ink" data-testid="libres">
               {plural(free, 'turno libre', 'turnos libres')} {whenLabel(when)}
             </p>
-            <ul className="mt-2 flex flex-wrap gap-2" aria-label={`Próximos turnos en ${v.name}`}>
+            <ul className="relative z-10 mt-2 flex flex-wrap gap-2" aria-label={`Próximos turnos en ${v.name}`}>
               {next.map((s) => (
                 <li key={`${s.courtId}-${s.start.toISOString()}`}>
                   <Link

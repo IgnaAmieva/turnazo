@@ -6,6 +6,8 @@
  * para que las tarjetas no sean todas iguales.
  */
 
+import { mapsUrl } from '@/lib/geo';
+
 function seeded(id: string) {
   let h = 2166136261;
   for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
@@ -37,5 +39,27 @@ export function MiniMap({ id, size = 76, className = '' }: { id: string; size?: 
         <circle cx="0" cy="-16" r="4" fill="var(--surface)" />
       </g>
     </svg>
+  );
+}
+
+/**
+ * El mapa chiquito como link: abre Google Maps con el pin real (lo mismo que
+ * "Ir"), en otra pestaña. Va por encima del link de la tarjeta (z-10).
+ */
+export function MiniMapLink({ id, name, lat, lng, size = 76 }: {
+  id: string; name: string; lat: number; lng: number; size?: number;
+}) {
+  return (
+    <a
+      href={mapsUrl({ lat, lng })}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Ver ubicación de ${name} en el mapa`}
+      data-testid="mapa-link"
+      className="relative z-10 shrink-0 rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring hover:opacity-90"
+      style={{ minWidth: 44, minHeight: 44 }}
+    >
+      <MiniMap id={id} size={size} className="block" />
+    </a>
   );
 }
