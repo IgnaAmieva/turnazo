@@ -119,7 +119,7 @@ Ojo, dato a revisar: `padelmates` (aprobado, en Tunuyán) tiene el pin en Guayma
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
 | Unitarios + integración | Vitest | 398 | 398 ✓ (2026-11-25, rama `rediseno`, con la 027 aplicada) |
-| E2E | Playwright | 164 (incluye el setup de login) | Corrida completa en 4 tandas verde con el punto 2 (151 entonces). Con los puntos 3 y 4: tanda 1 ✓ (35), la 2 se cortó a la mitad porque la máquina se quedó sin memoria (no fue una falla de los tests); `formato`, `aclaraciones`, `inicio`, `lista`, `cancha` y `etiquetas` pasaron sueltos. **Falta repetir la corrida completa** (2026-11-25) |
+| E2E | Playwright | 164 (incluye el setup de login) | 164 ✓ (2026-11-25, rama `rediseno`, con la 027 aplicada; --workers=1 en 8 tandas de 3 a 5 archivos: con 4 tandas grandes la máquina se quedó sin memoria) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
