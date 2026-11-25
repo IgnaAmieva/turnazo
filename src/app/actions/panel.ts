@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refundPayment } from "@/lib/mp/refunds";
 import { triggerPushSend } from "@/lib/push";
+import { detectLogoType, LOGO_BUCKET, LOGO_MAX_BYTES } from "@/lib/venue-logo";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -185,6 +186,128 @@ export async function updateVenueAction(
   revalidatePath(`/panel/complejos/${venueId}`);
   revalidatePath("/panel/complejos");
   redirect("/panel/complejos");
+}
+
+// ---------------------------------------------------------------------------
+// Logo del club (migración 024). Se sube con la sesión del dueño: las
+// políticas de storage limitan la carpeta '{venue_id}/' al dueño del complejo
+// y venues_logo_path_check obliga a que logo_path esté en esa carpeta.
+// ---------------------------------------------------------------------------
+
+const LOGO_ERRORS = {
+  missing:  "Elegí una imagen.",
+  tooBig:   "El logo puede pesar hasta 512 KB.",
+  badType:  "El logo tiene que ser una imagen PNG, JPG o WebP.",
+  upload:   "No se pudo subir el logo. Intentá de nuevo.",
+} as const;
+
+/** El complejo, solo si es del usuario de la sesión. */
+async function ownedVenueLogo(supabase: Awaited<ReturnType<typeof createClient>>, venueId: string, userId: string) {
+  if (!z.string().guid().safeParse(venueId).success) return null;
+  const { data } = await supabase
+    .from("venues")
+    .select("id, logo_path")
+    .eq("id", venueId)
+    .eq("owner_id", userId)
+    .maybeSingle();
+  return data;
+}
+
+export async function uploadVenueLogoAction(
+  venueId: string,
+  _state: PanelActionState,
+  formData: FormData
+): Promise<PanelActionState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const venue = await ownedVenueLogo(supabase, venueId, user.id);
+  if (!venue) return { error: "No autorizado" };
+
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) return { fieldErrors: { logo: [LOGO_ERRORS.missing] } };
+  if (file.size > LOGO_MAX_BYTES) return { fieldErrors: { logo: [LOGO_ERRORS.tooBig] } };
+
+  // Tipo real por los primeros bytes: la extensión y el Content-Type los elige el que sube
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const type = detectLogoType(bytes);
+  if (!type) return { fieldErrors: { logo: [LOGO_ERRORS.badType] } };
+
+  // Nombre nuevo en cada subida: la URL pública cambia y nadie ve el logo viejo de caché
+  const path = `${venueId}/logo-${Date.now()}.${type.ext}`;
+  const { error: upErr } = await supabase.storage
+    .from(LOGO_BUCKET)
+    .upload(path, bytes, { contentType: type.mime, upsert: false, cacheControl: "31536000" });
+  if (upErr) {
+    console.error("[panel] logo upload failed:", upErr.message);
+    return { error: LOGO_ERRORS.upload };
+  }
+
+  const { error } = await supabase
+    .from("venues")
+    .update({ logo_path: path })
+    .eq("id", venueId)
+    .eq("owner_id", user.id);
+  if (error) {
+    await supabase.storage.from(LOGO_BUCKET).remove([path]);
+    return dbError(error);
+  }
+
+  if (venue.logo_path && venue.logo_path !== path) {
+    const { error: rmErr } = await supabase.storage.from(LOGO_BUCKET).remove([venue.logo_path]);
+    if (rmErr) console.error("[panel] old logo remove failed:", rmErr.message);
+  }
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
+    venue_id:   venueId,
+    entity:     "venue",
+    entity_id:  venueId,
+    action:     "update",
+    new_data:   { logo_path: path },
+  });
+  if (auditErr) return auditError(auditErr);
+
+  revalidatePath(`/panel/complejos/${venueId}`);
+  return {};
+}
+
+export async function removeVenueLogoAction(
+  venueId: string,
+  _state: PanelActionState,
+  _formData: FormData
+): Promise<PanelActionState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const venue = await ownedVenueLogo(supabase, venueId, user.id);
+  if (!venue) return { error: "No autorizado" };
+  if (!venue.logo_path) return {};
+
+  const { error } = await supabase
+    .from("venues")
+    .update({ logo_path: null })
+    .eq("id", venueId)
+    .eq("owner_id", user.id);
+  if (error) return dbError(error);
+
+  const { error: rmErr } = await supabase.storage.from(LOGO_BUCKET).remove([venue.logo_path]);
+  if (rmErr) console.error("[panel] logo remove failed:", rmErr.message);
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
+    venue_id:   venueId,
+    entity:     "venue",
+    entity_id:  venueId,
+    action:     "update",
+    new_data:   { logo_path: null },
+  });
+  if (auditErr) return auditError(auditErr);
+
+  revalidatePath(`/panel/complejos/${venueId}`);
+  return {};
 }
 
 // ---------------------------------------------------------------------------

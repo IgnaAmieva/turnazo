@@ -1,11 +1,15 @@
 import { notFound } from "next/navigation";
 import { getOwnerVenue, getMpConnectionStatus } from "@/lib/supabase/panel-queries";
 import { getLocalities } from "@/lib/supabase/queries";
-import { updateVenueAction, updatePaymentSettingsAction, updateCancellationPolicyAction } from "@/app/actions/panel";
+import {
+  updateVenueAction, updatePaymentSettingsAction, updateCancellationPolicyAction,
+  uploadVenueLogoAction, removeVenueLogoAction,
+} from "@/app/actions/panel";
 import { VenueForm } from "@/components/panel/venue-form";
 import { MpConnectSection } from "@/components/panel/mp-connect-section";
 import { PaymentSettingsSection } from "@/components/panel/payment-settings-section";
 import { CancellationPolicySection } from "@/components/panel/cancellation-policy-section";
+import { VenueLogoSection } from "@/components/panel/venue-logo-section";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -55,6 +59,17 @@ export default async function EditarComplejoPage({
         >
           Teléfonos bloqueados
         </Link>
+      </div>
+
+      {/* Logo del club (portada e historias) */}
+      <div className="mb-6">
+        <VenueLogoSection
+          key={venue.logo_path ?? "sin-logo"}
+          name={venue.name}
+          logoPath={venue.logo_path}
+          upload={uploadVenueLogoAction.bind(null, id)}
+          remove={removeVenueLogoAction.bind(null, id)}
+        />
       </div>
 
       {/* Mercado Pago connection */}

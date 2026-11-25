@@ -633,6 +633,7 @@ export type Database = {
           lat: number
           lng: number
           locality_id: string
+          logo_path: string | null
           name: string
           owner_id: string
           payment_alias: string | null
@@ -656,6 +657,7 @@ export type Database = {
           lat: number
           lng: number
           locality_id: string
+          logo_path?: string | null
           name: string
           owner_id: string
           payment_alias?: string | null
@@ -679,6 +681,7 @@ export type Database = {
           lat?: number
           lng?: number
           locality_id?: string
+          logo_path?: string | null
           name?: string
           owner_id?: string
           payment_alias?: string | null

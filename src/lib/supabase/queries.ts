@@ -135,6 +135,8 @@ export type VenueWithCourts = {
   deposit_value: number | null;
   allow_full_payment: boolean;
   allow_pay_at_venue: boolean;
+  /** Migración 024: ruta en el bucket venue-logos, o null (iniciales) */
+  logo_path: string | null;
   courts: CourtWithSchedule[];
 };
 
@@ -167,7 +169,7 @@ export async function getVenueWithCourts(
       `id, name, address, lat, lng, phone,
        payment_alias, payment_link,
        deposit_required, deposit_type, deposit_value,
-       allow_full_payment, allow_pay_at_venue`
+       allow_full_payment, allow_pay_at_venue, logo_path`
     )
     .eq("id", venueId)
     .eq("status", "approved")

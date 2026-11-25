@@ -10,10 +10,10 @@ Los dueños de complejos gestionan sus canchas, horarios, precios y agenda desde
 
 | Capa | Tecnología |
 |------|-----------|
-| Framework | Next.js 15 App Router (TypeScript) |
-| Base de datos + Auth | Supabase (PostgreSQL + RLS + Auth) |
+| Framework | Next.js 16 App Router (TypeScript) |
+| Base de datos + Auth | Supabase (PostgreSQL + RLS + Auth + Storage) |
 | ORM / cliente | `@supabase/ssr` (server components + actions) |
-| Estilos | Tailwind CSS |
+| Estilos | Tailwind CSS v4 (colores como variables CSS en `src/app/globals.css`, claro y oscuro) |
 | Tests unitarios / integración | Vitest |
 | Tests E2E | Playwright (Chromium headless) |
 | Deploy | Vercel |
@@ -34,8 +34,8 @@ pnpm dev --port 3001
 # Tests unitarios + integración (carga .env.local automáticamente)
 pnpm test
 
-# Tests E2E (requiere dev server corriendo en :3001)
-pnpm test:e2e
+# Tests E2E (Playwright levanta el dev server en :3001; no arrancarlo a mano)
+pnpm test:e2e --workers=1
 
 # E2E con UI interactivo
 pnpm test:e2e:ui
@@ -82,15 +82,16 @@ src/
       court-form.tsx
     venue-pin-map.tsx   # Mapa Leaflet con marker draggable
     venue-pin-map-wrapper.tsx  # dynamic() SSR:false wrapper
-  middleware.ts         # Protege /panel/* → redirige a /login si no autenticado
+  proxy.ts              # (Next 16, antes middleware.ts) Protege /panel/* → redirige a /login si no autenticado
 
-supabase/migrations/    # 001 a 013, aplicadas en Supabase Cloud
+supabase/migrations/    # 001 a 024 aplicadas en Supabase Cloud (022 vive en la rama s2-captcha); 025 escrita, sin aplicar. Estado en ESTADO.md
 tests/
-  unit/                 # Vitest: phone.test.ts, slots.test.ts
-  integration/          # Vitest: public.test.ts, booking.test.ts, auth.test.ts, owner.test.ts
+  unit/                 # Vitest: teléfonos, slots, tema/contraste, MP, historias, logo, etc.
+  integration/          # Vitest contra la base real (fixtures propios, se borran al final)
   concurrency/          # Vitest: double-booking.test.ts
-  e2e/                  # Playwright: public.spec.ts, panel.spec.ts, agenda.spec.ts, audit.spec.ts
+  e2e/                  # Playwright: un spec por área (público, panel, agenda, pagos, rediseño, historias, logo…)
     helpers.ts          # Fixtures, helpers de API, createTestBooking, deleteTestBookings
+    setup/              # Login del dueño de prueba (storageState)
 ```
 
 ## Convenciones
@@ -126,7 +127,7 @@ tests/
 
 > **Fase por fase, con tests, sin dar nada por probado si no se cargó en un navegador real.**
 
-- Antes de cerrar una fase: `pnpm test` (Vitest, 65 tests) + `pnpm test:e2e` (Playwright, 28 tests) deben pasar todos.
+- Antes de cerrar una fase: `pnpm test` (Vitest, 362 tests) + `pnpm test:e2e --workers=1` (Playwright, 137 tests con el setup) deben pasar todos. Si la corrida entera se corta por memoria, correr por tandas de archivos. Nunca contra la URL publicada.
 - No avanzar a la siguiente fase hasta tener verde en ambos.
 - No crear helpers, abstracciones ni features que no pida la spec.
-- Los cambios de esquema van en migraciones numeradas (`014_...sql`) aplicadas via Supabase MCP antes de escribir código que las usa.
+- Los cambios de esquema van en migraciones numeradas (`026_...sql`) en archivo. **Claude no aplica migraciones ni corre SQL que modifique datos**: las aplica el revisor; el código que las usa se escribe después de aplicadas.

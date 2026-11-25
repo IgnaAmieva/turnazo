@@ -17,6 +17,7 @@ import { MiniMap } from "@/components/mini-map";
 import { VenueDistance } from "@/components/venue-distance";
 import { ScrollIntoViewOnMount } from "@/components/scroll-into-view";
 import { venueTagsLine } from "@/lib/court-tags";
+import { ClubLogo } from "@/components/club-logo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Breadcrumbs from "@/components/breadcrumbs";
@@ -156,9 +157,12 @@ export default async function VenuePage({ params, searchParams }: Props) {
           >
             <span aria-hidden="true">←</span>
           </Link>
-          <div>
-            <h1 className="text-[2rem] font-extrabold leading-tight">{venue.name}</h1>
-            <p className="text-sm" data-testid="etiquetas">{subtitle}</p>
+          <div className="flex items-center gap-3">
+            <ClubLogo name={venue.name} logoPath={venue.logo_path} size={60} />
+            <div className="min-w-0">
+              <h1 className="text-[2rem] font-extrabold leading-tight">{venue.name}</h1>
+              <p className="text-sm" data-testid="etiquetas">{subtitle}</p>
+            </div>
           </div>
         </div>
       </header>

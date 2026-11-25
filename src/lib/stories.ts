@@ -9,9 +9,11 @@ import { createClient } from '@/lib/supabase/server';
 import { freeSlots, type VenueForList } from '@/lib/free-slots';
 import { formatDateMendoza, formatTimeMendoza, mendozaToUtc, todayInMendoza } from '@/lib/slots';
 import type { CourtWithSchedule } from '@/lib/supabase/queries';
+import { detectLogoType, initials, LOGO_MAX_BYTES, venueLogoUrl } from '@/lib/venue-logo';
 
 import type { StorySport } from '@/lib/stories-shared';
 export { STORY_STYLES, parseStyle, type StoryStyle, type StorySport } from '@/lib/stories-shared';
+export { initials } from '@/lib/venue-logo';
 
 /** Máximo de turnos en la imagen. */
 export const STORY_MAX_SLOTS = 6;
@@ -22,6 +24,8 @@ export type StoryData = {
   venueId: string;
   venueName: string;
   initials: string;
+  /** Logo del club como data URI (la imagen no sale a buscarlo), o null → iniciales. */
+  logo: string | null;
   localityName: string;
   localitySlug: string;
   sport: StorySport;
@@ -31,15 +35,6 @@ export type StoryData = {
   slots: { time: string; price: number }[];
   minPrice: number | null;
 };
-
-/** Iniciales del club para el círculo del logo: "futmates" → "FU", "Club Norte" → "CN". */
-export function initials(name: string): string {
-  const words = name.replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean);
-  const stop = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'y']);
-  const main = words.filter((w) => !stop.has(w.toLowerCase()));
-  const pick = main.length >= 2 ? main[0][0] + main[1][0] : (main[0] ?? words[0] ?? '?').slice(0, 2);
-  return pick.toUpperCase();
-}
 
 export function dayLabel(date: string, today: string): string {
   const long = formatDateMendoza(mendozaToUtc(date, '12:00:00'));      // "martes 24 de noviembre"
@@ -58,7 +53,7 @@ export async function getStoryData(
 
   const { data: venue } = await supabase
     .from('venues')
-    .select('id, name, owner_id, localities(name, slug)')
+    .select('id, name, owner_id, logo_path, localities(name, slug)')
     .eq('id', venueId)
     .eq('owner_id', user.id)
     .maybeSingle();
@@ -108,6 +103,7 @@ export async function getStoryData(
     venueId: venue.id,
     venueName: venue.name,
     initials: initials(venue.name),
+    logo: await logoDataUri(venue.logo_path),
     localityName: locality?.name ?? '',
     localitySlug: locality?.slug ?? '',
     sport, sports, date,
@@ -115,4 +111,29 @@ export async function getStoryData(
     slots,
     minPrice: slots.length ? Math.min(...slots.map((s) => s.price)) : null,
   };
+}
+
+/**
+ * Baja el logo por su URL pública y lo pasa a data URI. Se vuelve a mirar el
+ * tipo real por los bytes; si no se puede bajar o no es una imagen válida,
+ * null (la historia muestra las iniciales).
+ */
+async function logoDataUri(path: string | null): Promise<string | null> {
+  const url = venueLogoUrl(path);
+  if (!url) return null;
+  try {
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const type = bytes.length <= LOGO_MAX_BYTES ? detectLogoType(bytes) : null;
+    if (!type) return null;
+    // next/og dibuja PNG y JPEG pero deja vacío el WebP: se pasa a PNG
+    if (type.ext === 'webp') {
+      const sharp = (await import('sharp')).default;
+      return `data:image/png;base64,${(await sharp(bytes).png().toBuffer()).toString('base64')}`;
+    }
+    return `data:${type.mime};base64,${Buffer.from(bytes).toString('base64')}`;
+  } catch {
+    return null;
+  }
 }

@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño: historias de turnos libres en la rama `rediseno`; 023 aplicada por el revisor; migración 023 escrita, sin aplicar; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-24 (rediseño: logo del club en la rama `rediseno`; 022, 023 y 024 aplicadas por el revisor; 025 escrita, sin aplicar; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -85,7 +85,13 @@
 
 | 021 | `021_security_lockdown.sql` | Aplicada por el revisor (2026-11-19), después del deploy `dpl_EjtXUcyNHyUG3tBLDCRSoXmKBV7c` (commit `99891c5`). Fase 7 S1: grants mínimos para anon/authenticated columna por columna (se revoca todo, incluidos TRUNCATE/TRIGGER/REFERENCES, y los privilegios por defecto); FK compuesta `bookings(court_id, venue_id) → courts(id, venue_id)` (C1); el dueño ya no escribe en `bookings`: RPCs `panel_create_block`, `panel_cancel_booking` (pago online → `refund_pending` en la misma transacción), `panel_mark_paid` (no si se pagó todo online; con seña, amount_paid = price_total), `panel_mark_no_show` (con pago online solo después de empezado el turno) (M2); trigger `trg_venues_status`: solo superadmin/servidor cambia `venues.status` (A1); `create_booking` / `create_booking_hold` solo `service_role` (C2/A2); `_validate_booking_slot` rechaza turnos a más de 30 días (`too_far_ahead`). Se aplica **después** del deploy del código de S1 (el código viejo llama a `create_booking` con anon). Validada en PGlite reconstruyendo 001–020 con stubs de Supabase: 64/64 consultas de la app y ataques |
 
-**Próxima migración:** `022_*.sql`
+| 022 | (rama `s2-captcha`) | Aplicada por el revisor. Fase 7 S2 (límites de intentos para Turnstile). El código que la usa está solo en `s2-captcha`; se integra después del merge de `rediseno` |
+| 023 | `023_court_features.sql` | Aplicada por el revisor (2026-11-24). Etiquetas de cancha: `surface` (CHECK con la lista), `covered`, `lit`, `has_locker_room`; grants por columna |
+| 024 | `024_venue_logos.sql` | Aplicada por el revisor (2026-11-24), con dos cambios sobre la propuesta (el archivo ya es igual a lo aplicado): SELECT de storage solo para el dueño (`venue_logos_owner_select`, nadie lista el bucket) y `venues_logo_path_check` (logo_path en la carpeta `{id}/` y sin `..`). `venues.logo_path`, bucket público `venue-logos` (512 KB, PNG/JPEG/WebP), políticas de dueño. **Sus políticas tienen un error** (`name` se resuelve como `venues.name`): nadie puede subir; lo corrige la 025 |
+
+**Escrita, SIN APLICAR:** `025_venue_logos_policies_fix.sql` — recrea las 4 políticas de `venue-logos` con `storage.foldername(objects.name)`. Sin ella el dueño no puede subir el logo desde el panel.
+
+**Próxima migración:** `026_*.sql`
 
 **Vault (ya configurado con la 020):** `refund_retry_url` = `https://turnazo-chi.vercel.app/api/mp/refund-retry`; `push_secret` es el mismo `PUSH_SEND_SECRET` de Vercel. Si cambia el dominio hay que actualizar `refund_retry_url` y `push_send_url`.
 (`push_secret` ya existe; es el mismo `PUSH_SEND_SECRET` de Vercel.)
@@ -96,8 +102,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 349 | ✓ verde (2026-11-24, rama `rediseno` historias + 024 escrita) |
-| E2E | Playwright | 133 (incluye el setup de login) | ✓ verde (2026-11-24, rama `rediseno` historias, --workers=1 en 4 tandas por archivo: la corrida entera se cortó por memoria del sistema) |
+| Unitarios + integración | Vitest | 362 | 361 ✓, 1 ✗ esperando la 025 (2026-11-24, rama `rediseno` logo del club) |
+| E2E | Playwright | 137 (incluye el setup de login) | 136 ✓, 1 ✗ esperando la 025 (2026-11-24, rama `rediseno` logo del club, --workers=1 en tandas por archivo) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -113,7 +119,7 @@ Archivos E2E:
 - `payment-flow.spec.ts` — 8 tests del pago del jugador (Bloques 3 y 4): opciones según configuración, "pagar en el lugar" sigue usando `create_booking`, pago online con cuenta MP falsa → error claro y hold liberado, pantalla `/pago/[token]` (pendiente con cuenta regresiva → confirmada al cambiar la base; botón "Cancelar y elegir otro horario" → hold `expired` y vuelve a `/reservar` del mismo horario; vencida; cancelada; token inexistente). Nunca llama a Mercado Pago. Limpia bookings `E2E Pago*`, la cuenta MP falsa y restaura el cobro original.
 
 Ramas (2026-11-24):
-- `s2-captcha`: Fase 7 S2 (Turnstile + límites, migración 022 sin aplicar). **Sin push**: las claves de Turnstile no están en Vercel y romperían las reservas en producción.
+- `s2-captcha`: Fase 7 S2 (Turnstile + límites; la 022 ya está aplicada). **Sin push** hasta que el revisor cargue las claves de Turnstile en Vercel. Orden decidido: primero se mergea `rediseno` a `main`, después `s2-captcha`.
 - `rediseno`: rediseño visual por etapas (D0–D2 visual, M1–M7 usabilidad), un commit por etapa. Se mergea a `main` solo con OK del revisor.
 
 Rediseño D0 (paleta, fuente, modo claro/oscuro):
@@ -132,11 +138,13 @@ Historias de turnos libres (panel; diseño en diseno/historias.png, fuera del re
 
 - Día de la imagen: la ruta responde `X-Historia-Fecha` con el día dibujado (hora de Mendoza). E2E: por defecto es hoy, al elegir otro día la vista previa, la descarga y la imagen usan ese día, y un día pasado vuelve a hoy; unit: "hoy" cerca de medianoche (02:30 UTC = 23:30 del día anterior en Mendoza). El "Martes 1" de las capturas anteriores era una imagen pedida a mano con ?fecha= de otro día, no un error.
 
-Logo del club: migración `supabase/migrations/024_venue_logos.sql` ESCRITA, SIN APLICAR (para revisar). Propuesta original:
-- Columna: `ALTER TABLE public.venues ADD COLUMN logo_path text;` (ruta dentro del bucket, no URL; NULL = sin logo → iniciales). GRANT SELECT (logo_path) a anon y authenticated; GRANT UPDATE (logo_path) a authenticated (el dueño edita su complejo por updateVenueAction + RLS, como el resto de las columnas).
-- Storage: bucket público `venue-logos` (lectura pública para la web y la historia), con límite de tamaño (ej. 512 KB) y tipos image/png, image/jpeg, image/webp (allowed_mime_types). Ruta `{venue_id}/logo.{ext}`.
-- Políticas en storage.objects para el bucket: SELECT para todos; INSERT/UPDATE/DELETE solo authenticated cuyo `(storage.foldername(name))[1]::uuid` sea un venue con owner_id = auth.uid(). Así nadie puede subir ni pisar el logo de otro complejo.
-- La app: subir desde el formulario del complejo, guardar logo_path y usarlo en la historia (fetch del PNG desde la URL pública del bucket) y, si se quiere, en la portada.
+Logo del club (024 aplicada; 025 escrita, sin aplicar):
+- Panel del complejo → "Logo del club" (`components/panel/venue-logo-section.tsx`): el logo actual o las iniciales, "Subir logo" / "Cambiar logo" y "Quitar logo" (44 px). Más de 512 KB se avisa antes de mandar.
+- `uploadVenueLogoAction` / `removeVenueLogoAction` (actions/panel.ts), con la sesión del dueño (las políticas de storage hacen cumplir la carpeta): verifica que el complejo sea suyo, tamaño ≤ 512 KB y el tipo REAL por los primeros bytes (`detectLogoType` en lib/venue-logo.ts: PNG, JPEG, WebP; la extensión y el Content-Type no cuentan). Sube a `{venue_id}/logo-{timestamp}.{ext}` (nombre nuevo cada vez: la URL pública cambia y nadie ve el viejo de caché), guarda logo_path, borra el anterior y escribe audit_log.
+- Se muestra por la URL pública del bucket (no necesita política de lectura): portada del complejo (`components/club-logo.tsx`, círculo junto al nombre) y panel. Sin logo, iniciales en verde sobre lima.
+- Historia: `getStoryData` baja el logo por su URL pública y lo pasa como data URI (vuelve a mirar los bytes; si falla, iniciales). next/og dibuja PNG y JPEG pero deja vacío el WebP: el WebP se convierte a PNG con `sharp` (agregado como dependencia directa; ya venía con Next, misma versión 0.35.5).
+- Tests: `tests/unit/venue-logo.test.ts` (bytes), `tests/integration/venue-logos.test.ts` (A no sube, no pisa, no borra ni lista en la carpeta de B; no apunta logo_path a otra carpeta ni con `..`; la acción rechaza un SVG con nombre .png, más de 512 KB, sin archivo y el complejo ajeno; A sube, cambia y quita su logo) y `tests/e2e/logo.spec.ts` (iniciales → logo en la portada y en la historia, PNG y WebP; archivo falso rechazado; aviso de 512 KB; el dueño sube y quita desde el panel).
+- **Esperando la 025**: "A sube, cambia y quita su logo" (integración) y "el dueño sube el logo…" (E2E) fallan con "new row violates row-level security policy" hasta aplicarla. Todo lo demás pasa.
 
 Rediseño M4 (Mi turno):
 - "Guardá este link" arriba de todo (borde primary): el link de Mi turno en un campo de solo lectura y "Copiar link" (44 px; sin permiso de portapapeles queda seleccionado para copiar a mano).
@@ -540,23 +548,23 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
 ## Antes del merge de `rediseno` a `main` (lista, 2026-11-24; NO mergeado)
 
 Ramas y orden
-- [ ] `main` local tiene `d27ec19` (cierre de S1) sin push: revisarlo y pushearlo primero. `rediseno` sale de ese commit (no hay commits en `main` que falten en `rediseno`), así que después el merge es directo.
-- [ ] `s2-captcha` (S2: Turnstile + límites de intentos) NO está en `rediseno` y no se pushea. Decidir si va antes o después del rediseño. Si va después, al integrarlo:
+- [x] `d27ec19` (cierre de S1) pusheado a `main` (2026-11-24). `rediseno` sale de ese commit: el merge es directo.
+- [x] Orden decidido: primero `rediseno` → `main` (juntos con el revisor), después `s2-captcha`. La 022 ya está aplicada; a S2 solo le faltan las claves de Turnstile (sitio + secreta), que carga el revisor en Vercel. Al integrarlo:
   - el captcha va en el lugar reservado del pie de la hoja y de /reservar (`data-captcha-slot`);
-  - `ABUSE_MESSAGES.tooMany` tiene que salir del catálogo (`bookingError("too_many_attempts").message`); hoy el catálogo reconoce el texto viejo como alias;
-  - migración 022 y claves de Cloudflare Turnstile (sitio + secreta) en Vercel: todavía no existen.
+  - `ABUSE_MESSAGES.tooMany` tiene que salir del catálogo (`bookingError("too_many_attempts").message`); hoy el catálogo reconoce el texto viejo como alias.
 - [ ] Merge sin squash, para conservar un commit por etapa.
 
 Base de datos (es la misma para Preview y producción)
 - [x] 023 (etiquetas de cancha) aplicada por el revisor; `main` no la usa, no rompe nada.
-- [ ] 024 (logo del club) escrita, sin aplicar. El código que la usa todavía no existe: se puede mergear sin ella.
+- [x] 024 (logo del club) aplicada.
+- [ ] 025 (corrige las políticas de la 024) escrita, sin aplicar. Sin ella el panel muestra "No se pudo subir el logo" (no rompe nada más; las portadas y las historias siguen con las iniciales). Aplicarla antes del merge.
 - [ ] Pendiente S5 (`p_replace_hold_token`), migración aparte: no bloquea el merge.
-- [ ] Datos: futmates no tiene precio de 22:00 a 00:00 (lo carga el dueño; el panel ya lo avisa). El "Complejo Padelero Tunuyán" de prueba está aprobado y se ve en producción (inicio, "Lo antes posible", lista): decidir si se deja visible.
-- [ ] Antes de mergear, verificar que no queden datos de prueba: 14 reservas, 0 teléfonos bloqueados, cancha de prueba sin etiquetas, cobro del complejo de prueba solo "en el lugar".
+- [ ] Datos: futmates no tiene precio de 22:00 a 00:00 (lo carga el dueño; el panel ya lo avisa). El "Complejo Padelero Tunuyán" de prueba está aprobado y se ve en producción (inicio, "Lo antes posible", lista): **queda visible por ahora; hay que ocultarlo antes de que entren dueños reales (va con S7, base de tests separada)**.
+- [ ] Antes de mergear, verificar que no queden datos de prueba: 14 reservas, 0 teléfonos bloqueados, cancha de prueba sin etiquetas, cobro del complejo de prueba solo "en el lugar", complejo de prueba sin logo y bucket `venue-logos` vacío.
 
 Vercel
 - [x] Los deploys de Preview de `rediseno` construyen (READY hasta `4a47cfe`).
-- [ ] Probar a mano en el Preview la imagen de la historia (`/panel/complejos/{id}/historia/imagen`): en Vercel lee las fuentes con fs (`outputFileTracingIncludes`). En local anda; en Vercel falta confirmarlo.
+- [ ] Probar a mano en el Preview la imagen de la historia (`/panel/complejos/{id}/historia/imagen`): en Vercel lee las fuentes con fs (`outputFileTracingIncludes`) y, con un logo WebP, usa `sharp`. En local anda; en Vercel falta confirmarlo.
 - [ ] Variables: el rediseño no agrega ninguna. Producción ya tiene `NEXT_PUBLIC_APP_URL` y las `MP_*`. En Preview falta `NEXT_PUBLIC_APP_URL` (el pago online no funciona ahí; no se agrega a Preview por decisión anterior).
 - [ ] Los links de Mi turno, el .ics y la historia usan el host del pedido: en producción salen con el dominio final.
 
@@ -570,4 +578,4 @@ Cambios de comportamiento a tener presentes
 Calidad
 - [ ] `pnpm test` y `pnpm test:e2e --workers=1` en verde sobre la rama final (si la corrida entera se corta por memoria, por tandas de archivos).
 - [ ] Lint: quedan 3 errores viejos de `react-hooks/set-state-in-effect` (payment-status-panel, botón de push, guía de PWA), anteriores al rediseño. `next build` no corre lint, así que no bloquean el deploy.
-- [ ] CLAUDE.md quedó desactualizado (dice Next 15 y 65/28 tests): actualizarlo después del merge.
+- [x] CLAUDE.md actualizado (Next 16, conteo de tests, migraciones hasta la 025, regla de migraciones).
