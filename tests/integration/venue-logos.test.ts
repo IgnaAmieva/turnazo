@@ -14,6 +14,8 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import sharp from "sharp";
+import { randomBytes } from "node:crypto";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -156,11 +158,13 @@ describe("024 — acción del panel", () => {
     expect(await files(venueA)).toEqual([]);
   });
 
-  it("rechaza más de 512 KB y el envío sin archivo", async () => {
+  it("rechaza más de 10 MB, el envío sin archivo y una imagen rota (bytes de PNG y el resto basura)", async () => {
     current.client = ownerA;
-    const big = Buffer.concat([PNG, Buffer.alloc(512 * 1024)]);
-    expect((await uploadVenueLogoAction(venueA, null, logoForm(big)))?.fieldErrors?.logo?.[0]).toMatch(/512 KB/);
+    const big = Buffer.concat([PNG, Buffer.alloc(10 * 1024 * 1024)]);
+    expect((await uploadVenueLogoAction(venueA, null, logoForm(big)))?.fieldErrors?.logo?.[0]).toMatch(/10 MB/);
     expect((await uploadVenueLogoAction(venueA, null, new FormData()))?.fieldErrors?.logo?.[0]).toMatch(/Elegí/);
+    const broken = Buffer.concat([PNG.subarray(0, 8), Buffer.alloc(3000, 7)]);
+    expect((await uploadVenueLogoAction(venueA, null, logoForm(broken)))?.fieldErrors?.logo?.[0]).toMatch(/No pudimos achicar/);
     expect(await files(venueA)).toEqual([]);
   });
 
@@ -174,15 +178,23 @@ describe("024 — acción del panel", () => {
     expect(await files(venueB)).toEqual(["logo-b.png"]);
   });
 
-  it("A sube su logo, lo cambia (el viejo se borra) y lo quita", async () => {
+  it("A sube su logo (PNG de 3 MB con transparencia: se guarda achicado y sigue PNG), lo cambia (el viejo se borra) y lo quita", async () => {
     current.client = ownerA;
-    expect(await uploadVenueLogoAction(venueA, null, logoForm(PNG))).toEqual({});
+    const bigPng = await sharp(randomBytes(1400 * 1400 * 4), { raw: { width: 1400, height: 1400, channels: 4 } }).png().toBuffer();
+    expect(bigPng.length).toBeGreaterThan(2 * 1024 * 1024);
+    expect(await uploadVenueLogoAction(venueA, null, logoForm(bigPng))).toEqual({});
     const first = await logoPath(venueA);
     expect(first).toMatch(new RegExp(`^${venueA}/logo-\\d+\\.png$`));
     expect(await files(venueA)).toEqual([first!.split("/")[1]]);
+    const stored = Buffer.from(await (await admin.storage.from(BUCKET).download(first!)).data!.arrayBuffer());
+    expect(stored.length).toBeLessThanOrEqual(512 * 1024);
+    const meta = await sharp(stored).metadata();
+    expect(meta.format).toBe("png");
+    expect(meta.hasAlpha).toBe(true);
+    expect(Math.max(meta.width!, meta.height!)).toBeLessThanOrEqual(1024);
 
     // JPEG con nombre .png: se guarda como .jpg (manda el tipo real)
-    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46, 0]);
+    const jpeg = await sharp({ create: { width: 400, height: 300, channels: 3, background: "#0b4f3c" } }).jpeg().toBuffer();
     await new Promise((r) => setTimeout(r, 5));
     expect(await uploadVenueLogoAction(venueA, null, logoForm(jpeg, "foto.png", "image/png"))).toEqual({});
     const second = await logoPath(venueA);
@@ -192,5 +204,5 @@ describe("024 — acción del panel", () => {
     expect(await removeVenueLogoAction(venueA, null, new FormData())).toEqual({});
     expect(await logoPath(venueA)).toBeNull();
     expect(await files(venueA)).toEqual([]);
-  });
+  }, 60_000); // el PNG de ruido es el peor caso para comprimir
 });

@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refundPayment } from "@/lib/mp/refunds";
 import { triggerPushSend } from "@/lib/push";
-import { detectLogoType, LOGO_BUCKET, LOGO_MAX_BYTES } from "@/lib/venue-logo";
+import { detectLogoType, LOGO_BUCKET, LOGO_UPLOAD_MAX_BYTES } from "@/lib/venue-logo";
+import { shrinkLogo } from "@/lib/venue-logo-shrink";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -196,8 +197,9 @@ export async function updateVenueAction(
 
 const LOGO_ERRORS = {
   missing:  "Elegí una imagen.",
-  tooBig:   "El logo puede pesar hasta 512 KB.",
+  tooBig:   "El logo puede pesar hasta 10 MB.",
   badType:  "El logo tiene que ser una imagen PNG, JPG o WebP.",
+  shrink:   "No pudimos achicar esta imagen. Probá con otra.",
   upload:   "No se pudo subir el logo. Intentá de nuevo.",
 } as const;
 
@@ -227,12 +229,16 @@ export async function uploadVenueLogoAction(
 
   const file = formData.get("logo");
   if (!(file instanceof File) || file.size === 0) return { fieldErrors: { logo: [LOGO_ERRORS.missing] } };
-  if (file.size > LOGO_MAX_BYTES) return { fieldErrors: { logo: [LOGO_ERRORS.tooBig] } };
+  if (file.size > LOGO_UPLOAD_MAX_BYTES) return { fieldErrors: { logo: [LOGO_ERRORS.tooBig] } };
 
   // Tipo real por los primeros bytes: la extensión y el Content-Type los elige el que sube
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const type = detectLogoType(bytes);
+  const original = new Uint8Array(await file.arrayBuffer());
+  const type = detectLogoType(original);
   if (!type) return { fieldErrors: { logo: [LOGO_ERRORS.badType] } };
+
+  // Se achica en el servidor (1024 px, < 512 KB, mismo formato) antes de subirlo
+  const bytes = await shrinkLogo(original, type);
+  if (!bytes) return { fieldErrors: { logo: [LOGO_ERRORS.shrink] } };
 
   // Nombre nuevo en cada subida: la URL pública cambia y nadie ve el logo viejo de caché
   const path = `${venueId}/logo-${Date.now()}.${type.ext}`;

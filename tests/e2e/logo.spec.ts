@@ -7,6 +7,8 @@
  * en el bucket y deja logo_path en null (como estaba).
  */
 import { test, expect, type APIRequestContext } from "@playwright/test";
+import sharp, { type Metadata } from "sharp";
+import { randomBytes } from "node:crypto";
 import { VENUE_ID, VENUE_PATH, SPORT, SUPABASE_URL, serviceHeaders, nextWeekday } from "./helpers";
 
 const BUCKET = "venue-logos";
@@ -14,8 +16,6 @@ const PNG = Buffer.from(
   "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6300010000000500010d0a2db40000000049454e44ae426082",
   "hex",
 );
-/** WebP 4×4 (sin pérdida): next/og también tiene que poder dibujarlo */
-const WEBP = Buffer.from("UklGRh4AAABXRUJQVlA4TBEAAAAvA8AAAAfQni7Upf+BiOh/AAA=", "base64");
 const PANEL = `/panel/complejos/${VENUE_ID}`;
 const IMG = `${PANEL}/historia/imagen?estilo=pizarra&deporte=${SPORT}&fecha=${nextWeekday(3, 2)}`;
 
@@ -38,6 +38,15 @@ async function cleanup(request: APIRequestContext) {
   }
 }
 
+/** El logo guardado del complejo de prueba (leído con service_role). */
+async function storedLogo(request: APIRequestContext) {
+  const res = await request.get(`${SUPABASE_URL}/rest/v1/venues?id=eq.${VENUE_ID}&select=logo_path`, { headers: serviceHeaders() });
+  const path = ((await res.json()) as { logo_path: string | null }[])[0].logo_path;
+  if (!path) return { path: null, bytes: 0, meta: {} as Metadata };
+  const file = await (await request.get(`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`)).body();
+  return { path, bytes: file.length, meta: await sharp(file).metadata() };
+}
+
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ request }) => cleanup(request));
 test.afterAll(async ({ request }) => cleanup(request));
@@ -48,10 +57,14 @@ test("sin logo: iniciales en la portada; con logo: la imagen, en la portada y en
   await expect(logo).toHaveText(/^[A-Z0-9]{2}$/);
   const withoutLogo = await (await request.get(IMG)).body();
 
-  // Logo cargado por el servicio (no depende de la subida del panel)
-  const path = `${VENUE_ID}/logo-e2e.png`;
+  // Logo cargado por el servicio (no depende de la subida del panel): círculo rojo
+  // sobre fondo transparente, y después uno azul en WebP
+  const dot = (fill: string) => sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><circle cx="32" cy="32" r="28" fill="${fill}"/></svg>`) }]);
+  // Nombre nuevo en cada corrida: la URL pública queda en la caché del CDN
+  const path = `${VENUE_ID}/logo-e2e-${Date.now()}.png`;
   const up = await request.post(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
-    headers: { ...serviceHeaders(), "Content-Type": "image/png" }, data: PNG,
+    headers: { ...serviceHeaders(), "Content-Type": "image/png" }, data: await dot("#c0392b").png().toBuffer(),
   });
   expect(up.ok()).toBe(true);
   await setLogoPath(request, path);
@@ -59,7 +72,7 @@ test("sin logo: iniciales en la portada; con logo: la imagen, en la portada y en
   await page.reload();
   const img = page.getByTestId("portada-complejo").getByRole("img", { name: /^Logo de / });
   await expect(img).toHaveAttribute("src", new RegExp(`/storage/v1/object/public/${BUCKET}/${path}$`));
-  await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBe(1);
+  await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBe(64);
 
   // La historia dibuja el logo en lugar de las iniciales: la imagen cambia
   const res = await request.get(IMG);
@@ -68,9 +81,9 @@ test("sin logo: iniciales en la portada; con logo: la imagen, en la portada y en
   expect(withLogo.equals(withoutLogo)).toBe(false);
 
   // También con un logo WebP
-  const webp = `${VENUE_ID}/logo-e2e.webp`;
+  const webp = `${VENUE_ID}/logo-e2e-${Date.now()}.webp`;
   expect((await request.post(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${webp}`, {
-    headers: { ...serviceHeaders(), "Content-Type": "image/webp" }, data: WEBP,
+    headers: { ...serviceHeaders(), "Content-Type": "image/webp" }, data: await dot("#2155c4").webp().toBuffer(),
   })).ok()).toBe(true);
   await setLogoPath(request, webp);
   const resWebp = await request.get(IMG);
@@ -97,26 +110,56 @@ test.describe("celular", () => {
     await expect(section.getByTestId("logo-iniciales")).toBeVisible();
   });
 
-  test("más de 512 KB se avisa antes de mandar", async ({ page }) => {
+  test("más de 10 MB se avisa antes de mandar", async ({ page }) => {
     await page.goto(PANEL);
     const section = page.getByTestId("seccion-logo");
-    await section.getByLabel("Archivo del logo").setInputFiles({ name: "grande.png", mimeType: "image/png", buffer: Buffer.concat([PNG, Buffer.alloc(600 * 1024)]) });
-    await expect(section.getByTestId("logo-error")).toHaveText(/512 KB/);
+    await section.getByLabel("Archivo del logo").setInputFiles({ name: "grande.png", mimeType: "image/png", buffer: Buffer.concat([PNG, Buffer.alloc(10 * 1024 * 1024)]) });
+    await expect(section.getByTestId("logo-error")).toHaveText(/10 MB/);
     await expect(section.getByRole("button", { name: "Subir logo" })).toBeDisabled();
   });
 
-  test("el dueño sube el logo, se ve en el panel y en la portada, y lo quita", async ({ page }) => {
+  test("el dueño sube un PNG transparente y después una foto JPG de más de 4 MB: se guardan achicados, en su formato; se ven enteros y lo quita", async ({ page, request }) => {
+    test.setTimeout(90_000);
     await page.goto(PANEL);
     const section = page.getByTestId("seccion-logo");
     const upload = section.getByRole("button", { name: "Subir logo" });
     expect((await upload.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    await section.getByLabel("Archivo del logo").setInputFiles({ name: "escudo.png", mimeType: "image/png", buffer: PNG });
+    // Escudo 1600×1600 con fondo transparente
+    const escudo = await sharp({ create: { width: 1600, height: 1600, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600"><circle cx="800" cy="800" r="600" fill="#0b4f3c"/></svg>`) }])
+      .png().toBuffer();
+    await section.getByLabel("Archivo del logo").setInputFiles({ name: "escudo.png", mimeType: "image/png", buffer: escudo });
     await upload.click();
     await expect(section.getByTestId("logo-actual")).toBeVisible();
     await expect(section.getByTestId("logo-error")).toHaveCount(0);
+    const png = await storedLogo(request);
+    expect(png.meta.format).toBe("png");
+    expect(png.meta.hasAlpha).toBe(true);
+    expect([png.meta.width, png.meta.height]).toEqual([1024, 1024]);
 
     await page.goto(VENUE_PATH);
-    await expect(page.getByTestId("portada-complejo").getByRole("img", { name: /^Logo de / })).toBeVisible();
+    const cover = page.getByTestId("portada-complejo").getByRole("img", { name: /^Logo de / });
+    await expect(cover).toBeVisible();
+    // Entero: sin círculo que lo recorte ni fondo blanco detrás
+    const box = await cover.evaluate((el) => {
+      const wrap = el.parentElement!;
+      const s = getComputedStyle(wrap);
+      return { radius: s.borderRadius, overflow: s.overflow, bg: s.backgroundColor, fit: getComputedStyle(el).objectFit };
+    });
+    expect(box).toEqual({ radius: "0px", overflow: "visible", bg: "rgba(0, 0, 0, 0)", fit: "contain" });
+
+    // Foto de más de 4 MB: el navegador la baja antes de mandarla (Vercel corta en 4,5 MB) y el servidor la deja < 512 KB
+    const foto = await sharp(randomBytes(2400 * 2400 * 3), { raw: { width: 2400, height: 2400, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+    expect(foto.length).toBeGreaterThan(4 * 1024 * 1024);
+    await page.goto(PANEL);
+    await section.getByLabel("Archivo del logo").setInputFiles({ name: "foto.jpg", mimeType: "image/jpeg", buffer: foto });
+    await section.getByRole("button", { name: "Cambiar logo" }).click();
+    await expect.poll(async () => (await storedLogo(request)).path, { timeout: 60_000 }).toMatch(/\.jpg$/);
+    const jpg = await storedLogo(request);
+    expect(jpg.meta.format).toBe("jpeg");
+    expect(jpg.bytes).toBeLessThanOrEqual(512 * 1024);
+    expect(Math.max(jpg.meta.width!, jpg.meta.height!)).toBeLessThanOrEqual(1024);
+    await expect(section.getByTestId("logo-error")).toHaveCount(0);
 
     await page.goto(PANEL);
     const remove = section.getByRole("button", { name: "Quitar logo" });

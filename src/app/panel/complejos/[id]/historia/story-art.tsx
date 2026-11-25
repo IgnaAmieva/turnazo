@@ -24,14 +24,11 @@ const money = (n: number) => `$${n.toLocaleString('es-AR')}`;
 /** Logo del club en un círculo blanco; sin logo, las iniciales. */
 function Logo({ data, bg, fg, size = 190 }: { data: StoryData; bg: string; fg: string; size?: number }) {
   if (data.logo) {
-    const inner = Math.round(size * 0.82);
+    // Entero y como se subió: sin recorte ni fondo (respeta la transparencia)
     return (
-      <div style={{
-        width: size, height: size, minWidth: size, borderRadius: size, background: C.white, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-      }}>
+      <div style={{ width: size, height: size, minWidth: size, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- satori (next/og) solo acepta <img> */}
-        <img src={data.logo} width={inner} height={inner} style={{ objectFit: 'contain' }} alt="" />
+        <img src={data.logo} width={size} height={size} style={{ objectFit: 'contain' }} alt="" />
       </div>
     );
   }

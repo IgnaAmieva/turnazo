@@ -5,8 +5,17 @@
  */
 
 export const LOGO_BUCKET = 'venue-logos';
-/** Igual que file_size_limit del bucket (024). */
+/** Igual que file_size_limit del bucket (024): lo que se guarda, ya achicado. */
 export const LOGO_MAX_BYTES = 512 * 1024;
+/** Lo que puede elegir el dueño: el servidor lo achica (1024 px, < 512 KB, mismo formato). */
+export const LOGO_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+/**
+ * Vercel corta los pedidos de más de 4,5 MB: si el archivo pesa más que esto,
+ * el navegador lo baja primero a 2048 px (mismo formato) y recién ahí lo manda.
+ */
+export const LOGO_SEND_MAX_BYTES = 4 * 1024 * 1024;
+/** Lado más largo del logo guardado. */
+export const LOGO_MAX_SIDE = 1024;
 
 export type LogoType = { mime: 'image/png' | 'image/jpeg' | 'image/webp'; ext: 'png' | 'jpg' | 'webp' };
 
