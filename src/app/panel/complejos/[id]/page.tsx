@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { getOwnerVenue, getMpConnectionStatus } from "@/lib/supabase/panel-queries";
-import { getLocalities } from "@/lib/supabase/queries";
 import {
   updateVenueAction, updatePaymentSettingsAction, updateCancellationPolicyAction,
   uploadVenueLogoAction, removeVenueLogoAction,
@@ -19,9 +18,8 @@ export default async function EditarComplejoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [venue, localities, mpConnection] = await Promise.all([
+  const [venue, mpConnection] = await Promise.all([
     getOwnerVenue(id),
-    getLocalities(),
     getMpConnectionStatus(id),
   ]);
 
@@ -107,7 +105,7 @@ export default async function EditarComplejoPage({
       <div className="mt-6 bg-surface rounded-2xl border border-line p-6">
         <VenueForm
           action={boundAction}
-          localities={localities}
+          localityName={venue.locality_name}
           venue={venue}
           submitLabel="Guardar cambios"
         />

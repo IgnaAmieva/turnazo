@@ -96,6 +96,26 @@ test("panel/complejos/nuevo loads the new venue form", async ({ page }) => {
 
   await expect(page.getByRole("button", { name: /crear complejo/i })).toBeVisible();
   expect(errors).toHaveLength(0);
+
+  // La localidad sale del pin (en el servidor): no hay selector, y el mapa arranca SIN pin
+  await expect(page.locator('select[name="locality_id"]')).toHaveCount(0);
+  await expect(page.getByTestId("pin-estado")).toContainText("Tocá el mapa justo donde está el complejo");
+  await expect(page.locator('input[name="lat"]')).toHaveValue("");
+
+  // Sin pin no se crea (no se guarda nada): avisa que falta marcar el mapa
+  await page.locator('input[name="name"]').fill("E2E Sin Pin");
+  await page.locator('input[name="phone"]').fill("2622000999");
+  await page.locator('input[name="address"]').fill("Calle de prueba 123");
+  await page.getByRole("button", { name: /crear complejo/i }).click();
+  await expect(page.getByText("Marcá en el mapa dónde está el complejo.")).toBeVisible();
+  await expect(page).toHaveURL(/\/panel\/complejos\/nuevo$/);
+});
+
+test("al editar el complejo se ve la localidad que salió del pin", async ({ page }) => {
+  await loginAsOwner(page);
+  await page.goto(`/panel/complejos/${VENUE_ID}`);
+  await expect(page.getByTestId("localidad-actual")).toContainText("Tunuyán");
+  await expect(page.locator('select[name="locality_id"]')).toHaveCount(0);
 });
 
 // ---------------------------------------------------------------------------

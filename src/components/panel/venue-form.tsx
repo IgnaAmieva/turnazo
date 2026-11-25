@@ -5,12 +5,12 @@ import { useSavedNotice } from "@/components/panel/saved-toast";
 import VenuePinMap from "@/components/venue-pin-map-wrapper";
 import type { PanelActionState } from "@/app/actions/panel";
 
-interface Locality { id: string; name: string }
 interface VenueFormProps {
   action: (state: PanelActionState, formData: FormData) => Promise<PanelActionState>;
-  localities: Locality[];
+  /** Al editar: la localidad que salió del pin */
+  localityName?: string;
   venue?: {
-    name: string; phone: string; address: string; locality_id: string;
+    name: string; phone: string; address: string;
     lat: number; lng: number; payment_alias: string | null; payment_link: string | null;
     whatsapp_template: string | null;
   };
@@ -36,7 +36,7 @@ function previewTemplate(template: string): string {
   );
 }
 
-export function VenueForm({ action, localities, venue, submitLabel = "Guardar" }: VenueFormProps) {
+export function VenueForm({ action, localityName, venue, submitLabel = "Guardar" }: VenueFormProps) {
   const [state, formAction, pending] = useActionState(action, null);
   useSavedNotice(pending, state);
   const [template, setTemplate] = useState(venue?.whatsapp_template ?? "");
@@ -81,27 +81,17 @@ export function VenueForm({ action, localities, venue, submitLabel = "Guardar" }
         <FieldError errors={state?.fieldErrors?.address} />
       </div>
 
-      {/* Localidad */}
-      <div>
-        <label className="block text-sm font-medium text-ink mb-1">Localidad</label>
-        <select
-          name="locality_id"
-          defaultValue={venue?.locality_id ?? ""}
-          className="w-full rounded-lg border border-line px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
-        >
-          <option value="">Seleccioná una localidad…</option>
-          {localities.map((l) => (
-            <option key={l.id} value={l.id}>{l.name}</option>
-          ))}
-        </select>
-        <FieldError errors={state?.fieldErrors?.locality_id} />
-      </div>
-
-      {/* Mapa */}
+      {/* Mapa: la localidad sale del pin (en el servidor), no se elige */}
       <div>
         <label className="block text-sm font-medium text-ink mb-2">Ubicación en el mapa</label>
+        {localityName && (
+          <p className="mb-2 text-sm text-ink" data-testid="localidad-actual">
+            Localidad: <strong>{localityName}</strong>
+            <span className="text-ink-muted"> · si movés el pin, se actualiza sola</span>
+          </p>
+        )}
         <VenuePinMap initialLat={venue?.lat} initialLng={venue?.lng} />
-        <FieldError errors={state?.fieldErrors?.lat} />
+        <FieldError errors={state?.fieldErrors?.lat ?? state?.fieldErrors?.lng} />
       </div>
 
       {/* Alias de pago */}

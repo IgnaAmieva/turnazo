@@ -36,13 +36,14 @@ export async function getOwnerVenue(venueId: string) {
 
   const { data, error } = await supabase
     .from("venues")
-    .select("*")
+    .select("*, localities(name)")
     .eq("id", venueId)
     .eq("owner_id", user.id)
     .single();
 
   if (error) return null;
-  return data;
+  const { localities, ...venue } = data;
+  return { ...venue, locality_name: (localities as { name: string } | null)?.name ?? "" };
 }
 
 // ---------------------------------------------------------------------------

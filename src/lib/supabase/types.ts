@@ -269,10 +269,12 @@ export type Database = {
           active: boolean
           covered: boolean
           created_at: string
+          format: string | null
           has_locker_room: boolean
           id: string
           lit: boolean
           name: string
+          notes: string | null
           slot_minutes: number
           sport_id: string
           surface: string | null
@@ -283,10 +285,12 @@ export type Database = {
           active?: boolean
           covered?: boolean
           created_at?: string
+          format?: string | null
           has_locker_room?: boolean
           id?: string
           lit?: boolean
           name: string
+          notes?: string | null
           slot_minutes: number
           sport_id: string
           surface?: string | null
@@ -297,10 +301,12 @@ export type Database = {
           active?: boolean
           covered?: boolean
           created_at?: string
+          format?: string | null
           has_locker_room?: boolean
           id?: string
           lit?: boolean
           name?: string
+          notes?: string | null
           slot_minutes?: number
           sport_id?: string
           surface?: string | null
@@ -328,6 +334,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          lat: number
+          lng: number
           name: string
           slug: string
           updated_at: string
@@ -335,6 +343,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          lat: number
+          lng: number
           name: string
           slug: string
           updated_at?: string
@@ -342,6 +352,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          lat?: number
+          lng?: number
           name?: string
           slug?: string
           updated_at?: string

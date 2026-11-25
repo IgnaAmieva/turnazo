@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { forgetPlayer, rememberPlayer, usePlayerMemory } from '@/lib/player-memory';
 
@@ -27,24 +26,6 @@ export function NotMeButton({ className = '', onForget }: { className?: string; 
       No soy yo
     </button>
   );
-}
-
-/**
- * Inicio (V2a): sin localidad/deporte en la URL, abre la búsqueda recordada
- * (si la hay y es distinta de la que se está mostrando).
- */
-export function OpenRememberedSearch({ shown }: { shown: { localidad: string; deporte: string | null } }) {
-  const mem = usePlayerMemory();
-  const router = useRouter();
-  const target = mem?.localidad && mem.deporte ? { l: mem.localidad.slug, d: mem.deporte.slug } : null;
-  useEffect(() => {
-    if (!target) return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('localidad') || params.has('deporte')) return;
-    if (target.l === shown.localidad && target.d === shown.deporte) return;
-    router.replace(`/?localidad=${encodeURIComponent(target.l)}&deporte=${encodeURIComponent(target.d)}`, { scroll: false });
-  }, [target?.l, target?.d, shown.localidad, shown.deporte, router]); // eslint-disable-line react-hooks/exhaustive-deps
-  return null;
 }
 
 /** Inicio (V2a): "Hola, Juan" y "No soy yo" dentro de la portada, si hay datos recordados. */

@@ -241,7 +241,7 @@ export async function getLocalitiesAndSportsWithCounts() {
   const supabase = await createClient();
 
   const [{ data: localities }, { data: sports }, { data: venueRows }] = await Promise.all([
-    supabase.from("localities").select("id, name, slug").order("name"),
+    supabase.from("localities").select("id, name, slug, lat, lng").order("name"),
     supabase.from("sports").select("id, name, slug, default_slot_minutes").order("name"),
     supabase.from("venues").select("id, locality_id, courts(sport_id)").eq("status", "approved"),
   ]);

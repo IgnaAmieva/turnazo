@@ -9,6 +9,7 @@ import { refundPayment } from "@/lib/mp/refunds";
 import { triggerPushSend } from "@/lib/push";
 import { detectLogoType, LOGO_BUCKET, LOGO_UPLOAD_MAX_BYTES } from "@/lib/venue-logo";
 import { shrinkLogo } from "@/lib/venue-logo-shrink";
+import { resolveLocality, type ResolvedLocality } from "@/lib/locality-resolver";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,17 +95,41 @@ const BookingRefSchema = z.object({
 // Venue actions
 // ---------------------------------------------------------------------------
 
+const PIN_MISSING = "Marcá en el mapa dónde está el complejo.";
+const LOCALITY_ERROR = "No pudimos ubicar el complejo. Intentá de nuevo.";
+
+/** lat/lng del pin: obligatorios (sin pin, los campos llegan vacíos y no valen 0). */
+const coord = (min: number, max: number) =>
+  z.string().trim().min(1, PIN_MISSING).transform(Number).pipe(z.number({ error: PIN_MISSING }).min(min, PIN_MISSING).max(max, PIN_MISSING));
+
+// La localidad NO viene del formulario: sale del pin en el servidor (lib/locality-resolver).
 const VenueSchema = z.object({
   name:               z.string().min(2, "Mínimo 2 caracteres").max(80),
   phone:              z.string().min(8, "Mínimo 8 dígitos").max(15),
   address:            z.string().min(5, "Mínimo 5 caracteres").max(200),
-  locality_id:        z.string().uuid("Seleccioná una localidad"),
-  lat:                z.coerce.number().min(-90).max(90),
-  lng:                z.coerce.number().min(-180).max(180),
+  lat:                coord(-90, 90),
+  lng:                coord(-180, 180),
   payment_alias:      z.string().max(100).optional(),
   payment_link:       z.string().max(500).optional(),
   whatsapp_template:  z.string().max(500).optional(),
 });
+
+/** Auditoría de una localidad creada por Georef al guardar un complejo. */
+async function auditCreatedLocality(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string, venueId: string, loc: ResolvedLocality, pin: { lat: number; lng: number },
+) {
+  if (!loc.created) return null;
+  const { error } = await supabase.from("audit_log").insert({
+    profile_id: userId,
+    venue_id:   venueId,
+    entity:     "locality",
+    entity_id:  loc.id,
+    action:     "create",
+    new_data:   { name: loc.name, source: loc.source, pin },
+  });
+  return error;
+}
 
 export async function createVenueAction(
   _state: PanelActionState,
@@ -118,7 +143,17 @@ export async function createVenueAction(
   const parsed = VenueSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-  const { name, phone, address, locality_id, lat, lng, payment_alias, payment_link, whatsapp_template } = parsed.data;
+  const { name, phone, address, lat, lng, payment_alias, payment_link, whatsapp_template } = parsed.data;
+
+  let loc: ResolvedLocality | null;
+  try {
+    loc = await resolveLocality({ lat, lng });
+  } catch (e) {
+    console.error("[panel] locality resolve failed:", (e as Error).message);
+    loc = null;
+  }
+  if (!loc) return { error: LOCALITY_ERROR };
+  const locality_id = loc.id;
 
   const { data: venue, error } = await supabase
     .from("venues")
@@ -146,9 +181,12 @@ export async function createVenueAction(
     entity:     "venue",
     entity_id:  venue.id,
     action:     "create",
-    new_data:   parsed.data,
+    // locality_source 'fallback' = Georef no respondió: el superadmin revisa la localidad al aprobar
+    new_data:   { ...parsed.data, locality_id, locality_source: loc.source },
   });
   if (auditErr) return auditError(auditErr);
+  const locAuditErr = await auditCreatedLocality(supabase, user.id, venue.id, loc, { lat, lng });
+  if (locAuditErr) return auditError(locAuditErr);
 
   revalidatePath("/panel/complejos");
   redirect("/panel/complejos");
@@ -167,7 +205,28 @@ export async function updateVenueAction(
   const parsed = VenueSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-  const { name, phone, address, locality_id, lat, lng, payment_alias, payment_link, whatsapp_template } = parsed.data;
+  const { name, phone, address, lat, lng, payment_alias, payment_link, whatsapp_template } = parsed.data;
+
+  const { data: current } = await supabase
+    .from("venues")
+    .select("lat, lng, locality_id")
+    .eq("id", venueId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!current) return { error: "No autorizado" };
+
+  // Con el pin en el mismo lugar, la localidad no se toca; si se movió, se vuelve a resolver
+  const moved = Math.abs(current.lat - lat) > 1e-6 || Math.abs(current.lng - lng) > 1e-6;
+  let loc: ResolvedLocality | null = null;
+  if (moved) {
+    try {
+      loc = await resolveLocality({ lat, lng });
+    } catch (e) {
+      console.error("[panel] locality resolve failed:", (e as Error).message);
+    }
+    if (!loc) return { error: LOCALITY_ERROR };
+  }
+  const locality_id = loc?.id ?? current.locality_id;
 
   const { error } = await supabase
     .from("venues")
@@ -193,9 +252,13 @@ export async function updateVenueAction(
     entity:     "venue",
     entity_id:  venueId,
     action:     "update",
-    new_data:   parsed.data,
+    new_data:   { ...parsed.data, locality_id, ...(loc ? { locality_source: loc.source } : {}) },
   });
   if (auditErr) return auditError(auditErr);
+  if (loc) {
+    const locAuditErr = await auditCreatedLocality(supabase, user.id, venueId, loc, { lat, lng });
+    if (locAuditErr) return auditError(locAuditErr);
+  }
 
   revalidatePath(`/panel/complejos/${venueId}`);
   revalidatePath("/panel/complejos");

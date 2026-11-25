@@ -1,32 +1,37 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getLocalitiesAndSportsWithCounts } from "@/lib/supabase/queries";
-import { getVenuesForList, earliestFreeSlot, slotHref, type FreeSlot } from "@/lib/free-slots";
+import { getVenuesForList, freeSlots, earliestFreeSlot, slotHref, type FreeSlot } from "@/lib/free-slots";
+import { parseWhen, whenParams } from "@/lib/franjas";
 import { formatTimeMendoza, todayInMendoza } from "@/lib/slots";
-import { CoverGreeting, OpenRememberedSearch } from "@/components/player-memory-ui";
+import { CoverGreeting, RememberSearch } from "@/components/player-memory-ui";
 import { CourtLines, SportIcon } from "@/components/sport-art";
+import { WhereBar } from "@/components/where-bar";
+import { VenueResults } from "@/components/venue-results";
+import { VenuesMapToggle } from "@/components/venues-map-toggle";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "¿Jugamos hoy?" };
 
-type Props = { searchParams: Promise<{ localidad?: string; deporte?: string }> };
+type Props = {
+  searchParams: Promise<{ localidad?: string; deporte?: string; franja?: string; hora?: string; _now?: string }>;
+};
 
 const plural = (n: number) => `${n} complejo${n !== 1 ? "s" : ""}`;
 
 /**
- * Inicio (V2a): deporte y lugar en una sola pantalla, y arriba el primer turno
- * libre ("Lo antes posible"). La elección va en la URL (?localidad=&deporte=);
- * sin elección, la búsqueda recordada en el dispositivo o la primera con complejos.
- * Las URLs /[localidad] y /[localidad]/[deporte] siguen funcionando.
+ * Inicio: deporte, "¿Dónde?" (una barra desplegable, la más cercana si el
+ * jugador dio permiso de ubicación), "¿A qué hora querés jugar?" y, en la
+ * MISMA pantalla, los complejos con lugar (primero el que tiene más turnos
+ * libres). La elección va en la URL (?localidad=&deporte=&franja=|hora=); sin
+ * elección, la más cercana, la recordada o la primera con complejos.
  */
 export default async function HomePage({ searchParams }: Props) {
   const params = await searchParams;
-  const { localities, sportsFor } = await getLocalitiesAndSportsWithCounts();
-  // Una localidad pedida sin complejos (ej. /la-consulta) se muestra igual, con su aviso
-  const locality =
-    localities.find((l) => l.slug === params.localidad) ??
-    localities.find((l) => l.venueCount > 0) ??
-    null;
+  const { localities: all, sportsFor } = await getLocalitiesAndSportsWithCounts();
+  // Solo localidades con al menos un complejo aprobado
+  const localities = all.filter((l) => l.venueCount > 0);
+  const locality = localities.find((l) => l.slug === params.localidad) ?? localities[0] ?? null;
 
   if (!locality) {
     return (
@@ -37,24 +42,35 @@ export default async function HomePage({ searchParams }: Props) {
     );
   }
 
+  // Solo en desarrollo/tests: ?_now= fija la hora actual (igual que la lista y el complejo)
+  const fixedNow = process.env.NODE_ENV !== "production" && params._now && !Number.isNaN(Date.parse(params._now))
+    ? params._now : null;
+  const now = fixedNow ? new Date(fixedNow) : new Date();
+  const today = todayInMendoza(now);
+  const when = parseWhen(params.franja, params.hora);
+
   const sports = sportsFor(locality.id);
   const sport =
     sports.find((s) => s.slug === params.deporte && s.venueCount > 0) ??
     sports.find((s) => s.venueCount > 0) ??
     null;
 
-  let earliest: FreeSlot | null = null;
-  if (sport) {
-    const venues = await getVenuesForList(locality.id, sport.id);
-    earliest = await earliestFreeSlot(venues);
-  }
+  const venues = sport ? await getVenuesForList(locality.id, sport.id) : [];
+  // Los libres de hoy se piden una vez por cancha (React cache): los usan la lista y "Lo antes posible"
+  const [slots, earliest] = sport
+    ? await Promise.all([freeSlots(venues, today, now), earliestFreeSlot(venues, now)])
+    : [[] as FreeSlot[], null];
 
-  const homeHref = (l: string, d?: string) => `/?localidad=${l}${d ? `&deporte=${d}` : ""}`;
-  const listHref = sport ? `/${locality.slug}/${sport.slug}` : null;
+  const explicit = params.localidad !== undefined || params.deporte !== undefined;
+  const keep: Record<string, string> = { ...(fixedNow ? { _now: fixedNow } : {}), ...whenParams(when) };
+  const homeHref = (l: string, d?: string) =>
+    `/?${new URLSearchParams({ localidad: l, ...(d ? { deporte: d } : {}), ...keep }).toString()}`;
 
   return (
     <div className="max-w-lg mx-auto">
-      <OpenRememberedSearch shown={{ localidad: locality.slug, deporte: sport?.slug ?? null }} />
+      {explicit && sport && (
+        <RememberSearch localidad={{ slug: locality.slug, nombre: locality.name }} deporte={{ slug: sport.slug, nombre: sport.name }} />
+      )}
 
       {/* Portada: saludo, "¿Jugamos hoy?" y el próximo turno libre */}
       <section className="cover relative overflow-hidden rounded-3xl p-5 shadow-sm" data-testid="portada">
@@ -73,7 +89,7 @@ export default async function HomePage({ searchParams }: Props) {
               <span className="min-w-0">
                 <span className="block text-sm">Lo antes posible</span>
                 <span className="block text-lg font-extrabold leading-tight">
-                  {earliest.date === todayInMendoza() ? "" : "Mañana "}
+                  {earliest.date === today ? "" : "Mañana "}
                   {formatTimeMendoza(earliest.start)} · {earliest.venueName}
                 </span>
               </span>
@@ -137,41 +153,34 @@ export default async function HomePage({ searchParams }: Props) {
 
       {/* ¿Dónde? */}
       <h2 className="mt-7 mb-3 text-lg text-ink">¿Dónde?</h2>
-      <ul className="flex flex-wrap gap-2">
-        {localities.map((l) => {
-          const selected = l.id === locality.id;
-          return (
-            <li key={l.id}>
-              {l.venueCount > 0 ? (
-                <Link
-                  href={homeHref(l.slug, sport?.slug)}
-                  scroll={false}
-                  aria-current={selected ? "true" : undefined}
-                  data-testid="localidad"
-                  className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-extrabold
-                    ${selected ? "border-primary bg-primary text-on-primary" : "border-line bg-surface text-ink hover:border-primary"}`}
-                >
-                  {l.name} · {l.venueCount}
-                </Link>
-              ) : (
-                <span aria-disabled="true" data-testid="locality-soon"
-                  className="inline-flex min-h-11 items-center rounded-full border border-dashed border-line px-4 text-sm font-extrabold text-ink-muted select-none">
-                  {l.name} · pronto
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <WhereBar
+        localities={localities.map(({ slug, name, lat, lng, venueCount }) => ({ slug, name, lat, lng, venueCount }))}
+        current={locality.slug}
+        sport={sport ? { slug: sport.slug, name: sport.name } : null}
+        explicit={explicit}
+        keep={keep}
+      />
 
-      {listHref && sport && (
-        <Link
-          href={listHref}
-          data-testid="ver-complejos"
-          className="mt-8 flex min-h-11 items-center justify-center rounded-2xl bg-primary px-4 py-3.5 text-sm font-extrabold text-on-primary shadow-sm hover:opacity-90"
-        >
-          Ver {plural(sport.venueCount)} de {sport.name} en {locality.name}
-        </Link>
+      {/* Complejos de ese deporte, en esta misma pantalla */}
+      {sport && (
+        <div id="complejos" data-testid="complejos-inicio">
+          <VenueResults
+            venues={venues}
+            slots={slots}
+            when={when}
+            today={today}
+            localitySlug={locality.slug}
+            sportSlug={sport.slug}
+            basePath="/"
+            baseParams={{
+              localidad: locality.slug, deporte: sport.slug,
+              ...(keep._now ? { _now: keep._now } : {}),
+            }}
+          />
+          {venues.length > 0 && (
+            <VenuesMapToggle venues={venues.map(({ id, name, address, lat, lng }) => ({ id, name, address, lat, lng }))} />
+          )}
+        </div>
       )}
     </div>
   );

@@ -23,19 +23,15 @@ test.afterAll(async ({ request }) => {
 });
 
 for (const scheme of ["light", "dark"] as const) {
-  test(`inicio (${scheme}): localidades sin complejos dicen "pronto", se leen (AA) y no se pueden tocar`, async ({ page }) => {
+  test(`inicio (${scheme}): las localidades sin complejos aprobados no aparecen; la barra "¿Dónde?" se lee (AA)`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    await page.goto("/");
-    const soon = page.getByTestId("locality-soon");
-    await expect(soon.first()).toBeVisible();
-    const n = await soon.count();
-    for (let i = 0; i < n; i++) {
-      const card = soon.nth(i);
-      await expect(card).toContainText("· pronto");
-      await expect(card).toHaveAttribute("aria-disabled", "true");
-      expect(await card.evaluate((el) => el.closest("a"))).toBeNull();
-      expect(await contrastOf(card)).toBeGreaterThanOrEqual(4.5);
-    }
+    await page.goto("/?localidad=la-consulta");
+    // Una localidad sin complejos pedida por URL no se muestra: queda la primera con complejos
+    const where = page.getByTestId("donde");
+    await expect(where).not.toHaveValue("la-consulta");
+    expect(await where.locator("option").allInnerTexts()).not.toContainEqual(expect.stringMatching(/pronto|La Consulta|San Carlos|Tupungato/));
+    await expect(page.getByTestId("locality-soon")).toHaveCount(0);
+    expect(await contrastOf(where)).toBeGreaterThanOrEqual(4.5);
   });
 
   test(`complejo (${scheme}): turnos libres en tarjeta neutra, legibles y de 44 px o más`, async ({ page }) => {

@@ -115,7 +115,7 @@ export async function freeSlots(venues: VenueForList[], date: string, now = new 
 
 /** "Lo antes posible": el primer turno libre de hoy o, si hoy no queda nada, de mañana. */
 export async function earliestFreeSlot(venues: VenueForList[], now = new Date()): Promise<FreeSlot | null> {
-  const today = todayInMendoza();
+  const today = todayInMendoza(now);
   const first = (await freeSlots(venues, today, now))[0];
   if (first) return first;
   return (await freeSlots(venues, nextDate(today), now))[0] ?? null;

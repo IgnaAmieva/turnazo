@@ -51,10 +51,10 @@ test("home page shows localities with venue counts", async ({ page }) => {
   // Tunuyán should appear as a link (has venues) with its venue count.
   // The exact number is not asserted: the shared DB also holds real venues
   // created from the panel (e.g. "futmates" on 2026-11-16).
-  // V2a: chip "Tunuyán · N" en "¿Dónde?"
-  const tunuyan = page.getByTestId("localidad").filter({ hasText: /tunuy/i });
-  await expect(tunuyan).toBeVisible();
-  await expect(tunuyan).toContainText(/Tunuyán · \d+/);
+  // "¿Dónde?": barra desplegable con "Tunuyán · N complejos"
+  const tunuyan = page.getByTestId("donde").locator("option", { hasText: /tunuy/i });
+  await expect(tunuyan).toHaveCount(1);
+  await expect(tunuyan).toContainText(/Tunuyán · \d+ complejos?/);
 });
 
 // ---------------------------------------------------------------------------
@@ -258,11 +258,12 @@ test("shows 'No quedan turnos para hoy' when all slots are past", async ({ page 
 // ---------------------------------------------------------------------------
 // Locality with no venues shows empty state
 // ---------------------------------------------------------------------------
-test("/la-consulta shows empty state (no venues)", async ({ page }) => {
+test("/la-consulta (sin complejos aprobados) no se muestra: abre el inicio con una localidad que tiene complejos", async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto("/la-consulta");
   await page.waitForLoadState("networkidle");
   await assertNoError(page);
   expect(errors).toHaveLength(0);
-  await expect(page.getByText(/sin complejos|no hay complejos/i)).toBeVisible();
+  await expect(page.getByTestId("donde")).not.toHaveValue("la-consulta");
+  await expect(page.getByTestId("donde").locator("option", { hasText: "La Consulta" })).toHaveCount(0);
 });
