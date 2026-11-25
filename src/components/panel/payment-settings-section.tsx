@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 import type { PanelActionState } from "@/app/actions/panel";
+import { useSavedNotice } from "@/components/panel/saved-toast";
 
 interface PaymentSettingsSectionProps {
   action: (state: PanelActionState, formData: FormData) => Promise<PanelActionState>;
@@ -17,6 +18,7 @@ interface PaymentSettingsSectionProps {
 
 export function PaymentSettingsSection({ action, mpConnected, settings }: PaymentSettingsSectionProps) {
   const [state, formAction, pending] = useActionState(action, null);
+  useSavedNotice(pending, state);
 
   // Seña y pago total solo existen con Mercado Pago conectado.
   // (El servidor valida lo mismo: esto es solo para no ofrecer lo que va a rechazar.)

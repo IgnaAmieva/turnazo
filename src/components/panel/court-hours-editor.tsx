@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import type { PanelActionState } from "@/app/actions/panel";
+import { useSavedNotice } from "@/components/panel/saved-toast";
 
 const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -36,6 +37,7 @@ export function CourtHoursEditor({ action, initialHours, otherCourts = [] }: Cou
     }))
   );
   const [state, formAction, pending] = useActionState(action, null);
+  useSavedNotice(pending, state, "Horarios guardados");
 
   function addRow() {
     setRows((prev) => [...prev, { weekday: 1, open_time: "08:00", close_time: "22:00" }]);
@@ -70,13 +72,19 @@ export function CourtHoursEditor({ action, initialHours, otherCourts = [] }: Cou
   }
 
   return (
-    <form action={formAction}>
+    <form
+      // onSubmit y no action=: al terminar una acción de formulario React 19 hace
+      // form.reset() y los selects controlados quedan mostrando el primer día
+      // ("Dom") aunque lo guardado y el estado sean correctos.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        startTransition(() => formAction(formData));
+      }}
+    >
       <input type="hidden" name="hours" value={JSON.stringify(rows)} readOnly />
 
       {state?.error && <p className="mb-3 text-sm text-danger">{state.error}</p>}
-      {state !== null && !state?.error && (
-        <p className="mb-3 text-sm text-brand">Horarios guardados.</p>
-      )}
 
       {/* Cargar desde otra cancha */}
       {otherCourts.length > 0 && (
@@ -85,7 +93,7 @@ export function CourtHoursEditor({ action, initialHours, otherCourts = [] }: Cou
           <select
             defaultValue=""
             onChange={(e) => { if (e.target.value) loadFromCourt(e.target.value); e.target.value = ""; }}
-            className="rounded-lg border border-line px-2 py-1 text-xs text-ink bg-surface-2"
+            className="min-h-11 rounded-lg border border-line px-2 text-sm text-ink bg-surface-2"
           >
             <option value="">Otra cancha…</option>
             {otherCourts.map((c) => (
@@ -105,24 +113,24 @@ export function CourtHoursEditor({ action, initialHours, otherCourts = [] }: Cou
             <select
               value={row.weekday}
               onChange={(e) => updateRow(idx, "weekday", Number(e.target.value))}
-              className="rounded-lg border border-line px-2 py-1.5 text-sm"
+              className="min-h-11 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
             >
               {DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
             </select>
             <input
               type="time" value={row.open_time}
               onChange={(e) => updateRow(idx, "open_time", e.target.value)}
-              className="rounded-lg border border-line px-2 py-1.5 text-sm"
+              className="min-h-11 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
             />
             <span className="text-ink-muted text-sm">→</span>
             <input
               type="time" value={row.close_time}
               onChange={(e) => updateRow(idx, "close_time", e.target.value)}
-              className="rounded-lg border border-line px-2 py-1.5 text-sm"
+              className="min-h-11 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
             />
             <button
               type="button" onClick={() => removeRow(idx)}
-              className="text-ink-muted hover:text-danger text-sm px-1"
+              className="flex h-11 w-11 items-center justify-center text-ink-muted hover:text-danger text-sm"
               aria-label="Eliminar"
             >
               ✕
@@ -134,14 +142,14 @@ export function CourtHoursEditor({ action, initialHours, otherCourts = [] }: Cou
       <div className="flex items-center gap-2 flex-wrap">
         <button
           type="button" onClick={addRow}
-          className="text-sm text-brand hover:text-ink border border-primary rounded-lg px-3 py-1.5"
+          className="text-sm text-brand hover:text-ink border border-primary rounded-lg min-h-11 px-3"
         >
           + Agregar tramo
         </button>
         {rows.length > 0 && (
           <button
             type="button" onClick={copyToAllDays}
-            className="text-sm text-ink-muted hover:text-ink border border-line rounded-lg px-3 py-1.5"
+            className="text-sm text-ink-muted hover:text-ink border border-line rounded-lg min-h-11 px-3"
             title="Replica el primer tramo a los 7 días"
           >
             Copiar a todos los días
@@ -149,7 +157,7 @@ export function CourtHoursEditor({ action, initialHours, otherCourts = [] }: Cou
         )}
         <button
           type="submit" disabled={pending}
-          className="rounded-xl bg-primary px-4 py-1.5 text-sm font-medium text-on-primary hover:opacity-90 disabled:opacity-60 transition-colors"
+          className="min-h-11 rounded-xl bg-primary px-4 text-sm font-medium text-on-primary hover:opacity-90 disabled:opacity-60 transition-colors"
         >
           {pending ? "Guardando…" : "Guardar horarios"}
         </button>

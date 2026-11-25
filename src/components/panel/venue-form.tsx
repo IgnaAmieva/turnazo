@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useSavedNotice } from "@/components/panel/saved-toast";
 import VenuePinMap from "@/components/venue-pin-map-wrapper";
 import type { PanelActionState } from "@/app/actions/panel";
 
@@ -37,6 +38,7 @@ function previewTemplate(template: string): string {
 
 export function VenueForm({ action, localities, venue, submitLabel = "Guardar" }: VenueFormProps) {
   const [state, formAction, pending] = useActionState(action, null);
+  useSavedNotice(pending, state);
   const [template, setTemplate] = useState(venue?.whatsapp_template ?? "");
 
   return (

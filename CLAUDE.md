@@ -75,7 +75,8 @@ src/
     phone.ts            # normalizeArgentinePhone(), buildWhatsAppUrl()
   components/
     panel/
-      agenda-grid.tsx   # Grid diaria de la agenda (client component)
+      agenda-day.tsx    # Agenda del día: lista por hora, resumen, hojas de acciones (client component)
+      saved-toast.tsx   # Aviso "Guardado" del panel (showSaved / useSavedNotice)
       court-hours-editor.tsx
       court-prices-editor.tsx
       venue-form.tsx
@@ -84,7 +85,7 @@ src/
     venue-pin-map-wrapper.tsx  # dynamic() SSR:false wrapper
   proxy.ts              # (Next 16, antes middleware.ts) Protege /panel/* → redirige a /login si no autenticado
 
-supabase/migrations/    # 001 a 025 aplicadas en Supabase Cloud (el código de la 022 vive en la rama s2-captcha). Estado en ESTADO.md
+supabase/migrations/    # 001 a 025 aplicadas en Supabase Cloud (el código de la 022 vive en la rama s2-captcha); 026 escrita, sin aplicar. Estado en ESTADO.md
 tests/
   unit/                 # Vitest: teléfonos, slots, tema/contraste, MP, historias, logo, etc.
   integration/          # Vitest contra la base real (fixtures propios, se borran al final)
@@ -127,7 +128,7 @@ tests/
 
 > **Fase por fase, con tests, sin dar nada por probado si no se cargó en un navegador real.**
 
-- Antes de cerrar una fase: `pnpm test` (Vitest, 362 tests) + `pnpm test:e2e --workers=1` (Playwright, 137 tests con el setup) deben pasar todos. Si la corrida entera se corta por memoria, correr por tandas de archivos. Nunca contra la URL publicada.
+- Antes de cerrar una fase: `pnpm test` (Vitest, 374 tests) + `pnpm test:e2e --workers=1` (Playwright, 147 tests con el setup) deben pasar todos. Si la corrida entera se corta por memoria, correr por tandas de archivos. Nunca contra la URL publicada.
 - No avanzar a la siguiente fase hasta tener verde en ambos.
 - No crear helpers, abstracciones ni features que no pida la spec.
-- Los cambios de esquema van en migraciones numeradas (`026_...sql`) en archivo. **Claude no aplica migraciones ni corre SQL que modifique datos**: las aplica el revisor; el código que las usa se escribe después de aplicadas.
+- Los cambios de esquema van en migraciones numeradas (`027_...sql`) en archivo. **Claude no aplica migraciones ni corre SQL que modifique datos**: las aplica el revisor; el código que las usa se escribe después de aplicadas.

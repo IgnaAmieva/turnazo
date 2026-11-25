@@ -579,7 +579,8 @@ export async function createCourtAction(
   if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/canchas`);
-  redirect(`/panel/complejos/${venueId}/canchas/${court.id}`);
+  // Paso 2 de 3 (precios), con el aviso "Cancha cargada"
+  redirect(`/panel/complejos/${venueId}/canchas/${court.id}?paso=precios`);
 }
 
 export async function updateCourtAction(

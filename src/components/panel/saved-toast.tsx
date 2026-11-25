@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Aviso "Guardado" del panel: cualquier formulario llama a showSaved() cuando
@@ -12,6 +12,23 @@ const EVENT = 'turnazo-guardado';
 
 export function showSaved(message = 'Guardado') {
   window.dispatchEvent(new CustomEvent(EVENT, { detail: message }));
+}
+
+/**
+ * Para los formularios con useActionState: cuando termina de guardar (pending
+ * pasa de true a false) sin error, muestra el aviso. No depende de qué
+ * devuelva la acción al salir bien (null o {}).
+ */
+export function useSavedNotice(
+  pending: boolean,
+  state: { error?: string; fieldErrors?: unknown } | null | undefined,
+  message = 'Guardado',
+) {
+  const wasPending = useRef(false);
+  useEffect(() => {
+    if (wasPending.current && !pending && !state?.error && !state?.fieldErrors) showSaved(message);
+    wasPending.current = pending;
+  }, [pending, state, message]);
 }
 
 export default function SavedToast() {

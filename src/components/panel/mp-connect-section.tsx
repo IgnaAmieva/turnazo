@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { disconnectMpAction } from "@/app/actions/mp";
 import type { PanelActionState } from "@/app/actions/panel";
+import { useSavedNotice } from "@/components/panel/saved-toast";
 
 const MP_ERROR_MESSAGES: Record<string, string> = {
   invalid_params:    "Parámetros inválidos en la respuesta de Mercado Pago.",
@@ -37,6 +38,7 @@ export function MpConnectSection({ venueId, mpConnection }: MpConnectSectionProp
     disconnectMpAction,
     null
   );
+  useSavedNotice(pending, state, "Mercado Pago desconectado");
 
   return (
     <div className="bg-surface rounded-2xl border border-line p-6">

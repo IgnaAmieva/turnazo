@@ -107,7 +107,7 @@ test("panel/complejos/[id]/canchas/nuevo loads the new court form", async ({ pag
   await page.goto(`/panel/complejos/${VENUE_ID}/canchas/nuevo`);
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByRole("button", { name: /crear cancha/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /siguiente: precios/i })).toBeVisible();
   expect(errors).toHaveLength(0);
 });
 

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import type { PanelActionState } from "@/app/actions/panel";
+import { useSavedNotice } from "@/components/panel/saved-toast";
 
 interface CancellationPolicySectionProps {
   action: (state: PanelActionState, formData: FormData) => Promise<PanelActionState>;
@@ -13,6 +14,7 @@ interface CancellationPolicySectionProps {
 
 export function CancellationPolicySection({ action, settings }: CancellationPolicySectionProps) {
   const [state, formAction, pending] = useActionState(action, null);
+  useSavedNotice(pending, state);
   const saved = state !== null && !state.error && !state.fieldErrors;
 
   return (

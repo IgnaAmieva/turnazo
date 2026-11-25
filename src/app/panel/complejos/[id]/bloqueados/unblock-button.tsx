@@ -3,12 +3,14 @@
 import { useActionState } from "react";
 import { unblockPhoneAction } from "@/app/actions/panel";
 import type { PanelActionState } from "@/app/actions/panel";
+import { useSavedNotice } from "@/components/panel/saved-toast";
 
 export function UnblockButton({ venueId, phone }: { venueId: string; phone: string }) {
   const [state, formAction, pending] = useActionState<PanelActionState, FormData>(
     unblockPhoneAction,
     null
   );
+  useSavedNotice(pending, state, "Número desbloqueado");
 
   return (
     <form action={formAction} className="inline">

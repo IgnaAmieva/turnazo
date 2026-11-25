@@ -3,6 +3,7 @@
 import { startTransition, useActionState, useState } from "react";
 import type { PanelActionState } from "@/app/actions/panel";
 import { initials, LOGO_SEND_MAX_BYTES, LOGO_UPLOAD_MAX_BYTES, venueLogoUrl } from "@/lib/venue-logo";
+import { useSavedNotice } from "@/components/panel/saved-toast";
 
 type Action = (state: PanelActionState, formData: FormData) => Promise<PanelActionState>;
 
@@ -46,6 +47,8 @@ export function VenueLogoSection({ name, logoPath, upload, remove }: {
 }) {
   const [upState, upAction, uploading] = useActionState(upload, null);
   const [rmState, rmAction, removing] = useActionState(remove, null);
+  useSavedNotice(uploading, upState, "Logo guardado");
+  useSavedNotice(removing, rmState, "Logo quitado");
   const [tooBig, setTooBig] = useState(false);
   const [prepareError, setPrepareError] = useState(false);
   const [preparing, setPreparing] = useState(false);

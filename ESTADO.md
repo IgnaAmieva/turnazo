@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-25 (rediseño: logo del club cerrado en la rama `rediseno`; 022 a 025 aplicadas por el revisor; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-25 (rediseño: funciones en cle1, logo de hasta 10 MB, agenda nueva y carga de cancha por pasos en la rama `rediseno`; 022 a 025 aplicadas; 026 escrita, SIN APLICAR; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -41,7 +41,7 @@
 
 **Bloque 2 — Agenda:**
 - Vista diaria `/panel/complejos/[id]/agenda?fecha=YYYY-MM-DD`.
-- Grid columnas = canchas, filas = tiempo. Rango calculado dinámicamente desde `court_hours` del día (maneja cruce de medianoche).
+- (2026-11-25: la grilla se reemplazó por la agenda nueva, ver "Agenda nueva" más abajo.) Grid columnas = canchas, filas = tiempo.
 - Acciones: cancelar turno, marcar pagado, marcar ausente, bloquear teléfono, crear bloqueo manual.
 - WhatsApp deep-link con template `{nombre}`, `{cancha}`, `{dia}`, `{hora}`, `{total}` desde `venues.whatsapp_template`.
 - Filtro por deporte (solo si hay más de uno). Cancelados/ausentes en gris. Badge de estado de pago.
@@ -90,7 +90,9 @@
 | 024 | `024_venue_logos.sql` | Aplicada por el revisor (2026-11-24), con dos cambios sobre la propuesta (el archivo ya es igual a lo aplicado): SELECT de storage solo para el dueño (`venue_logos_owner_select`, nadie lista el bucket) y `venues_logo_path_check` (logo_path en la carpeta `{id}/` y sin `..`). `venues.logo_path`, bucket público `venue-logos` (512 KB, PNG/JPEG/WebP), políticas de dueño. Sus políticas tenían un error (`name` se resolvía como `venues.name`): lo corrige la 025 |
 | 025 | `025_venue_logos_policies_fix.sql` | Aplicada por el revisor (2026-11-25; pg_policies dice `storage.foldername(objects.name)`). Recrea las 4 políticas de `venue-logos` con `objects.name` |
 
-**Próxima migración:** `026_*.sql`
+**Escrita, SIN APLICAR:** `026_panel_create_booking.sql` — `panel_create_booking(venue, court, start, end, nombre, celular)`: el dueño carga un turno desde la agenda ("+ Cargar turno" / "+ Nuevo turno"). Verifica el dueño, valida con `_validate_booking_slot` (igual que la reserva pública: horario, grilla, duración, precio, celular, teléfono bloqueado, 3 turnos futuros por celular, 30 días), deja `confirmed` / `unpaid` / `source = 'manual'` con el precio de la cancha; horario ocupado → `slot_taken`; sin outbox. EXECUTE solo authenticated. Hasta aplicarla, "Cargar turno" muestra el error genérico y fallan 1 E2E y 5 de integración (los de 026).
+
+**Próxima migración:** `027_*.sql`
 
 **Vault (ya configurado con la 020):** `refund_retry_url` = `https://turnazo-chi.vercel.app/api/mp/refund-retry`; `push_secret` es el mismo `PUSH_SEND_SECRET` de Vercel. Si cambia el dominio hay que actualizar `refund_retry_url` y `push_send_url`.
 (`push_secret` ya existe; es el mismo `PUSH_SEND_SECRET` de Vercel.)
@@ -101,8 +103,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 362 | ✓ verde (2026-11-25, rama `rediseno` logo del club, con la 025 aplicada) |
-| E2E | Playwright | 137 (incluye el setup de login) | ✓ verde (2026-11-25, rama `rediseno` logo del club, --workers=1 en 4 tandas por archivo) |
+| Unitarios + integración | Vitest | 374 | 369 ✓, 5 ✗ esperando la 026 (`tests/integration/panel-create-booking.test.ts`) (2026-11-25, rama `rediseno`) |
+| E2E | Playwright | 147 (incluye el setup de login) | 146 ✓, 1 ✗ esperando la 026 (`agenda-v2.spec.ts` "+ Cargar turno") (2026-11-25, rama `rediseno`, --workers=1 en 4 tandas por archivo) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -137,12 +139,45 @@ Historias de turnos libres (panel; diseño en diseno/historias.png, fuera del re
 
 - Día de la imagen: la ruta responde `X-Historia-Fecha` con el día dibujado (hora de Mendoza). E2E: por defecto es hoy, al elegir otro día la vista previa, la descarga y la imagen usan ese día, y un día pasado vuelve a hoy; unit: "hoy" cerca de medianoche (02:30 UTC = 23:30 del día anterior en Mendoza). El "Martes 1" de las capturas anteriores era una imagen pedida a mano con ?fecha= de otro día, no un error.
 
-Logo del club (024 y 025 aplicadas; cerrado 2026-11-25):
-- Panel del complejo → "Logo del club" (`components/panel/venue-logo-section.tsx`): el logo actual o las iniciales, "Subir logo" / "Cambiar logo" y "Quitar logo" (44 px). Más de 512 KB se avisa antes de mandar.
+Velocidad (2026-11-25):
+- Causa: Supabase está en us-east-2 (Ohio) y las funciones de Vercel estaban en gru1 (San Pablo): cada consulta cruzaba el continente. `vercel.json`: `regions: ["cle1"]` (Cleveland). La mudanza de la base a São Paulo va con S7.
+- Consultas en cadena juntadas: inicio (localidades, deportes y complejos en una tanda: `getLocalitiesAndSportsWithCounts`), complejo (deporte, complejo y canchas a la vez, con React cache: `generateMetadata` y la página no repiten), agenda (complejo, canchas y reservas a la vez).
+- Medido desde Argentina (tiempo hasta el primer byte, mediana de 15 pedidos, deploy viejo y nuevo uno detrás del otro; agenda con la sesión del dueño de prueba):
+
+  | Pantalla | Antes (gru1) | Después (cle1 + consultas juntas) |
+  |---|---|---|
+  | Inicio | 1132 ms | 572 ms |
+  | Lista (/tunuyan/padel) | 642 ms | 506 ms |
+  | Complejo | 798 ms | 485 ms |
+  | Agenda | 1257 ms | 518 ms |
+
+  Lo que queda es en buena parte el viaje Argentina ↔ Cleveland (antes ese tramo era corto y el largo era cada consulta). La lista hace todavía 3 pasos seguidos (localidad/deporte → complejos → disponibilidad), ahora de pocos ms cada uno.
+
+Logo del club (024 y 025 aplicadas; hasta 10 MB desde 2026-11-25):
+- Panel del complejo → "Logo del club" (`components/panel/venue-logo-section.tsx`): el logo actual o las iniciales, "Subir logo" / "Cambiar logo" y "Quitar logo" (44 px). Acepta hasta 10 MB (más se avisa antes de mandar).
+- El servidor lo achica con sharp (`lib/venue-logo-shrink.ts`): 1024 px de lado como máximo (sin agrandar ni recortar), menos de 512 KB, MISMO formato (PNG con su transparencia, JPEG, WebP), orientación EXIF aplicada y sin metadatos. Si no entra, baja la calidad y después el lado en proporción.
+- Vercel corta los pedidos de más de 4,5 MB: si el archivo pesa más de 4 MB, el navegador lo baja antes a 2048 px (o 1024) en el mismo formato; si no puede (un navegador que no sabe guardar WebP), avisa. `next.config`: `serverActions.bodySizeLimit` y `proxyClientMaxBodySize` en 11mb.
+- Portada, panel e historias: el logo entero y como se subió, sin círculo que lo recorte ni fondo blanco (respeta la transparencia).
 - `uploadVenueLogoAction` / `removeVenueLogoAction` (actions/panel.ts), con la sesión del dueño (las políticas de storage hacen cumplir la carpeta): verifica que el complejo sea suyo, tamaño ≤ 512 KB y el tipo REAL por los primeros bytes (`detectLogoType` en lib/venue-logo.ts: PNG, JPEG, WebP; la extensión y el Content-Type no cuentan). Sube a `{venue_id}/logo-{timestamp}.{ext}` (nombre nuevo cada vez: la URL pública cambia y nadie ve el viejo de caché), guarda logo_path, borra el anterior y escribe audit_log.
 - Se muestra por la URL pública del bucket (no necesita política de lectura): portada del complejo (`components/club-logo.tsx`, círculo junto al nombre) y panel. Sin logo, iniciales en verde sobre lima.
 - Historia: `getStoryData` baja el logo por su URL pública y lo pasa como data URI (vuelve a mirar los bytes; si falla, iniciales). next/og dibuja PNG y JPEG pero deja vacío el WebP: el WebP se convierte a PNG con `sharp` (agregado como dependencia directa; ya venía con Next, misma versión 0.35.5).
-- Tests: `tests/unit/venue-logo.test.ts` (bytes), `tests/integration/venue-logos.test.ts` (A no sube, no pisa, no borra ni lista en la carpeta de B; no apunta logo_path a otra carpeta ni con `..`; la acción rechaza un SVG con nombre .png, más de 512 KB, sin archivo y el complejo ajeno; A sube, cambia y quita su logo) y `tests/e2e/logo.spec.ts` (iniciales → logo en la portada y en la historia, PNG y WebP; archivo falso rechazado; aviso de 512 KB; el dueño sube y quita desde el panel).
+- Tests: `tests/unit/venue-logo.test.ts` (bytes), `tests/unit/venue-logo-shrink.test.ts` (PNG con alfa, JPEG, WebP, sin agrandar, EXIF, imagen rota), `tests/integration/venue-logos.test.ts` (A no sube, no pisa, no borra ni lista en la carpeta de B; no apunta logo_path a otra carpeta ni con `..`; la acción rechaza un SVG con nombre .png, más de 10 MB, sin archivo, una imagen rota y el complejo ajeno; A sube un PNG de 3 MB que se guarda achicado y sigue PNG con alfa, lo cambia y lo quita) y `tests/e2e/logo.spec.ts` (iniciales → logo en la portada y en la historia, PNG y WebP; archivo falso rechazado; aviso de 10 MB; el dueño sube un PNG transparente y una foto de más de 4 MB, se guardan achicados en su formato, se ven enteros, y lo quita).
+
+Agenda nueva (2026-11-25; diseno/agenda-v2.png, pantallas 1 y 2; `components/panel/agenda-day.tsx`, reemplaza a la grilla):
+- Días Hoy + 6 (y el elegido) y "Otra fecha". Resumen del día de todas las canchas: turnos, $ a cobrar (lo que falta de los confirmados) y libres.
+- Pestañas por cancha con su cantidad de turnos y "Todas" (recordada en el dispositivo). En "Todas", en pantallas anchas, una columna por cancha lado a lado; en el celular, una lista con el nombre de la cancha.
+- Lista en orden de hora: turnos (hora y fin, nombre, celular, pago en lima pagado/seña o ámbar sin pagar, WhatsApp de 44 px), bloqueos y libres punteados con "+ Cargar turno". Línea AHORA si el día es hoy. Los cancelados no se listan (su horario aparece libre).
+- Barra fija abajo: "+ Nuevo turno" y "Compartir libres".
+- Hoja del turno: "Cobrado $X" y "WhatsApp" grandes arriba; abajo "Marcar que no vino", "Cancelar turno" y "Bloquear este número" (estos dos piden confirmación). Hoja "Nuevo turno": turno de un jugador (cancha, horario libre, nombre, celular; necesita la 026) o bloquear horario (lo de antes).
+- No se hizo "Mover a otro horario" ni "3er turno este mes" del diseño: no estaban en el pedido.
+- Tests: `tests/e2e/agenda-v2.spec.ts` (nuevo) y agenda, audit, panel-movil y cancellation adaptados; `tests/integration/panel-create-booking.test.ts` (026).
+
+Cargar cancha por pasos (2026-11-25; diseno/agenda-v2.png, pantalla 3):
+- 1 Datos (`/canchas/nuevo`): nombre, deporte y duración con botones (la duración sigue a la del deporte hasta que se toca), superficie, Techada / Iluminada / Vestuario / Visible. "Siguiente: precios →".
+- 2 Precios (`/canchas/{id}?paso=precios`): aviso lima "Cancha X cargada · Ya aparece en la app. Te faltan los precios.", el aviso de horarios sin precio ahí mismo (se va al guardar los que faltan), precios y horarios. 3 Listo (`?paso=listo`): "Cancha X lista" o lo que falta, y Ver la agenda / Cargar otra cancha.
+- Aviso "Guardado" en todo el panel (`components/panel/saved-toast.tsx`, uno solo en el layout; `useSavedNotice` en cada formulario): datos del complejo, cancha, horarios, precios, cobro, cancelaciones, logo, desbloquear, Mercado Pago y las acciones de la agenda.
+- Los editores de horarios y precios ahora se mandan con onSubmit: con `action=` React 19 hacía form.reset() y después de guardar todas las filas mostraban "Dom" (lo guardado estaba bien). Controles de 44 px.
+- Tests: `tests/e2e/cancha.spec.ts`.
 
 Rediseño M4 (Mi turno):
 - "Guardá este link" arriba de todo (borde primary): el link de Mi turno en un campo de solo lectura y "Copiar link" (44 px; sin permiso de portapapeles queda seleccionado para copiar a mano).
@@ -556,12 +591,15 @@ Base de datos (es la misma para Preview y producción)
 - [x] 023 (etiquetas de cancha) aplicada por el revisor; `main` no la usa, no rompe nada.
 - [x] 024 (logo del club) aplicada.
 - [x] 025 (corrige las políticas de la 024) aplicada (2026-11-25).
+- [ ] **026 (`panel_create_booking`, cargar turnos desde la agenda) escrita, SIN APLICAR**: revisarla y aplicarla antes del merge; después correr `tests/integration/panel-create-booking.test.ts` y `tests/e2e/agenda-v2.spec.ts`.
 - [ ] Pendiente S5 (`p_replace_hold_token`), migración aparte: no bloquea el merge.
 - [ ] Datos: futmates no tiene precio de 22:00 a 00:00 (lo carga el dueño; el panel ya lo avisa). El "Complejo Padelero Tunuyán" de prueba está aprobado y se ve en producción (inicio, "Lo antes posible", lista): **queda visible por ahora; hay que ocultarlo antes de que entren dueños reales (va con S7, base de tests separada)**.
-- [ ] Antes de mergear, verificar que no queden datos de prueba: 14 reservas, 0 teléfonos bloqueados, cancha de prueba sin etiquetas, cobro del complejo de prueba solo "en el lugar", complejo de prueba sin logo y bucket `venue-logos` vacío.
+- [ ] Antes de mergear, verificar que no queden datos de prueba: 0 reservas "E2E*" / "Audit Test*", 0 teléfonos bloqueados, cancha de prueba sin etiquetas, cobro del complejo de prueba solo "en el lugar", complejo de prueba sin logo, bucket `venue-logos` vacío, 4 canchas (sin "E2E Cancha*"). Hoy hay 16 reservas: las 14 de antes más 2 que hizo Igna en el Preview el 2026-11-25 en el complejo de prueba (una cancelada y una confirmada a las 12:30). Además futmates tiene una cancha de pádel real desde el 2026-11-25 (por eso el inicio ya no muestra "1 complejo" de pádel).
 
 Vercel
-- [x] Los deploys de Preview de `rediseno` construyen (READY hasta `4a47cfe`).
+- [x] Los deploys de Preview de `rediseno` construyen (READY hasta `dd8cb07`, el de cle1).
+- [x] Funciones en cle1 (`vercel.json`), medido en el Preview (tabla en "Velocidad").
+- [ ] Probar en el Preview subir un logo de más de 4,5 MB (el navegador lo achica antes) y uno WebP.
 - [ ] Probar a mano en el Preview la imagen de la historia (`/panel/complejos/{id}/historia/imagen`): en Vercel lee las fuentes con fs (`outputFileTracingIncludes`) y, con un logo WebP, usa `sharp`. En local anda; en Vercel falta confirmarlo.
 - [ ] Variables: el rediseño no agrega ninguna. Producción ya tiene `NEXT_PUBLIC_APP_URL` y las `MP_*`. En Preview falta `NEXT_PUBLIC_APP_URL` (el pago online no funciona ahí; no se agrega a Preview por decisión anterior).
 - [ ] Los links de Mi turno, el .ics y la historia usan el host del pedido: en producción salen con el dominio final.
