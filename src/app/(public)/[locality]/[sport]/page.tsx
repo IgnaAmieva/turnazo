@@ -4,7 +4,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLocalityBySlug, getSportBySlug } from "@/lib/supabase/queries";
 import { getVenuesForList, freeSlots } from "@/lib/free-slots";
-import { parseWhen } from "@/lib/franjas";
+import { parseWhen, whenParams } from "@/lib/franjas";
+import { filterByFormat, formatLabel, isFormat } from "@/lib/court-format";
+import { FormatChips } from "@/components/format-chips";
 import { formatDateMendoza, todayInMendoza, mendozaToUtc } from "@/lib/slots";
 import Breadcrumbs from "@/components/breadcrumbs";
 import { RememberSearch } from "@/components/player-memory-ui";
@@ -13,7 +15,7 @@ import { VenueResults } from "@/components/venue-results";
 
 type Props = {
   params: Promise<{ locality: string; sport: string }>;
-  searchParams: Promise<{ franja?: string; hora?: string; _now?: string }>;
+  searchParams: Promise<{ franja?: string; hora?: string; formato?: string; _now?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -31,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  */
 export default async function VenuesPage({ params, searchParams }: Props) {
   const { locality: lSlug, sport: sSlug } = await params;
-  const { franja, hora, _now } = await searchParams;
+  const { franja, hora, formato: formatoParam, _now } = await searchParams;
   const when = parseWhen(franja, hora);
 
   const [locality, sport] = await Promise.all([getLocalityBySlug(lSlug), getSportBySlug(sSlug)]);
@@ -42,7 +44,9 @@ export default async function VenuesPage({ params, searchParams }: Props) {
   const nowUtc = fixedNow ? new Date(fixedNow) : new Date();
   const today = todayInMendoza(nowUtc);
 
-  const venues = await getVenuesForList(locality.id, sport.id);
+  // Fútbol: ?formato= deja solo las canchas de ese formato (027)
+  const formato = sport.slug === "futbol" && isFormat(formatoParam) ? formatoParam : null;
+  const venues = filterByFormat(await getVenuesForList(locality.id, sport.id), formato);
   const slots = await freeSlots(venues, today, nowUtc);
 
   const todayLabel = formatDateMendoza(mendozaToUtc(today, "12:00:00"));
@@ -67,7 +71,12 @@ export default async function VenuesPage({ params, searchParams }: Props) {
         localitySlug={lSlug}
         sportSlug={sSlug}
         basePath={`/${lSlug}/${sSlug}`}
-        baseParams={fixedNow ? { _now: fixedNow } : {}}
+        baseParams={{ ...(fixedNow ? { _now: fixedNow } : {}), ...(formato ? { formato } : {}) }}
+        noVenuesText={formato ? `Ningún complejo de ${locality.name} cargó canchas de ${formatLabel(formato)} todavía.` : undefined}
+        filters={sport.slug === "futbol" ? (
+          <FormatChips basePath={`/${lSlug}/${sSlug}`} current={formato}
+            params={{ ...(fixedNow ? { _now: fixedNow } : {}), ...whenParams(when) }} />
+        ) : undefined}
       />
       {venues.length > 0 && <VenuesMapToggle venues={venues.map(({ id, name, address, lat, lng }) => ({ id, name, address, lat, lng }))} />}
     </div>

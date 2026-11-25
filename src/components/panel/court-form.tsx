@@ -3,15 +3,17 @@
 import { useActionState, useState } from "react";
 import type { PanelActionState } from "@/app/actions/panel";
 import { SURFACES } from "@/lib/court-tags";
+import { FORMATS } from "@/lib/court-format";
 import { useSavedNotice } from "@/components/panel/saved-toast";
 
-interface Sport { id: string; name: string; default_slot_minutes: number }
+interface Sport { id: string; name: string; slug: string; default_slot_minutes: number }
 interface CourtFormProps {
   action: (state: PanelActionState, formData: FormData) => Promise<PanelActionState>;
   sports: Sport[];
   court?: {
     name: string; sport_id: string; slot_minutes: number; active: boolean;
     surface?: string | null; covered?: boolean; lit?: boolean; has_locker_room?: boolean;
+    format?: string | null;
   };
   submitLabel?: string;
 }
@@ -47,6 +49,9 @@ export function CourtForm({ action, sports, court, submitLabel = "Guardar" }: Co
   useSavedNotice(pending, court ? state : { error: "crear" });
 
   const [sportId, setSportId] = useState(court?.sport_id ?? "");
+  // Formato (027): solo fútbol. Con otro deporte no se manda y el servidor guarda NULL.
+  const [format, setFormat] = useState(court?.format ?? "");
+  const isFutbol = sports.find((s) => s.id === sportId)?.slug === "futbol";
   const [minutes, setMinutes] = useState(court?.slot_minutes ?? 90);
   // Mientras no se toca la duración, sigue a la del deporte (pádel 90, fútbol 60…)
   const [minutesTouched, setMinutesTouched] = useState(Boolean(court));
@@ -86,6 +91,20 @@ export function CourtForm({ action, sports, court, submitLabel = "Guardar" }: Co
         </div>
         <FieldError errors={state?.fieldErrors?.sport_id} />
       </fieldset>
+
+      {isFutbol && (
+        <fieldset>
+          <legend className="block text-sm font-extrabold text-ink mb-1.5">Formato</legend>
+          <div className="grid grid-cols-3 gap-2">
+            {FORMATS.map((f) => (
+              <Choice key={f.value} name="format" value={f.value} checked={format === f.value} onChange={() => setFormat(f.value)}>
+                {f.label}
+              </Choice>
+            ))}
+          </div>
+          <FieldError errors={state?.fieldErrors?.format} />
+        </fieldset>
+      )}
 
       <fieldset>
         <legend className="block text-sm font-extrabold text-ink mb-1.5">Duración del turno</legend>

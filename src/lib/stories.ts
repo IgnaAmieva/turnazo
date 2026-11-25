@@ -62,7 +62,7 @@ export async function getStoryData(
 
   const { data: courtRows } = await supabase
     .from('courts')
-    .select(`id, name, slot_minutes, sport_id, surface, covered, lit, has_locker_room,
+    .select(`id, name, slot_minutes, sport_id, surface, covered, lit, has_locker_room, format,
       sports(name, slug),
       court_hours(weekday, open_time, close_time),
       court_prices(weekday, from_time, to_time, price)`)
@@ -87,6 +87,7 @@ export async function getStoryData(
     courts: courts.filter((c) => c.sports?.slug === sport.slug).map((c) => ({
       id: c.id, name: c.name, slot_minutes: c.slot_minutes, sport_id: c.sport_id,
       surface: c.surface, covered: c.covered, lit: c.lit, has_locker_room: c.has_locker_room,
+      format: c.format ?? null,
       hours: c.court_hours ?? [], prices: (c.court_prices ?? []).map((p) => ({ ...p, price: Number(p.price) })),
     })),
   };

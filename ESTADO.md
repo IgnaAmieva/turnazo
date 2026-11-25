@@ -202,6 +202,13 @@ Inicio con "¿Dónde?" y complejos en la misma pantalla (2026-11-25; necesita la
 - El mapa del complejo nuevo arranca SIN pin, y sin pin no se guarda ("Marcá en el mapa dónde está el complejo."). Antes el marcador arrancaba en el centro de Mendoza (-32.8908, -68.8272): es exactamente el pin de padelmates, que seguramente nunca lo movió. Sus datos no se tocaron (lo revisa Igna).
 - Tests: `tests/unit/locality-resolver.test.ts`, `tests/unit/franjas.test.ts` (hora exacta y orden); E2E `inicio.spec.ts` (barra, orden, hora, ubicación), `panel.spec.ts` (sin pin), `public.spec`, `rediseno.spec`.
 
+Fútbol: formato de la cancha (2026-11-25; 027):
+- Panel: en la carga de cancha, si el deporte es fútbol aparece "Formato" con 6 botones (Fútbol 5, 6, 7, 9, 11, Futsal; radios de 44 px). Con pádel o tenis no se muestra y el servidor guarda `format = NULL` aunque el formulario lo mande (`formatForSport` en `actions/panel.ts`); así una cancha que pasa a pádel nunca choca con el trigger `enforce_court_format`.
+- Inicio y lista, solo con fútbol: chips "Todos · 5 · 6 · 7 · 9 · 11 · Futsal" (`?formato=`, `components/format-chips.tsx`) que dejan solo las canchas de ese formato (`filterByFormat`, también para "Lo antes posible"); cambiar la hora conserva el formato.
+- Tarjeta y portada: el formato va primero en las etiquetas ("Fútbol 5 · 1 cancha · turnos de 60 min"; en la portada sin repetir "Fútbol"), y en la pestaña de la cancha ("Cancha 1 · Fútbol 5").
+- Hoy la única cancha de fútbol (futmates) no tiene formato: aparece con "Todos" y no con un formato hasta que el dueño lo elija.
+- Tests: `tests/unit/court-format.test.ts`, `court-tags.test.ts`; `tests/integration/court-format.test.ts` (API: dueño, anon, CHECK, trigger, notes de 200; acciones: crear con formato, pasar a pádel → NULL); E2E `tests/e2e/formato.spec.ts` (crea y borra "E2E Formato F5" en el complejo de prueba).
+
 Rediseño M4 (Mi turno):
 - "Guardá este link" arriba de todo (borde primary): el link de Mi turno en un campo de solo lectura y "Copiar link" (44 px; sin permiso de portapapeles queda seleccionado para copiar a mano).
 - Con el turno confirmado: "Compartir por WhatsApp" (wa.me/?text= con cancha, día, horario, dirección y "Cómo llegar"; SIN el link de Mi turno, porque con él se puede cancelar), "Agregar al calendario" (GET /turnos/{token}/calendario → turno.ics, RFC 5545, horas en UTC, Cache-Control private/no-store; 404 si el turno no existe o no está confirmado) y "Cómo llegar" (Google Maps con el pin del complejo; sin pin, nombre y dirección).

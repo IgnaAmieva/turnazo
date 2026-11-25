@@ -17,6 +17,7 @@ import { MiniMap } from "@/components/mini-map";
 import { VenueDistance } from "@/components/venue-distance";
 import { ScrollIntoViewOnMount } from "@/components/scroll-into-view";
 import { venueTagsLine } from "@/lib/court-tags";
+import { formatLabel, venueFormats } from "@/lib/court-format";
 import { ClubLogo } from "@/components/club-logo";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -122,7 +123,10 @@ export default async function VenuePage({ params, searchParams }: Props) {
 
   const minutes = [...new Set(venue.courts.map((ct) => ct.slot_minutes))].sort((a, b) => a - b);
   // Etiquetas (023): "Pádel · Sintético · Techada", o "Pádel · 2 canchas · turnos de 90 min" si no hay nada cargado
-  const subtitle = `${sport.name} · ${venueTagsLine(venue.courts)}`;
+  // Fútbol con formato (027): "Fútbol 5 · …" en lugar de "Fútbol · Fútbol 5 · …"
+  const subtitle = venueFormats(venue.courts).length > 0
+    ? venueTagsLine(venue.courts)
+    : `${sport.name} · ${venueTagsLine(venue.courts)}`;
 
   const days: string[] = [];
   for (let d = today, i = 0; i < BOOKING_DAYS; i++, d = nextDate(d)) days.push(d);
@@ -243,6 +247,7 @@ export default async function VenuePage({ params, searchParams }: Props) {
                       ${selected ? "border-primary bg-primary text-on-primary" : "border-line bg-surface text-ink hover:border-primary"}`}
                   >
                     {ct.name}
+                    {formatLabel(ct.format) && <span className="ml-1 font-normal">· {formatLabel(ct.format)}</span>}
                   </Link>
                 );
               })}

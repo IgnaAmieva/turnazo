@@ -29,9 +29,11 @@ type Props = {
   baseParams: Record<string, string>;
   /** Filtros extra entre la hora y la lista (formato de fútbol) */
   filters?: ReactNode;
+  /** Texto si no hay ningún complejo (por ejemplo, ninguno con canchas de ese formato) */
+  noVenuesText?: string;
 };
 
-export function VenueResults({ venues, slots, when, today, localitySlug, sportSlug, basePath, baseParams, filters }: Props) {
+export function VenueResults({ venues, slots, when, today, localitySlug, sportSlug, basePath, baseParams, filters, noVenuesText }: Props) {
   const rows = rankVenues(venues, slots, when, today);
   const without = venues.length - rows.length;
   const href = (params: Record<string, string>) => {
@@ -66,7 +68,7 @@ export function VenueResults({ venues, slots, when, today, localitySlug, sportSl
 
       <p className="mt-4 mb-3 text-sm text-ink-muted" data-testid="con-lugar">
         {venues.length === 0
-          ? 'No hay complejos disponibles en esta localidad todavía.'
+          ? (noVenuesText ?? 'No hay complejos disponibles en esta localidad todavía.')
           : rows.length === 0
             ? `Ningún complejo tiene lugar ${whenLabel(when)}. Probá otra hora.`
             : `${plural(rows.length, 'complejo', 'complejos')} con lugar ${whenLabel(when)}` +

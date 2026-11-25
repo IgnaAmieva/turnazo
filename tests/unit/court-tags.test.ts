@@ -17,6 +17,13 @@ describe("etiquetas de cancha (023)", () => {
       .toEqual(["Cemento", "Blindex", "Vestuario"]);
   });
 
+  it("fútbol (027): el formato va primero; solo con formato, también cantidad y duración", () => {
+    expect(venueTagsLine([c({ format: "futbol_5", slot_minutes: 60 }), c({ format: "futbol_5", slot_minutes: 60 })]))
+      .toBe("Fútbol 5 · 2 canchas · turnos de 60 min");
+    expect(venueTagsLine([c({ format: "futbol_7", surface: "sintetico" }), c({ format: "futbol_5", lit: true })]))
+      .toBe("Fútbol 5 · Fútbol 7 · Sintético · Iluminada");
+  });
+
   it("isSurface acepta solo las 5 del CHECK de la 023", () => {
     for (const s of ["sintetico", "pasto", "cemento", "polvo_ladrillo", "blindex"]) expect(isSurface(s)).toBe(true);
     for (const s of ["", "arena", null, undefined]) expect(isSurface(s)).toBe(false);

@@ -10,6 +10,7 @@ import { triggerPushSend } from "@/lib/push";
 import { detectLogoType, LOGO_BUCKET, LOGO_UPLOAD_MAX_BYTES } from "@/lib/venue-logo";
 import { shrinkLogo } from "@/lib/venue-logo-shrink";
 import { resolveLocality, type ResolvedLocality } from "@/lib/locality-resolver";
+import { FORMAT_VALUES } from "@/lib/court-format";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -559,17 +560,33 @@ const CourtSchema = z.object({
   covered:         z.boolean(),
   lit:             z.boolean(),
   has_locker_room: z.boolean(),
+  // Migración 027: formato, solo fútbol (sin elegir = NULL)
+  format:          z.enum(FORMAT_VALUES, { error: "Elegí un formato de la lista" }).nullable(),
 });
 
-/** Etiquetas del formulario: superficie (select) y tres interruptores. */
+/** Etiquetas del formulario: superficie (select), tres interruptores y el formato (botones). */
 function courtFeaturesFrom(formData: FormData) {
   const surface = String(formData.get("surface") ?? "");
+  const format = String(formData.get("format") ?? "");
   return {
     surface:         surface === "" ? null : surface,
     covered:         formData.get("covered") !== null,
     lit:             formData.get("lit") !== null,
     has_locker_room: formData.get("has_locker_room") !== null,
+    format:          format === "" ? null : format,
   };
+}
+
+/**
+ * El formato solo vale para fútbol: si la cancha es (o pasa a ser) de pádel o
+ * tenis se manda NULL (el trigger enforce_court_format de la 027 rechazaría otro valor).
+ */
+async function formatForSport(
+  supabase: Awaited<ReturnType<typeof createClient>>, sportId: string, format: string | null,
+): Promise<{ slug: string | null; format: string | null }> {
+  const { data: sport } = await supabase.from("sports").select("slug").eq("id", sportId).maybeSingle();
+  const slug = sport?.slug ?? null;
+  return { slug, format: slug === "futbol" ? format : null };
 }
 
 export async function createCourtAction(
@@ -591,6 +608,9 @@ export async function createCourtAction(
   const parsed = CourtSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
+  const { slug: sportSlug, format } = await formatForSport(supabase, parsed.data.sport_id, parsed.data.format);
+  parsed.data.format = format as typeof parsed.data.format;
+
   const { data: court, error } = await supabase
     .from("courts")
     .insert({
@@ -603,6 +623,7 @@ export async function createCourtAction(
       covered:         parsed.data.covered,
       lit:             parsed.data.lit,
       has_locker_room: parsed.data.has_locker_room,
+      format,
     })
     .select("id")
     .single();
@@ -610,11 +631,7 @@ export async function createCourtAction(
   if (error) return dbError(error);
 
   // Horarios precargados según deporte (SPEC §12)
-  const { data: sport } = await supabase
-    .from("sports")
-    .select("slug")
-    .eq("id", parsed.data.sport_id)
-    .single();
+  const sport = sportSlug ? { slug: sportSlug } : null;
 
   const SPORT_HOURS: Record<string, { open: string; close: string }> = {
     padel:  { open: "08:00:00", close: "00:30:00" },
@@ -666,6 +683,10 @@ export async function updateCourtAction(
   const parsed = CourtSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
+  // Si la cancha pasa a pádel o tenis, format = NULL
+  const { format } = await formatForSport(supabase, parsed.data.sport_id, parsed.data.format);
+  parsed.data.format = format as typeof parsed.data.format;
+
   const { error } = await supabase
     .from("courts")
     .update({
@@ -677,6 +698,7 @@ export async function updateCourtAction(
       covered:         parsed.data.covered,
       lit:             parsed.data.lit,
       has_locker_room: parsed.data.has_locker_room,
+      format,
     })
     .eq("id", courtId)
     .eq("venue_id", venueId);

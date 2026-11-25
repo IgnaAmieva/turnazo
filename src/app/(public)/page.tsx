@@ -9,12 +9,14 @@ import { CourtLines, SportIcon } from "@/components/sport-art";
 import { WhereBar } from "@/components/where-bar";
 import { VenueResults } from "@/components/venue-results";
 import { VenuesMapToggle } from "@/components/venues-map-toggle";
+import { FormatChips } from "@/components/format-chips";
+import { filterByFormat, formatLabel, isFormat } from "@/lib/court-format";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "¿Jugamos hoy?" };
 
 type Props = {
-  searchParams: Promise<{ localidad?: string; deporte?: string; franja?: string; hora?: string; _now?: string }>;
+  searchParams: Promise<{ localidad?: string; deporte?: string; franja?: string; hora?: string; formato?: string; _now?: string }>;
 };
 
 const plural = (n: number) => `${n} complejo${n !== 1 ? "s" : ""}`;
@@ -55,7 +57,9 @@ export default async function HomePage({ searchParams }: Props) {
     sports.find((s) => s.venueCount > 0) ??
     null;
 
-  const venues = sport ? await getVenuesForList(locality.id, sport.id) : [];
+  // Fútbol: ?formato= deja solo las canchas de ese formato (027)
+  const formato = sport?.slug === "futbol" && isFormat(params.formato) ? params.formato : null;
+  const venues = sport ? filterByFormat(await getVenuesForList(locality.id, sport.id), formato) : [];
   // Los libres de hoy se piden una vez por cancha (React cache): los usan la lista y "Lo antes posible"
   const [slots, earliest] = sport
     ? await Promise.all([freeSlots(venues, today, now), earliestFreeSlot(venues, now)])
@@ -175,7 +179,12 @@ export default async function HomePage({ searchParams }: Props) {
             baseParams={{
               localidad: locality.slug, deporte: sport.slug,
               ...(keep._now ? { _now: keep._now } : {}),
+              ...(formato ? { formato } : {}),
             }}
+            noVenuesText={formato ? `Ningún complejo de ${locality.name} cargó canchas de ${formatLabel(formato)} todavía.` : undefined}
+            filters={sport.slug === "futbol" ? (
+              <FormatChips basePath="/" current={formato} params={{ localidad: locality.slug, deporte: sport.slug, ...keep }} />
+            ) : undefined}
           />
           {venues.length > 0 && (
             <VenuesMapToggle venues={venues.map(({ id, name, address, lat, lng }) => ({ id, name, address, lat, lng }))} />
