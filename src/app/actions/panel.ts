@@ -112,7 +112,7 @@ const VenueSchema = z.object({
   lng:                coord(-180, 180),
   payment_alias:      z.string().max(100).optional(),
   payment_link:       z.string().max(500).optional(),
-  whatsapp_template:  z.string().max(500).optional(),
+  whatsapp_template:  z.string().max(500, "El mensaje puede tener hasta 500 caracteres.").optional(),
 });
 
 /** Auditoría de una localidad creada por Georef al guardar un complejo. */

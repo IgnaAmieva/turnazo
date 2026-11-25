@@ -16,6 +16,7 @@ import {
   getOwnerToken,
   serviceHeaders,
   unblockTestPhones,
+  contrastOf,
 } from "./helpers";
 
 // Phone used exclusively by this test file
@@ -115,54 +116,105 @@ test.afterAll(async ({ request }) => {
 // 1. WhatsApp template editor loads
 // ---------------------------------------------------------------------------
 
-test("venue edit page shows whatsapp_template textarea", async ({ page }) => {
+const DEFAULT_MSG = "¡Hola {nombre}! Tu turno en {cancha} el {dia} a las {hora} está confirmado. Total: {total}. ¡Te esperamos!";
+const value = (page: import("@playwright/test").Page) => page.locator('input[name="whatsapp_template"]').inputValue();
+
+test("plantilla: variables como pastillas, botones de 44 px y mensaje por defecto en un complejo nuevo", async ({ page }) => {
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}`);
-  await page.waitForLoadState("networkidle");
+  const editor = page.getByTestId("wa-editor");
+  await expect(editor).toBeVisible();
+  await expect(page.locator("textarea[name=whatsapp_template]")).toHaveCount(0);
+  // Las {variables} se ven como pastillas con su nombre, sin llaves
+  await expect(editor.locator("[data-var=nombre]")).toHaveText("Nombre");
+  expect(await editor.innerText()).not.toContain("{nombre}");
 
-  await expect(page.locator('textarea[name="whatsapp_template"]')).toBeVisible();
-  // Variable hint badges (the <code> elements, not the textarea placeholder)
-  await expect(page.locator("code").filter({ hasText: "{nombre}" })).toBeVisible();
-  await expect(page.locator("code").filter({ hasText: "{cancha}" })).toBeVisible();
+  const chips = page.getByTestId("wa-variable");
+  await expect(chips).toHaveText(["+ Nombre", "+ Cancha", "+ Día", "+ Hora", "+ Total"]);
+  for (const c of [...await chips.all(), page.getByTestId("wa-original")]) {
+    expect((await c.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+
+  // Complejo nuevo: viene cargado el mensaje armado
+  await page.goto("/panel/complejos/nuevo");
+  expect(await value(page)).toBe(DEFAULT_MSG);
+  await expect(page.getByTestId("wa-vista-previa")).toContainText("¡Hola Juan Pérez! Tu turno en Cancha 1");
 });
 
-// ---------------------------------------------------------------------------
-// 2. Live preview renders when template is typed
-// ---------------------------------------------------------------------------
-
-test("whatsapp template live preview shows substituted text", async ({ page }) => {
+test("plantilla: el botón inserta en el cursor (o al final), una tecla borra la pastilla entera, 'Volver al mensaje original'", async ({ page }) => {
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}`);
-  await page.waitForLoadState("networkidle");
+  const editor = page.getByTestId("wa-editor");
 
-  const textarea = page.locator('textarea[name="whatsapp_template"]');
-  await textarea.fill("Hola {nombre}, tu turno es el {dia} a las {hora}.");
+  await page.getByTestId("wa-original").click();
+  expect(await value(page)).toBe(DEFAULT_MSG);
 
-  // Preview section should appear with substituted values
-  await expect(page.getByText("Vista previa:")).toBeVisible();
-  await expect(page.getByText(/Hola Juan Pérez/)).toBeVisible();
+  // Sin cursor en el editor: al final
+  await page.getByTestId("wa-variable").filter({ hasText: "Cancha" }).click();
+  expect(await value(page)).toBe(`${DEFAULT_MSG}{cancha}`);
+
+  // Una sola tecla borra la pastilla entera (el cursor quedó justo después)
+  await page.keyboard.press("Backspace");
+  expect(await value(page)).toBe(DEFAULT_MSG);
+
+  // Con el cursor al principio: ahí
+  await editor.click();
+  await page.keyboard.press("Control+Home");
+  await page.getByTestId("wa-variable").filter({ hasText: "Hora" }).click();
+  expect(await value(page)).toBe(`{hora}${DEFAULT_MSG}`);
+  await page.keyboard.type(" — ");
+  expect(await value(page)).toBe(`{hora} — ${DEFAULT_MSG}`);
+
+  // Escribir {total} a mano también vale (al salir se ve como pastilla)
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type(" {total}");
+  await page.getByRole("heading", { level: 1 }).click();
+  await expect(editor.locator("[data-var=total]")).toHaveCount(2);
+  expect(await value(page)).toBe(`{hora} — ${DEFAULT_MSG} {total}`);
+
+  await page.getByTestId("wa-original").click();
+  expect(await value(page)).toBe(DEFAULT_MSG);
+  await expect(editor.locator("[data-var]")).toHaveCount(5);
 });
 
-// ---------------------------------------------------------------------------
-// 3. Saving template persists to DB
-// ---------------------------------------------------------------------------
+for (const scheme of ["light", "dark"] as const) {
+  test(`plantilla: contraste AA de pastillas, botones y vista previa (${scheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await loginAsOwner(page);
+    await page.goto(`/panel/complejos/${VENUE_ID}`);
+    for (const el of [
+      page.getByTestId("wa-editor").locator("[data-var]").first(),
+      ...await page.getByTestId("wa-variable").all(),
+      page.getByTestId("wa-original"),
+      page.getByTestId("wa-vista-previa").locator("p").last(),
+    ]) {
+      expect(await contrastOf(el)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+}
 
-test("saving whatsapp template persists the value", async ({ page, request }) => {
+test("plantilla: vista previa con datos de ejemplo y se guarda como texto con {variables}", async ({ page, request }) => {
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}`);
-  await page.waitForLoadState("networkidle");
+  const editor = page.getByTestId("wa-editor");
 
-  const newTemplate = "Test template {nombre} — settings spec";
-  const textarea = page.locator('textarea[name="whatsapp_template"]');
-  await textarea.fill(newTemplate);
+  // Reemplazar todo y armar "Hola <Nombre>, te esperamos a las <Hora>."
+  await editor.click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.press("Delete");
+  await page.keyboard.type("Hola ");
+  await page.getByTestId("wa-variable").filter({ hasText: "Nombre" }).click();
+  await page.keyboard.type(", te esperamos a las ");
+  await page.getByTestId("wa-variable").filter({ hasText: "Hora" }).click();
+  await page.keyboard.type(".");
+
+  const expected = "Hola {nombre}, te esperamos a las {hora}.";
+  expect(await value(page)).toBe(expected);
+  await expect(page.getByTestId("wa-vista-previa")).toContainText("Hola Juan Pérez, te esperamos a las 10:00–11:30.");
 
   await page.getByRole("button", { name: /guardar cambios/i }).click();
-  // After save, the action redirects to /panel/complejos
   await page.waitForURL(/\/panel\/complejos$/, { timeout: 10_000 });
-
-  // Verify the value was persisted
-  const saved = await getTemplate(request);
-  expect(saved).toBe(newTemplate);
+  expect(await getTemplate(request)).toBe(expected);
 });
 
 // ---------------------------------------------------------------------------

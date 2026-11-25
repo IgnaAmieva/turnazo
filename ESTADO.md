@@ -219,6 +219,12 @@ Mapa chiquito clickeable (2026-11-25, antes del merge):
 - En la lista, el resto de la tarjeta lleva al complejo: el nombre es un link estirado (`after:absolute inset-0`) y el mapa y los turnos quedan por encima (z-10).
 - Tests: `lista.spec` (atributos, 44 px, que el toque caiga en el mapa y que tocar la dirección abra el complejo) y `complejo.spec` (mismo href que "Ir").
 
+Plantilla de WhatsApp más fácil (2026-11-25, antes del merge; sin migración):
+- `components/panel/wa-template-editor.tsx`: editor (contenteditable, `role="textbox"`) donde las variables se ven como pastillas lima ("Nombre", "Cancha", "Día", "Hora", "Total", `contenteditable=false`: una tecla las borra enteras). Botones "+ Nombre"… de 44 px que insertan en el cursor (o al final si el cursor no está en el editor). "Volver al mensaje original". Contador /500. Vista previa como antes. Pegar pega solo texto; Enter inserta un salto de línea; `{nombre}` escrito a mano se vuelve pastilla al salir del editor.
+- Se guarda como hoy: texto con `{variables}` en un campo oculto `whatsapp_template` (`lib/wa-template.ts`: parse/serialize, ida y vuelta sin cambios; llaves desconocidas como `{link}` quedan como texto).
+- Mensaje por defecto (`DEFAULT_WA_TEMPLATE`): "¡Hola {nombre}! Tu turno en {cancha} el {dia} a las {hora} está confirmado. Total: {total}. ¡Te esperamos!". Viene cargado en un complejo sin plantilla, y la agenda lo usa si el complejo no tiene plantilla guardada (antes abría WhatsApp sin texto).
+- Tests: `tests/unit/wa-template.test.ts`; E2E `settings.spec.ts` (pastillas, botones de 44 px, insertar en el cursor y al final, borrar con una tecla, original, guardar, contraste AA claro/oscuro; restaura la plantilla del complejo de prueba).
+
 Rediseño M4 (Mi turno):
 - "Guardá este link" arriba de todo (borde primary): el link de Mi turno en un campo de solo lectura y "Copiar link" (44 px; sin permiso de portapapeles queda seleccionado para copiar a mano).
 - Con el turno confirmado: "Compartir por WhatsApp" (wa.me/?text= con cancha, día, horario, dirección y "Cómo llegar"; SIN el link de Mi turno, porque con él se puede cancelar), "Agregar al calendario" (GET /turnos/{token}/calendario → turno.ics, RFC 5545, horas en UTC, Cache-Control private/no-store; 404 si el turno no existe o no está confirmado) y "Cómo llegar" (Google Maps con el pin del complejo; sin pin, nombre y dirección).

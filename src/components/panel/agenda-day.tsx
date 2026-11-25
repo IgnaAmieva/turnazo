@@ -23,6 +23,7 @@ import type { AgendaBooking, AgendaCourt } from "@/lib/supabase/panel-queries";
 import type { PanelActionState } from "@/app/actions/panel";
 import { buildWhatsAppUrl, formatArgentinePhone } from "@/lib/phone";
 import { showSaved } from "@/components/panel/saved-toast";
+import { DEFAULT_WA_TEMPLATE } from "@/lib/wa-template";
 
 export type FreeSlot = { courtId: string; start: string; end: string };
 type PanelAction = (prev: PanelActionState, fd: FormData) => Promise<PanelActionState>;
@@ -391,7 +392,8 @@ function TimeCol({ start, end }: { start: string; end: string }) {
 
 function waLink(b: AgendaBooking, courtName: string, date: string, template: string | null): string | null {
   if (!b.customer_phone) return null;
-  return buildWhatsAppUrl(b.customer_phone, template, {
+  // Sin plantilla guardada, el mensaje armado por defecto (el mismo que trae el editor)
+  return buildWhatsAppUrl(b.customer_phone, template?.trim() ? template : DEFAULT_WA_TEMPLATE, {
     nombre: b.customer_name ?? "",
     cancha: courtName,
     dia:    new Intl.DateTimeFormat("es-AR", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }).format(new Date(date + "T12:00:00Z")),

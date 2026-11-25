@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
+import { WaTemplateEditor } from "@/components/panel/wa-template-editor";
 import { useSavedNotice } from "@/components/panel/saved-toast";
 import VenuePinMap from "@/components/venue-pin-map-wrapper";
 import type { PanelActionState } from "@/app/actions/panel";
@@ -22,24 +23,9 @@ function FieldError({ errors }: { errors?: string[] }) {
   return <p className="mt-1 text-xs text-danger">{errors[0]}</p>;
 }
 
-/** Replace {key} placeholders in the template with sample values for preview. */
-function previewTemplate(template: string): string {
-  const samples: Record<string, string> = {
-    nombre: "Juan Pérez",
-    cancha: "Cancha 1",
-    dia:    "miércoles 15 de enero",
-    hora:   "10:00–11:30",
-    total:  "$4.000",
-  };
-  return template.replace(/\{(\w+)\}/g, (_, key) =>
-    key in samples ? samples[key] : `{${key}}`
-  );
-}
-
 export function VenueForm({ action, localityName, venue, submitLabel = "Guardar" }: VenueFormProps) {
   const [state, formAction, pending] = useActionState(action, null);
   useSavedNotice(pending, state);
-  const [template, setTemplate] = useState(venue?.whatsapp_template ?? "");
 
   return (
     <form action={formAction} className="space-y-6 max-w-2xl">
@@ -116,29 +102,12 @@ export function VenueForm({ action, localityName, venue, submitLabel = "Guardar"
 
       {/* Plantilla de WhatsApp */}
       <div>
-        <label className="block text-sm font-medium text-ink mb-1">
-          Plantilla de WhatsApp (opcional)
-        </label>
+        <p className="block text-sm font-medium text-ink mb-1">Mensaje de WhatsApp al jugador</p>
         <p className="text-xs text-ink-muted mb-2">
-          Variables disponibles:{" "}
-          {["{nombre}", "{cancha}", "{dia}", "{hora}", "{total}"].map((v) => (
-            <code key={v} className="mx-0.5 rounded bg-surface-2 px-1 py-0.5 font-mono text-xs">{v}</code>
-          ))}
+          Es el mensaje que se arma al tocar WhatsApp en la agenda. Los datos en verde se completan solos con los de cada turno.
         </p>
-        <textarea
-          name="whatsapp_template"
-          value={template}
-          onChange={(e) => setTemplate(e.target.value)}
-          rows={3}
-          placeholder={"Hola {nombre}, te confirmamos tu turno en {cancha} el {dia} a las {hora}. Total: {total}."}
-          className="w-full rounded-lg border border-line px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
-        />
-        {template.trim() && (
-          <div className="mt-2 rounded-lg border border-transparent bg-accent px-3 py-2">
-            <p className="mb-1 text-xs font-medium text-brand">Vista previa:</p>
-            <p className="text-sm text-brand whitespace-pre-wrap">{previewTemplate(template)}</p>
-          </div>
-        )}
+        <WaTemplateEditor initial={venue?.whatsapp_template ?? null} />
+        <FieldError errors={state?.fieldErrors?.whatsapp_template} />
       </div>
 
       <div>
