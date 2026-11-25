@@ -355,7 +355,7 @@ describe("startPaymentAction — idempotencia y errores del RPC", () => {
     const second = await pay("deposit", slotAt08(7)); // mismo teléfono, otro horario
     expect(second.kind).toBe("state");
     if (second.kind === "state") {
-      expect(second.state.error).toMatch(/reserva en proceso de pago/);
+      expect(second.state.error).toMatch(/Ya tenés un pago en curso/);
     }
 
     expect(createMpOrderMock).toHaveBeenCalledTimes(1);
@@ -405,7 +405,7 @@ describe("startPaymentAction — idempotencia y errores del RPC", () => {
       const outcome = await pay("deposit", slotAt08(10));
       expect(outcome.kind).toBe("state");
       if (outcome.kind === "state") {
-        expect(outcome.state.error).toMatch(/no tiene configurada la seña/);
+        expect(outcome.state.error).toMatch(/no tiene la seña configurada/);
       }
       expect(await bookingsOfFixture()).toHaveLength(0);
     } finally {

@@ -36,13 +36,14 @@ export async function getOwnerVenue(venueId: string) {
 
   const { data, error } = await supabase
     .from("venues")
-    .select("*")
+    .select("*, localities(name)")
     .eq("id", venueId)
     .eq("owner_id", user.id)
     .single();
 
   if (error) return null;
-  return data;
+  const { localities, ...venue } = data;
+  return { ...venue, locality_name: (localities as { name: string } | null)?.name ?? "" };
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +78,7 @@ export async function getCourt(courtId: string) {
     .from("courts")
     .select(`
       id, name, slot_minutes, active, venue_id, sport_id,
+      surface, covered, lit, has_locker_room, format, notes,
       sports(name, slug),
       court_hours(id, weekday, open_time, close_time),
       court_prices(id, weekday, from_time, to_time, price)
@@ -90,6 +92,12 @@ export async function getCourt(courtId: string) {
     name: data.name,
     slot_minutes: data.slot_minutes,
     active: data.active,
+    surface: data.surface,
+    covered: data.covered,
+    lit: data.lit,
+    has_locker_room: data.has_locker_room,
+    format: data.format,
+    notes: data.notes,
     venue_id: data.venue_id,
     sport_id: data.sport_id,
     sport_name: (data.sports as { name: string } | null)?.name ?? "",
@@ -148,20 +156,36 @@ export async function getAgendaData(venueId: string, date: string): Promise<Agen
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: venue } = await supabase
-    .from("venues")
-    .select("id, name, whatsapp_template")
-    .eq("id", venueId)
-    .eq("owner_id", user.id)
-    .single();
-  if (!venue) return null;
+  // Mendoza is UTC-3 year-round. The day [date] starts at 03:00 UTC and ends at 03:00 UTC next day.
+  const [y, mo, d] = date.split("-").map(Number);
+  const dayStart = new Date(Date.UTC(y, mo - 1, d,     3, 0, 0));
+  const dayEnd   = new Date(Date.UTC(y, mo - 1, d + 1, 3, 0, 0));
 
-  const { data: rawCourts } = await supabase
-    .from("courts")
-    .select("id, name, slot_minutes, sport_id, sports(name), court_hours(weekday, open_time, close_time)")
-    .eq("venue_id", venueId)
-    .eq("active", true)
-    .order("name");
+  const rangeFilter = `[${dayStart.toISOString()},${dayEnd.toISOString()})`;
+
+  // Complejo, canchas y reservas a la vez (antes, tres pasos seguidos). Si el
+  // complejo no es del usuario se devuelve null y lo demás se descarta.
+  const [{ data: venue }, { data: rawCourts }, { data: rawBookings }] = await Promise.all([
+    supabase
+      .from("venues")
+      .select("id, name, whatsapp_template")
+      .eq("id", venueId)
+      .eq("owner_id", user.id)
+      .single(),
+    supabase
+      .from("courts")
+      .select("id, name, slot_minutes, sport_id, sports(name), court_hours(weekday, open_time, close_time)")
+      .eq("venue_id", venueId)
+      .eq("active", true)
+      .order("name"),
+    supabase
+      .from("bookings")
+      .select("id, court_id, customer_name, customer_phone, period, status, kind, price_total, amount_paid, payment_status, cancel_token, payments(amount, status)")
+      .eq("venue_id", venueId)
+      .filter("period", "ov", rangeFilter)
+      .in("status", ["confirmed", "hold", "completed", "no_show", "cancelled"]),
+  ]);
+  if (!venue) return null;
 
   const courts: AgendaCourt[] = (rawCourts ?? []).map((c) => ({
     id:           c.id,
@@ -171,20 +195,6 @@ export async function getAgendaData(venueId: string, date: string): Promise<Agen
     sport_id:     c.sport_id,
     hours:        (c.court_hours as AgendaCourtHour[]) ?? [],
   }));
-
-  // Mendoza is UTC-3 year-round. The day [date] starts at 03:00 UTC and ends at 03:00 UTC next day.
-  const [y, mo, d] = date.split("-").map(Number);
-  const dayStart = new Date(Date.UTC(y, mo - 1, d,     3, 0, 0));
-  const dayEnd   = new Date(Date.UTC(y, mo - 1, d + 1, 3, 0, 0));
-
-  const rangeFilter = `[${dayStart.toISOString()},${dayEnd.toISOString()})`;
-
-  const { data: rawBookings } = await supabase
-    .from("bookings")
-    .select("id, court_id, customer_name, customer_phone, period, status, kind, price_total, amount_paid, payment_status, cancel_token, payments(amount, status)")
-    .eq("venue_id", venueId)
-    .filter("period", "ov", rangeFilter)
-    .in("status", ["confirmed", "hold", "completed", "no_show", "cancelled"]);
 
   // Parse tstzrange → {start, end} ISO strings
   // PostgREST returns ranges as strings like: ["2026-11-12T11:00:00+00:00","2026-11-12T12:30:00+00:00")

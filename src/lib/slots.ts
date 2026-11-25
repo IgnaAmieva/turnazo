@@ -33,13 +33,13 @@ export interface TimeSlot {
 /**
  * Devuelve la fecha de hoy en Mendoza como "YYYY-MM-DD".
  */
-export function todayInMendoza(): string {
+export function todayInMendoza(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: APP_TIMEZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date()); // en-CA usa YYYY-MM-DD
+  }).format(now); // en-CA usa YYYY-MM-DD
 }
 
 /**

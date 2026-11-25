@@ -1,11 +1,14 @@
 import { notFound } from "next/navigation";
 import { getOwnerVenue, getMpConnectionStatus } from "@/lib/supabase/panel-queries";
-import { getLocalities } from "@/lib/supabase/queries";
-import { updateVenueAction, updatePaymentSettingsAction, updateCancellationPolicyAction } from "@/app/actions/panel";
+import {
+  updateVenueAction, updatePaymentSettingsAction, updateCancellationPolicyAction,
+  uploadVenueLogoAction, removeVenueLogoAction,
+} from "@/app/actions/panel";
 import { VenueForm } from "@/components/panel/venue-form";
 import { MpConnectSection } from "@/components/panel/mp-connect-section";
 import { PaymentSettingsSection } from "@/components/panel/payment-settings-section";
 import { CancellationPolicySection } from "@/components/panel/cancellation-policy-section";
+import { VenueLogoSection } from "@/components/panel/venue-logo-section";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -15,9 +18,8 @@ export default async function EditarComplejoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [venue, localities, mpConnection] = await Promise.all([
+  const [venue, mpConnection] = await Promise.all([
     getOwnerVenue(id),
-    getLocalities(),
     getMpConnectionStatus(id),
   ]);
 
@@ -28,33 +30,44 @@ export default async function EditarComplejoPage({
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/panel/complejos" className="text-sm text-gray-500 hover:text-gray-700">
+        <Link href="/panel/complejos" className="text-sm text-ink-muted hover:text-ink">
           ← Complejos
         </Link>
-        <span className="text-gray-300">/</span>
-        <h1 className="text-xl font-semibold text-gray-900 truncate">{venue.name}</h1>
+        <span className="text-ink-muted">/</span>
+        <h1 className="text-xl font-semibold text-ink truncate">{venue.name}</h1>
       </div>
 
       {/* Quick links */}
       <div className="flex flex-wrap gap-2 mb-6">
         <Link
           href={`/panel/complejos/${id}/canchas`}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:border-green-400 hover:text-green-700 transition-colors"
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink-muted hover:border-primary hover:text-ink transition-colors"
         >
           Canchas
         </Link>
         <Link
           href={`/panel/complejos/${id}/agenda`}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:border-green-400 hover:text-green-700 transition-colors"
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink-muted hover:border-primary hover:text-ink transition-colors"
         >
           Agenda
         </Link>
         <Link
           href={`/panel/complejos/${id}/bloqueados`}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:border-green-400 hover:text-green-700 transition-colors"
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink-muted hover:border-primary hover:text-ink transition-colors"
         >
           Teléfonos bloqueados
         </Link>
+      </div>
+
+      {/* Logo del club (portada e historias) */}
+      <div className="mb-6">
+        <VenueLogoSection
+          key={venue.logo_path ?? "sin-logo"}
+          name={venue.name}
+          logoPath={venue.logo_path}
+          upload={uploadVenueLogoAction.bind(null, id)}
+          remove={removeVenueLogoAction.bind(null, id)}
+        />
       </div>
 
       {/* Mercado Pago connection */}
@@ -89,10 +102,10 @@ export default async function EditarComplejoPage({
         />
       </div>
 
-      <div className="mt-6 bg-white rounded-2xl border border-gray-200 p-6">
+      <div className="mt-6 bg-surface rounded-2xl border border-line p-6">
         <VenueForm
           action={boundAction}
-          localities={localities}
+          localityName={venue.locality_name}
           venue={venue}
           submitLabel="Guardar cambios"
         />

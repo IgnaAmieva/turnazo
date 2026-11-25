@@ -101,7 +101,7 @@ export default function PushSubscribeButton() {
 
   if (state === 'denied') {
     return (
-      <p className="text-xs text-gray-400 mt-2 leading-tight">
+      <p className="text-xs text-ink-muted leading-tight">
         Notificaciones bloqueadas en este navegador.
       </p>
     );
@@ -109,11 +109,11 @@ export default function PushSubscribeButton() {
 
   if (state === 'subscribed') {
     return (
-      <div className="mt-2">
-        <p className="text-xs text-green-700 mb-1">Notificaciones activadas</p>
+      <div>
+        <p className="text-xs text-brand px-3">Notificaciones activadas</p>
         <button
           onClick={unsubscribe}
-          className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+          className="flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-ink-muted hover:bg-surface-2 hover:text-danger transition-colors"
         >
           Desactivar
         </button>
@@ -124,7 +124,7 @@ export default function PushSubscribeButton() {
   return (
     <button
       onClick={subscribe}
-      className="mt-2 w-full text-left text-xs text-green-700 hover:text-green-900 transition-colors"
+      className="flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-brand hover:bg-surface-2 transition-colors"
     >
       Activar notificaciones
     </button>

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import Link from 'next/link';
+import Breadcrumbs from "@/components/breadcrumbs";
 import { getPaymentStatus } from '@/lib/payment-status';
 import PaymentStatusPanel from './payment-status-panel';
 
@@ -21,11 +21,7 @@ export default async function PagoPage({ params }: Props) {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
-      <nav className="text-sm text-gray-400 mb-6">
-        <Link href="/" className="hover:text-green-600">Inicio</Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-700">Tu pago</span>
-      </nav>
+      <Breadcrumbs back="/" items={[{ href: "/", label: "Inicio" }]} current="Tu pago" />
 
       <PaymentStatusPanel token={token} initial={initial} />
     </div>

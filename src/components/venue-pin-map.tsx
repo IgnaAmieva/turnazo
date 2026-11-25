@@ -8,9 +8,11 @@ interface VenuePinMapProps {
   initialLng?: number;
 }
 
-// Default: Mendoza city center
-const DEFAULT_LAT = -32.8908;
-const DEFAULT_LNG = -68.8272;
+// Centro del mapa sin pin: Valle de Uco y Gran Mendoza a la vista. NO es un pin:
+// antes el marcador arrancaba en el centro de Mendoza y, si el dueño no lo movía,
+// el complejo quedaba ahí (así le pasó a padelmates). La localidad sale del pin.
+const VIEW_CENTER = { lat: -33.25, lng: -68.95 };
+const VIEW_ZOOM = 9;
 
 function ClickHandler({
   onMove,
@@ -25,13 +27,18 @@ function ClickHandler({
   return null;
 }
 
-export default function VenuePinMap({
-  initialLat = DEFAULT_LAT,
-  initialLng = DEFAULT_LNG,
-}: VenuePinMapProps) {
+export default function VenuePinMap({ initialLat, initialLng }: VenuePinMapProps) {
   const [mounted, setMounted] = useState(false);
   const [L, setL] = useState<typeof import("leaflet") | null>(null);
-  const [pos, setPos] = useState({ lat: initialLat, lng: initialLng });
+  const [pos, setPos] = useState<{ lat: number; lng: number } | null>(
+    initialLat !== undefined && initialLng !== undefined ? { lat: initialLat, lng: initialLng } : null,
+  );
+  const hidden = (
+    <>
+      <input type="hidden" name="lat" value={pos ? String(pos.lat) : ""} readOnly />
+      <input type="hidden" name="lng" value={pos ? String(pos.lng) : ""} readOnly />
+    </>
+  );
 
   useEffect(() => {
     import("leaflet/dist/leaflet.css");
@@ -50,8 +57,7 @@ export default function VenuePinMap({
         >
           Cargando mapa…
         </div>
-        <input type="hidden" name="lat" value={String(pos.lat)} readOnly />
-        <input type="hidden" name="lng" value={String(pos.lng)} readOnly />
+        {hidden}
       </div>
     );
   }
@@ -66,8 +72,8 @@ export default function VenuePinMap({
   return (
     <div>
       <MapContainer
-        center={[pos.lat, pos.lng]}
-        zoom={13}
+        center={pos ? [pos.lat, pos.lng] : [VIEW_CENTER.lat, VIEW_CENTER.lng]}
+        zoom={pos ? 13 : VIEW_ZOOM}
         scrollWheelZoom={false}
         style={{ height: 256 }}
         className="w-full rounded-lg border border-gray-300"
@@ -77,23 +83,25 @@ export default function VenuePinMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ClickHandler onMove={(lat, lng) => setPos({ lat, lng })} />
-        <Marker
-          position={[pos.lat, pos.lng]}
-          icon={icon}
-          draggable
-          eventHandlers={{
-            dragend(e) {
-              const { lat, lng } = (e.target as import("leaflet").Marker).getLatLng();
-              setPos({ lat, lng });
-            },
-          }}
-        />
+        {pos && (
+          <Marker
+            position={[pos.lat, pos.lng]}
+            icon={icon}
+            draggable
+            eventHandlers={{
+              dragend(e) {
+                const { lat, lng } = (e.target as import("leaflet").Marker).getLatLng();
+                setPos({ lat, lng });
+              },
+            }}
+          />
+        )}
       </MapContainer>
-      <input type="hidden" name="lat" value={String(pos.lat)} readOnly />
-      <input type="hidden" name="lng" value={String(pos.lng)} readOnly />
-      <p className="mt-1.5 text-xs text-gray-500">
-        Hacé clic en el mapa o arrastrá el marcador para fijar la ubicación.
-        Coordenadas: {pos.lat.toFixed(5)}, {pos.lng.toFixed(5)}
+      {hidden}
+      <p className="mt-1.5 text-xs text-ink-muted" data-testid="pin-estado">
+        {pos
+          ? `Arrastrá el marcador o tocá el mapa para corregirlo. Coordenadas: ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`
+          : "Tocá el mapa justo donde está el complejo. Con eso sabemos en qué localidad aparece."}
       </p>
     </div>
   );

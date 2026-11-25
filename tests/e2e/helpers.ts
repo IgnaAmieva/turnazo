@@ -176,3 +176,27 @@ export async function createTestBooking(
     return null;
   }
 }
+
+/** Contraste entre el color del texto del elemento y el fondo opaco más cercano. */
+export async function contrastOf(el: import("@playwright/test").Locator): Promise<number> {
+  return el.evaluate((node) => {
+    const rgb = (s: string) => (s.match(/[\d.]+/g) ?? []).map(Number);
+    const lum = ([r, g, b]: number[]) => {
+      const f = (c: number) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    let bgEl: Element | null = node;
+    let bg = "";
+    while (bgEl) {
+      const c = getComputedStyle(bgEl).backgroundColor;
+      const parts = rgb(c);
+      if (parts.length === 3 || (parts.length === 4 && parts[3] === 1)) { bg = c; break; }
+      bgEl = bgEl.parentElement;
+    }
+    let opacity = 1;
+    for (let e: Element | null = node; e; e = e.parentElement) opacity *= Number(getComputedStyle(e).opacity);
+    if (opacity < 1) return 0; // un texto semitransparente no cuenta como legible
+    const [a, b] = [lum(rgb(getComputedStyle(node).color)), lum(rgb(bg))].sort((x, y) => y - x);
+    return (a + 0.05) / (b + 0.05);
+  });
+}

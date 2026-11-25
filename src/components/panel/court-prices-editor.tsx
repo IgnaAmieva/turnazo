@@ -1,7 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import type { PanelActionState } from "@/app/actions/panel";
+import type { CourtHour } from "@/lib/slots";
+import { defaultPriceRow } from "@/lib/price-coverage";
+import { useSavedNotice } from "@/components/panel/saved-toast";
 
 const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -22,13 +25,16 @@ interface CourtPricesEditorProps {
   action: (state: PanelActionState, formData: FormData) => Promise<PanelActionState>;
   initialPrices: PriceRow[];
   otherCourts?: OtherCourt[];
+  /** Horario de apertura y duración de turno: la fila por defecto cubre lo abierto sin precio. */
+  courtHours?: CourtHour[];
+  slotMinutes?: number;
 }
 
 function normalizeTime(t: string) {
   return t.slice(0, 5);
 }
 
-export function CourtPricesEditor({ action, initialPrices, otherCourts = [] }: CourtPricesEditorProps) {
+export function CourtPricesEditor({ action, initialPrices, otherCourts = [], courtHours = [], slotMinutes = 60 }: CourtPricesEditorProps) {
   const [rows, setRows] = useState<PriceRow[]>(
     initialPrices.map((p) => ({
       weekday:   p.weekday,
@@ -38,9 +44,11 @@ export function CourtPricesEditor({ action, initialPrices, otherCourts = [] }: C
     }))
   );
   const [state, formAction, pending] = useActionState(action, null);
+  useSavedNotice(pending, state, "Precios guardados");
 
   function addRow() {
-    setRows((prev) => [...prev, { weekday: 1, from_time: "08:00", to_time: "22:00", price: 0 }]);
+    // Propone el tramo abierto que falta cubrir (no 08:00–22:00 fijo: así quedó futmates sin precio de 22 a 00)
+    setRows((prev) => [...prev, { ...defaultPriceRow(courtHours, prev, slotMinutes), price: 0 }]);
   }
 
   function removeRow(idx: number) {
@@ -74,22 +82,28 @@ export function CourtPricesEditor({ action, initialPrices, otherCourts = [] }: C
   }
 
   return (
-    <form action={formAction}>
+    <form
+      // onSubmit y no action=: al terminar una acción de formulario React 19 hace
+      // form.reset() y los selects controlados quedan mostrando el primer día
+      // ("Dom") aunque lo guardado y el estado sean correctos.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        startTransition(() => formAction(formData));
+      }}
+    >
       <input type="hidden" name="prices" value={JSON.stringify(rows)} readOnly />
 
-      {state?.error && <p className="mb-3 text-sm text-red-600">{state.error}</p>}
-      {state !== null && !state?.error && (
-        <p className="mb-3 text-sm text-green-600">Precios guardados.</p>
-      )}
+      {state?.error && <p className="mb-3 text-sm text-danger">{state.error}</p>}
 
       {/* Cargar desde otra cancha */}
       {otherCourts.length > 0 && (
         <div className="mb-4 flex items-center gap-2">
-          <span className="text-xs text-gray-500 shrink-0">Cargar desde:</span>
+          <span className="text-xs text-ink-muted shrink-0">Cargar desde:</span>
           <select
             defaultValue=""
             onChange={(e) => { if (e.target.value) loadFromCourt(e.target.value); e.target.value = ""; }}
-            className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-700 bg-gray-50"
+            className="min-h-11 rounded-lg border border-line px-2 text-sm text-ink bg-surface-2"
           >
             <option value="">Otra cancha…</option>
             {otherCourts.map((c) => (
@@ -100,7 +114,7 @@ export function CourtPricesEditor({ action, initialPrices, otherCourts = [] }: C
       )}
 
       {rows.length === 0 && (
-        <p className="text-sm text-gray-500 mb-3">Sin precios configurados.</p>
+        <p className="text-sm text-ink-muted mb-3">Sin precios configurados.</p>
       )}
 
       <div className="space-y-2 mb-4">
@@ -109,30 +123,30 @@ export function CourtPricesEditor({ action, initialPrices, otherCourts = [] }: C
             <select
               value={row.weekday}
               onChange={(e) => updateRow(idx, "weekday", Number(e.target.value))}
-              className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              className="min-h-11 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
             >
               {DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
             </select>
             <input
               type="time" value={row.from_time}
               onChange={(e) => updateRow(idx, "from_time", e.target.value)}
-              className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              className="min-h-11 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
             />
-            <span className="text-gray-400 text-sm">→</span>
+            <span className="text-ink-muted text-sm">→</span>
             <input
               type="time" value={row.to_time}
               onChange={(e) => updateRow(idx, "to_time", e.target.value)}
-              className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              className="min-h-11 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
             />
-            <span className="text-gray-500 text-sm">$</span>
+            <span className="text-ink-muted text-sm">$</span>
             <input
               type="number" value={row.price} min={0} step={100}
               onChange={(e) => updateRow(idx, "price", Number(e.target.value))}
-              className="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              className="w-24 min-h-11 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
             />
             <button
               type="button" onClick={() => removeRow(idx)}
-              className="text-gray-400 hover:text-red-500 text-sm px-1"
+              className="flex h-11 w-11 items-center justify-center text-ink-muted hover:text-danger text-sm"
               aria-label="Eliminar"
             >
               ✕
@@ -144,14 +158,14 @@ export function CourtPricesEditor({ action, initialPrices, otherCourts = [] }: C
       <div className="flex items-center gap-2 flex-wrap">
         <button
           type="button" onClick={addRow}
-          className="text-sm text-green-700 hover:text-green-900 border border-green-300 rounded-lg px-3 py-1.5"
+          className="text-sm text-brand hover:text-ink border border-primary rounded-lg min-h-11 px-3"
         >
           + Agregar precio
         </button>
         {rows.length > 0 && (
           <button
             type="button" onClick={copyToAllDays}
-            className="text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5"
+            className="text-sm text-ink-muted hover:text-ink border border-line rounded-lg min-h-11 px-3"
             title="Replica la primera franja a los 7 días"
           >
             Copiar a todos los días
@@ -159,7 +173,7 @@ export function CourtPricesEditor({ action, initialPrices, otherCourts = [] }: C
         )}
         <button
           type="submit" disabled={pending}
-          className="rounded-xl bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60 transition-colors"
+          className="min-h-11 rounded-xl bg-primary px-4 text-sm font-medium text-on-primary hover:opacity-90 disabled:opacity-60 transition-colors"
         >
           {pending ? "Guardando…" : "Guardar precios"}
         </button>

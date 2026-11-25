@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { SlotLink } from '@/components/booking-sheet';
 import {
   generateSlots,
   weekdayInMendoza,
@@ -9,10 +9,14 @@ import {
 } from '@/lib/slots';
 import { APP_TIMEZONE } from '@/lib/constants';
 
+const CELL = 'min-h-14 rounded-2xl border px-1 py-2 flex flex-col items-center justify-center gap-0.5 text-center';
+
 interface Court {
   id: string;
   name: string;
   slot_minutes: number;
+  /** Aclaraciones (027), para la hoja de reserva */
+  notes?: string | null;
   hours: CourtHour[];
   prices: CourtPrice[];
 }
@@ -62,7 +66,7 @@ export default function CourtCalendar({
 
   if (allSlots.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 p-6 text-center text-gray-500 text-sm">
+      <div className="rounded-xl border border-line p-6 text-center text-ink-muted text-sm">
         Sin horario este día
       </div>
     );
@@ -71,14 +75,16 @@ export default function CourtCalendar({
   if (slots.length === 0) {
     // Had hours but all slots are in the past
     return (
-      <div className="rounded-xl border border-gray-200 p-6 text-center text-gray-500 text-sm">
+      <div className="rounded-xl border border-line p-6 text-center text-ink-muted text-sm">
         No quedan turnos para hoy
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+    // V2c: 4 columnas. Libre en tarjeta neutra con precio; elegido en lima con
+    // borde primary; ocupado punteado y tachado.
+    <div className="grid grid-cols-4 gap-2">
       {slots.map((slot) => {
         const startIso = slot.start.toISOString();
         const endIso   = slot.end.toISOString();
@@ -88,12 +94,28 @@ export default function CourtCalendar({
           return (
             <div
               key={startIso}
-              className="rounded-lg border border-gray-200 bg-gray-100 p-3 flex flex-col items-center gap-1 cursor-not-allowed"
+              data-testid="slot-taken"
+              className={`${CELL} border-dashed border-line bg-transparent cursor-not-allowed`}
             >
-              <span className="text-sm font-medium text-gray-400 line-through">
+              <span className="text-base text-ink-muted line-through">
                 {label}
               </span>
-              <span className="text-xs text-gray-400">Ocupado</span>
+              <span className="text-xs text-ink-muted">Ocupado</span>
+            </div>
+          );
+        }
+
+        // Sin precio cargado para ese horario (ej. futmates de 22:00 a 00:00): la base
+        // rechaza la reserva (price_not_set), así que no se ofrece como libre.
+        if (slot.price === null) {
+          return (
+            <div
+              key={startIso}
+              data-testid="slot-no-price"
+              className={`${CELL} border-dashed border-line bg-transparent cursor-not-allowed`}
+            >
+              <span className="text-base text-ink-muted">{label}</span>
+              <span className="text-xs leading-tight text-ink-muted">Consultá</span>
             </div>
           );
         }
@@ -101,19 +123,28 @@ export default function CourtCalendar({
         const href = `/${localitySlug}/${sportSlug}/${venueId}/reservar?cancha=${court.id}&inicio=${startIso}&fin=${endIso}&fecha=${date}`;
 
         return (
-          <Link
+          <SlotLink
             key={startIso}
             href={href}
-            className="rounded-lg border border-green-200 bg-green-50 p-3 flex flex-col items-center gap-1
-              hover:bg-green-100 hover:border-green-300 active:bg-green-200 transition-colors"
+            slot={{
+              courtId: court.id,
+              courtName: court.name,
+              start: startIso,
+              end: endIso,
+              date,
+              timeLabel: `${label} – ${formatTimeMendoza(slot.end)}`,
+              price: slot.price,
+              courtNotes: court.notes ?? null,
+            }}
+            className={`group ${CELL} border-line bg-surface shadow-sm hover:border-primary transition-colors
+              focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
+            selectedClassName="!border-2 !border-primary !bg-accent"
           >
-            <span className="text-sm font-semibold text-green-900">{label}</span>
-            {slot.price !== null && (
-              <span className="text-xs text-green-700">
-                ${slot.price.toLocaleString('es-AR')}
-              </span>
-            )}
-          </Link>
+            <span className="text-base font-extrabold text-ink group-data-[selected=true]:text-on-accent">{label}</span>
+            <span className="text-xs text-ink-muted group-data-[selected=true]:font-extrabold group-data-[selected=true]:text-on-accent">
+              ${slot.price.toLocaleString('es-AR')}
+            </span>
+          </SlotLink>
         );
       })}
     </div>

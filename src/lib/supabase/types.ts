@@ -267,31 +267,49 @@ export type Database = {
       courts: {
         Row: {
           active: boolean
+          covered: boolean
           created_at: string
+          format: string | null
+          has_locker_room: boolean
           id: string
+          lit: boolean
           name: string
+          notes: string | null
           slot_minutes: number
           sport_id: string
+          surface: string | null
           updated_at: string
           venue_id: string
         }
         Insert: {
           active?: boolean
+          covered?: boolean
           created_at?: string
+          format?: string | null
+          has_locker_room?: boolean
           id?: string
+          lit?: boolean
           name: string
+          notes?: string | null
           slot_minutes: number
           sport_id: string
+          surface?: string | null
           updated_at?: string
           venue_id: string
         }
         Update: {
           active?: boolean
+          covered?: boolean
           created_at?: string
+          format?: string | null
+          has_locker_room?: boolean
           id?: string
+          lit?: boolean
           name?: string
+          notes?: string | null
           slot_minutes?: number
           sport_id?: string
+          surface?: string | null
           updated_at?: string
           venue_id?: string
         }
@@ -316,6 +334,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          lat: number
+          lng: number
           name: string
           slug: string
           updated_at: string
@@ -323,6 +343,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          lat: number
+          lng: number
           name: string
           slug: string
           updated_at?: string
@@ -330,6 +352,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          lat?: number
+          lng?: number
           name?: string
           slug?: string
           updated_at?: string
@@ -621,6 +645,7 @@ export type Database = {
           lat: number
           lng: number
           locality_id: string
+          logo_path: string | null
           name: string
           owner_id: string
           payment_alias: string | null
@@ -644,6 +669,7 @@ export type Database = {
           lat: number
           lng: number
           locality_id: string
+          logo_path?: string | null
           name: string
           owner_id: string
           payment_alias?: string | null
@@ -667,6 +693,7 @@ export type Database = {
           lat?: number
           lng?: number
           locality_id?: string
+          logo_path?: string | null
           name?: string
           owner_id?: string
           payment_alias?: string | null

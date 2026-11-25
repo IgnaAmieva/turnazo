@@ -33,24 +33,24 @@ export default function PwaInstallGuide() {
   }
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-4">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm bg-surface rounded-2xl shadow-xl border border-line p-4">
       <button
         onClick={dismiss}
         aria-label="Cerrar"
-        className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-lg leading-none"
+        className="absolute top-3 right-3 text-ink-muted hover:text-ink text-lg leading-none"
       >
         ×
       </button>
-      <p className="font-semibold text-gray-900 text-sm mb-1">Instalá Turnazo en tu iPhone</p>
-      <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+      <p className="font-semibold text-ink text-sm mb-1">Instalá Turnazo en tu iPhone</p>
+      <p className="text-xs text-ink-muted mb-3 leading-relaxed">
         Para recibir notificaciones de nuevos turnos, instalá la app desde Safari:
       </p>
-      <ol className="text-xs text-gray-700 space-y-1.5 list-none">
+      <ol className="text-xs text-ink space-y-1.5 list-none">
         <li>
           <span className="inline-flex items-center gap-1.5">
             <span className="text-base">1.</span>
             Tocá el botón <strong>Compartir</strong>{' '}
-            <span className="inline-block bg-gray-100 rounded px-1.5 py-0.5 font-mono text-[10px]">□↑</span>
+            <span className="inline-block bg-surface-2 rounded px-1.5 py-0.5 font-mono text-[10px]">□↑</span>
             {' '}en la barra de Safari.
           </span>
         </li>
@@ -69,7 +69,7 @@ export default function PwaInstallGuide() {
       </ol>
       <button
         onClick={dismiss}
-        className="mt-3 w-full rounded-xl bg-green-600 py-2 text-xs font-medium text-white hover:bg-green-700 transition-colors"
+        className="mt-3 w-full rounded-xl bg-primary py-2 text-xs font-medium text-on-primary hover:opacity-90 transition-colors"
       >
         Entendido
       </button>

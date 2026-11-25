@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-19 (Fase 7 S1 cerrado: 021 aplicada, todo verde)
+Última actualización: 2026-11-25 (rediseño: funciones en cle1, logo de hasta 10 MB, agenda nueva y carga de cancha por pasos en la rama `rediseno`; 022 a 025 aplicadas; 026 aplicada; 027 escrita, SIN APLICAR; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -41,7 +41,7 @@
 
 **Bloque 2 — Agenda:**
 - Vista diaria `/panel/complejos/[id]/agenda?fecha=YYYY-MM-DD`.
-- Grid columnas = canchas, filas = tiempo. Rango calculado dinámicamente desde `court_hours` del día (maneja cruce de medianoche).
+- (2026-11-25: la grilla se reemplazó por la agenda nueva, ver "Agenda nueva" más abajo.) Grid columnas = canchas, filas = tiempo.
 - Acciones: cancelar turno, marcar pagado, marcar ausente, bloquear teléfono, crear bloqueo manual.
 - WhatsApp deep-link con template `{nombre}`, `{cancha}`, `{dia}`, `{hora}`, `{total}` desde `venues.whatsapp_template`.
 - Filtro por deporte (solo si hay más de uno). Cancelados/ausentes en gris. Badge de estado de pago.
@@ -85,7 +85,29 @@
 
 | 021 | `021_security_lockdown.sql` | Aplicada por el revisor (2026-11-19), después del deploy `dpl_EjtXUcyNHyUG3tBLDCRSoXmKBV7c` (commit `99891c5`). Fase 7 S1: grants mínimos para anon/authenticated columna por columna (se revoca todo, incluidos TRUNCATE/TRIGGER/REFERENCES, y los privilegios por defecto); FK compuesta `bookings(court_id, venue_id) → courts(id, venue_id)` (C1); el dueño ya no escribe en `bookings`: RPCs `panel_create_block`, `panel_cancel_booking` (pago online → `refund_pending` en la misma transacción), `panel_mark_paid` (no si se pagó todo online; con seña, amount_paid = price_total), `panel_mark_no_show` (con pago online solo después de empezado el turno) (M2); trigger `trg_venues_status`: solo superadmin/servidor cambia `venues.status` (A1); `create_booking` / `create_booking_hold` solo `service_role` (C2/A2); `_validate_booking_slot` rechaza turnos a más de 30 días (`too_far_ahead`). Se aplica **después** del deploy del código de S1 (el código viejo llama a `create_booking` con anon). Validada en PGlite reconstruyendo 001–020 con stubs de Supabase: 64/64 consultas de la app y ataques |
 
-**Próxima migración:** `022_*.sql`
+| 022 | (rama `s2-captcha`) | Aplicada por el revisor. Fase 7 S2 (límites de intentos para Turnstile). El código que la usa está solo en `s2-captcha`; se integra después del merge de `rediseno` |
+| 023 | `023_court_features.sql` | Aplicada por el revisor (2026-11-24). Etiquetas de cancha: `surface` (CHECK con la lista), `covered`, `lit`, `has_locker_room`; grants por columna |
+| 024 | `024_venue_logos.sql` | Aplicada por el revisor (2026-11-24), con dos cambios sobre la propuesta (el archivo ya es igual a lo aplicado): SELECT de storage solo para el dueño (`venue_logos_owner_select`, nadie lista el bucket) y `venues_logo_path_check` (logo_path en la carpeta `{id}/` y sin `..`). `venues.logo_path`, bucket público `venue-logos` (512 KB, PNG/JPEG/WebP), políticas de dueño. Sus políticas tenían un error (`name` se resolvía como `venues.name`): lo corrige la 025 |
+| 025 | `025_venue_logos_policies_fix.sql` | Aplicada por el revisor (2026-11-25; pg_policies dice `storage.foldername(objects.name)`). Recrea las 4 políticas de `venue-logos` con `objects.name` |
+| 026 | `026_panel_create_booking.sql` | Aplicada por el revisor (2026-11-25). `panel_create_booking(venue, court, start, end, nombre, celular)`: el dueño carga un turno desde la agenda ("+ Cargar turno" / "+ Nuevo turno"). Verifica el dueño, valida con `_validate_booking_slot` (igual que la reserva pública), deja `confirmed` / `unpaid` / `source = 'manual'` con el precio de la cancha; horario ocupado → `slot_taken`; sin outbox. EXECUTE solo authenticated |
+
+**Escrita, SIN APLICAR:** `027_localities_geo_court_format_notes.sql`:
+- `localities.lat` / `lng` NOT NULL (las 4 existentes con el centroide oficial de Georef) y grant de SELECT;
+- `courts.format` (`futbol_5`, `futbol_6`, `futbol_7`, `futbol_9`, `futbol_11`, `futsal` o NULL) con CHECK y un trigger `enforce_court_format` que rechaza formato en canchas que no son de fútbol (`format_only_futbol`; también si se cambia el deporte de una cancha con formato: el panel tiene que mandar NULL);
+- `courts.notes` (200 caracteres como máximo, CHECK);
+- grants por columna (lectura anon/authenticated; escritura del dueño en format y notes). Nadie salvo el servidor escribe localities.
+
+**Próxima migración:** `028_*.sql`
+
+### Propuesta: localidades nuevas (falta decidir; NO implementado)
+Cuando un dueño registra un complejo fuera de las localidades cargadas:
+1. El dueño solo pone el pin (ya lo hace). La server action de crear/editar complejo recibe lat/lng, no una localidad elegida a mano. El cliente nunca crea localidades: no hay grants de escritura en `localities` para anon ni authenticated y no se agrega ninguna RPC para eso.
+2. En el servidor, primero se busca una localidad existente cuyo centro esté a menos de ~6 km del pin. Esto hace falta porque Georef devuelve el **municipio**, y en Mendoza municipio = departamento: un complejo en La Consulta da "San Carlos" (verificado con la API). Sin este paso, La Consulta nunca se usaría.
+3. Si no hay ninguna cerca: `GET https://apis.datos.gob.ar/georef/api/ubicacion?lat=…&lon=…` (sin clave, desde el servidor, timeout de 3 s). Se toma `municipio.nombre` (o `departamento.nombre` si viene vacío) y `provincia`. Si ya existe una localidad con ese slug, se usa; si no, se crea con el cliente de service role (`lib/supabase/admin.ts`) con nombre, slug y el centroide del municipio (`/georef/api/municipios?id=…&campos=centroide`). Se escribe en `audit_log` quién la originó.
+4. Si Georef falla o el punto cae fuera de Argentina: se guarda el complejo en la localidad más cercana y el superadmin lo revisa al aprobarlo (el complejo entra `pending` igual).
+5. Visibilidad: la localidad aparece en el inicio solo si tiene al menos un complejo aprobado. Lo hace la consulta del inicio (ya cuenta complejos aprobados). Si querés que también lo haga la base, sería una política RLS para anon en `localities` con `EXISTS (venue aprobado)`, en otra migración.
+
+Ojo, dato a revisar: `padelmates` (aprobado, en Tunuyán) tiene el pin en Guaymallén (-32.8908, -68.8272, Georef lo confirma). Con el orden por cercanía va a quedar lejos de Tunuyán: el pin o la localidad están mal.
 
 **Vault (ya configurado con la 020):** `refund_retry_url` = `https://turnazo-chi.vercel.app/api/mp/refund-retry`; `push_secret` es el mismo `PUSH_SEND_SECRET` de Vercel. Si cambia el dominio hay que actualizar `refund_retry_url` y `push_send_url`.
 (`push_secret` ya existe; es el mismo `PUSH_SEND_SECRET` de Vercel.)
@@ -96,8 +118,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 227 | ✓ verde (2026-11-19, con 021 aplicada) |
-| E2E | Playwright | 65 (incluye el setup de login) | ✓ verde (2026-11-19, con 021 aplicada) |
+| Unitarios + integración | Vitest | 402 | 402 ✓ (2026-11-25, rama `rediseno` antes del merge) |
+| E2E | Playwright | 167 (incluye el setup de login) | 167 ✓ (2026-11-25, rama `rediseno` antes del merge; --workers=1 en 8 tandas de 3 a 5 archivos: con 4 tandas grandes la máquina se quedó sin memoria) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -111,6 +133,174 @@ Archivos E2E:
 - `payment-settings.spec.ts` — 10 tests de configuración de cobro, sin MP y con una cuenta MP falsa (lee `SUPABASE_SERVICE_ROLE_KEY` de `.env.local` para crearla y borrarla); incluye la pantalla pública de reserva en modo "solo pago online" (ahora: ofrece solo "Pagar el total online")
 - `cancellation.spec.ts` — 5 tests (Bloque 5): panel "Cancelaciones" (guarda plazo + política, persiste al recargar, rechaza fuera de rango), panel agenda: cancelar una reserva con pago online muestra "Se le devolverán $X al jugador", pide confirmar, cancela y deja la devolución en proceso (`refund_failed`, sin token de MP en local), y jugador con pago online (devolución total dentro del plazo → avisa el monto, cancela, devolución "en proceso"; política `none` → aviso, checkbox obligatorio, cancela sin devolver). Los 2 del jugador se saltean si la 020 no está aplicada. La limpieza busca las reservas `E2E Cancel*` por nombre (no por ids en memoria: si un test falla, Playwright reinicia el worker y vuelve a correr `beforeAll`), borra primero `payments` y `audit_log`, después reservas y outbox; restaura la política original.
 - `payment-flow.spec.ts` — 8 tests del pago del jugador (Bloques 3 y 4): opciones según configuración, "pagar en el lugar" sigue usando `create_booking`, pago online con cuenta MP falsa → error claro y hold liberado, pantalla `/pago/[token]` (pendiente con cuenta regresiva → confirmada al cambiar la base; botón "Cancelar y elegir otro horario" → hold `expired` y vuelve a `/reservar` del mismo horario; vencida; cancelada; token inexistente). Nunca llama a Mercado Pago. Limpia bookings `E2E Pago*`, la cuenta MP falsa y restaura el cobro original.
+
+Ramas (2026-11-24):
+- `s2-captcha`: Fase 7 S2 (Turnstile + límites; la 022 ya está aplicada). **Sin push** hasta que el revisor cargue las claves de Turnstile en Vercel. Orden decidido: primero se mergea `rediseno` a `main`, después `s2-captcha`.
+- `rediseno`: rediseño visual por etapas (D0–D2 visual, M1–M7 usabilidad), un commit por etapa. Se mergea a `main` solo con OK del revisor.
+
+Rediseño D0 (paleta, fuente, modo claro/oscuro):
+- Colores en un solo lugar: variables CSS en `src/app/globals.css` (claro en `:root`, oscuro en `[data-theme="dark"]` y en un bloque `prefers-color-scheme` para cuando no hay JS) expuestas a Tailwind con `@theme inline`: `bg`, `surface`, `surface-2`, `ink`, `ink-muted`, `line`, `brand`, `primary`/`on-primary`, `accent`/`on-accent`, `danger`(`-soft`), `warning`(`-soft`), `ring`. En oscuro `primary` es lima (el verde oscuro es el fondo). El lima va solo de fondo.
+- `tests/unit/theme-contrast.test.ts` lee `globals.css` y exige AA (4.5:1) para cada par texto/fondo en los dos modos; además que el lima no sea color de texto.
+- Modo: `src/lib/theme.ts` (`THEME_SCRIPT` inline en el `<head>`, sin parpadeo): automático sigue al celular; el botón `components/theme-toggle.tsx` (encabezado público) cicla Automático → Claro → Oscuro y guarda solo `turnazo-theme` en localStorage. Actualiza el color de la barra del celular. Tests: `tests/unit/theme.test.ts` (ejecuta el mismo script con un navegador simulado) y `tests/e2e/theme.spec.ts`.
+- Fuente Outfit (500 texto, 800 títulos) con `next/font`.
+- Desde D2 no queda ninguna pantalla forzada en claro.
+
+Historias de turnos libres (panel; diseño en diseno/historias.png, fuera del repo):
+- Agenda del complejo → "Compartir turnos libres" (/panel/complejos/{id}/historia): día (hoy + 6), deporte (si el club tiene varios) y estilo Pizarra / Invitación / Urgencia con la vista previa de los 3 (la misma imagen que se descarga). "Descargar" (Content-Disposition attachment) y "Compartir" (navigator.share con el archivo si el navegador puede; si no, avisa que use Descargar).
+- Imagen: GET /panel/complejos/{id}/historia/imagen?fecha=&deporte=&estilo=[&descargar=1] → PNG 1080×1920 con next/og (ImageResponse), Outfit 500/800 (src/assets/fonts, OFL; outputFileTracingIncludes en next.config). Contenido: círculo con las iniciales del club (no hay logo todavía), nombre y localidad, DEPORTE en una pastilla grande, el día, hasta 6 horarios libres con precio (los mismos que ve el jugador: libres, con precio, sin los que ya empezaron), el link y la marca Turnazo. Cache-Control private, no-store.
+- Solo el dueño: getStoryData (lib/stories.ts) verifica la sesión y venues.owner_id con el cliente del dueño; si no es el dueño, 404 (sin decir si el complejo existe). /panel/* sin sesión va al login (middleware).
+- Link en la imagen: {host}/c/{primeros 8 del id}/{deporte} (src/app/c/[code]/[sport]/route.ts) redirige a la página del complejo; busca por rango de uuid entre los complejos aprobados y, si no hay exactamente uno, va al inicio.
+- Tests: tests/e2e/historias.spec.ts (agenda → elegir → vistas previas → descarga PNG 1080×1920; sin sesión → login; complejo de otro dueño → 404; link corto) y tests/unit/stories.test.ts.
+
+- Día de la imagen: la ruta responde `X-Historia-Fecha` con el día dibujado (hora de Mendoza). E2E: por defecto es hoy, al elegir otro día la vista previa, la descarga y la imagen usan ese día, y un día pasado vuelve a hoy; unit: "hoy" cerca de medianoche (02:30 UTC = 23:30 del día anterior en Mendoza). El "Martes 1" de las capturas anteriores era una imagen pedida a mano con ?fecha= de otro día, no un error.
+
+Velocidad (2026-11-25):
+- Causa: Supabase está en us-east-2 (Ohio) y las funciones de Vercel estaban en gru1 (San Pablo): cada consulta cruzaba el continente. `vercel.json`: `regions: ["cle1"]` (Cleveland). La mudanza de la base a São Paulo va con S7.
+- Consultas en cadena juntadas: inicio (localidades, deportes y complejos en una tanda: `getLocalitiesAndSportsWithCounts`), complejo (deporte, complejo y canchas a la vez, con React cache: `generateMetadata` y la página no repiten), agenda (complejo, canchas y reservas a la vez).
+- Medido desde Argentina (tiempo hasta el primer byte, mediana de 15 pedidos, deploy viejo y nuevo uno detrás del otro; agenda con la sesión del dueño de prueba):
+
+  | Pantalla | Antes (gru1) | Después (cle1 + consultas juntas) |
+  |---|---|---|
+  | Inicio | 1132 ms | 572 ms |
+  | Lista (/tunuyan/padel) | 642 ms | 506 ms |
+  | Complejo | 798 ms | 485 ms |
+  | Agenda | 1257 ms | 518 ms |
+
+  Lo que queda es en buena parte el viaje Argentina ↔ Cleveland (antes ese tramo era corto y el largo era cada consulta). La lista hace todavía 3 pasos seguidos (localidad/deporte → complejos → disponibilidad), ahora de pocos ms cada uno.
+
+Logo del club (024 y 025 aplicadas; hasta 10 MB desde 2026-11-25):
+- Panel del complejo → "Logo del club" (`components/panel/venue-logo-section.tsx`): el logo actual o las iniciales, "Subir logo" / "Cambiar logo" y "Quitar logo" (44 px). Acepta hasta 10 MB (más se avisa antes de mandar).
+- El servidor lo achica con sharp (`lib/venue-logo-shrink.ts`): 1024 px de lado como máximo (sin agrandar ni recortar), menos de 512 KB, MISMO formato (PNG con su transparencia, JPEG, WebP), orientación EXIF aplicada y sin metadatos. Si no entra, baja la calidad y después el lado en proporción.
+- Vercel corta los pedidos de más de 4,5 MB: si el archivo pesa más de 4 MB, el navegador lo baja antes a 2048 px (o 1024) en el mismo formato; si no puede (un navegador que no sabe guardar WebP), avisa. `next.config`: `serverActions.bodySizeLimit` y `proxyClientMaxBodySize` en 11mb.
+- Portada, panel e historias: el logo entero y como se subió, sin círculo que lo recorte ni fondo blanco (respeta la transparencia).
+- `uploadVenueLogoAction` / `removeVenueLogoAction` (actions/panel.ts), con la sesión del dueño (las políticas de storage hacen cumplir la carpeta): verifica que el complejo sea suyo, tamaño ≤ 512 KB y el tipo REAL por los primeros bytes (`detectLogoType` en lib/venue-logo.ts: PNG, JPEG, WebP; la extensión y el Content-Type no cuentan). Sube a `{venue_id}/logo-{timestamp}.{ext}` (nombre nuevo cada vez: la URL pública cambia y nadie ve el viejo de caché), guarda logo_path, borra el anterior y escribe audit_log.
+- Se muestra por la URL pública del bucket (no necesita política de lectura): portada del complejo (`components/club-logo.tsx`, círculo junto al nombre) y panel. Sin logo, iniciales en verde sobre lima.
+- Historia: `getStoryData` baja el logo por su URL pública y lo pasa como data URI (vuelve a mirar los bytes; si falla, iniciales). next/og dibuja PNG y JPEG pero deja vacío el WebP: el WebP se convierte a PNG con `sharp` (agregado como dependencia directa; ya venía con Next, misma versión 0.35.5).
+- Tests: `tests/unit/venue-logo.test.ts` (bytes), `tests/unit/venue-logo-shrink.test.ts` (PNG con alfa, JPEG, WebP, sin agrandar, EXIF, imagen rota), `tests/integration/venue-logos.test.ts` (A no sube, no pisa, no borra ni lista en la carpeta de B; no apunta logo_path a otra carpeta ni con `..`; la acción rechaza un SVG con nombre .png, más de 10 MB, sin archivo, una imagen rota y el complejo ajeno; A sube un PNG de 3 MB que se guarda achicado y sigue PNG con alfa, lo cambia y lo quita) y `tests/e2e/logo.spec.ts` (iniciales → logo en la portada y en la historia, PNG y WebP; archivo falso rechazado; aviso de 10 MB; el dueño sube un PNG transparente y una foto de más de 4 MB, se guardan achicados en su formato, se ven enteros, y lo quita).
+
+Agenda nueva (2026-11-25; diseno/agenda-v2.png, pantallas 1 y 2; `components/panel/agenda-day.tsx`, reemplaza a la grilla):
+- Días Hoy + 6 (y el elegido) y "Otra fecha". Resumen del día de todas las canchas: turnos, $ a cobrar (lo que falta de los confirmados) y libres.
+- Pestañas por cancha con su cantidad de turnos y "Todas" (recordada en el dispositivo). En "Todas", en pantallas anchas, una columna por cancha lado a lado; en el celular, una lista con el nombre de la cancha.
+- Lista en orden de hora: turnos (hora y fin, nombre, celular, pago en lima pagado/seña o ámbar sin pagar, WhatsApp de 44 px), bloqueos y libres punteados con "+ Cargar turno". Línea AHORA si el día es hoy. Los cancelados no se listan (su horario aparece libre).
+- Barra fija abajo: "+ Nuevo turno" y "Compartir libres".
+- Hoja del turno: "Cobrado $X" y "WhatsApp" grandes arriba; abajo "Marcar que no vino", "Cancelar turno" y "Bloquear este número" (estos dos piden confirmación). Hoja "Nuevo turno": turno de un jugador (cancha, horario libre, nombre, celular; necesita la 026) o bloquear horario (lo de antes).
+- No se hizo "Mover a otro horario" ni "3er turno este mes" del diseño: no estaban en el pedido.
+- Tests: `tests/e2e/agenda-v2.spec.ts` (nuevo) y agenda, audit, panel-movil y cancellation adaptados; `tests/integration/panel-create-booking.test.ts` (026).
+
+Cargar cancha por pasos (2026-11-25; diseno/agenda-v2.png, pantalla 3):
+- 1 Datos (`/canchas/nuevo`): nombre, deporte y duración con botones (la duración sigue a la del deporte hasta que se toca), superficie, Techada / Iluminada / Vestuario / Visible. "Siguiente: precios →".
+- 2 Precios (`/canchas/{id}?paso=precios`): aviso lima "Cancha X cargada · Ya aparece en la app. Te faltan los precios.", el aviso de horarios sin precio ahí mismo (se va al guardar los que faltan), precios y horarios. 3 Listo (`?paso=listo`): "Cancha X lista" o lo que falta, y Ver la agenda / Cargar otra cancha.
+- Aviso "Guardado" en todo el panel (`components/panel/saved-toast.tsx`, uno solo en el layout; `useSavedNotice` en cada formulario): datos del complejo, cancha, horarios, precios, cobro, cancelaciones, logo, desbloquear, Mercado Pago y las acciones de la agenda.
+- Los editores de horarios y precios ahora se mandan con onSubmit: con `action=` React 19 hacía form.reset() y después de guardar todas las filas mostraban "Dom" (lo guardado estaba bien). Controles de 44 px.
+- Tests: `tests/e2e/cancha.spec.ts`.
+
+Inicio con "¿Dónde?" y complejos en la misma pantalla (2026-11-25; necesita la 027, aplicada):
+- "¿Dónde?" es una sola barra desplegable (`components/where-bar.tsx`, select nativo de 48 px) con las localidades que tienen al menos un complejo aprobado ("Tunuyán · 3 complejos"). Las que no tienen no aparecen: `/la-consulta` abre el inicio con la primera que sí.
+- Sin localidad en la URL: con permiso de ubicación YA dado, la más cercana (por el centro de la localidad, 027) y la lista ordenada por distancia ("· a 0,5 km"); sin permiso, la última que usó (localStorage) o la primera. "Usar mi ubicación" pide el permiso solo si el jugador lo toca. La posición no se guarda. Reemplaza a `OpenRememberedSearch`.
+- Debajo, en la misma pantalla, los complejos del deporte (`components/venue-results.tsx`, el mismo de `/[localidad]/[deporte]`): "¿A qué hora querés jugar?" con Ahora · 18–20 · 20–22 · 22+ y "Otra hora…" (08 a 23; `?hora=19` = turnos que empiezan de 18:30 a 19:59, porque con la grilla de 90 min ningún turno empieza justo a las 19). Solo aparecen los complejos con lugar a esa hora, primero el que tiene MÁS turnos libres (`lib/rank-venues.ts`, para repartir), con "N turnos libres …" y hasta 4 horarios. El botón "Ver N complejos" ya no existe.
+- Localidad desde el pin (propuesta aprobada, `lib/locality-resolver.ts`): el formulario del complejo ya no tiene selector de localidad. Al crear (o al mover el pin al editar), el servidor busca una localidad a menos de 6 km; si no hay, consulta Georef (`/ubicacion`, 3 s de timeout) y usa o crea el municipio con la clave de servicio (centroide de Georef), con `audit_log` (`entity = 'locality'`); si Georef falla, la más cercana con `locality_source = 'fallback'` en el audit del complejo, para que la revise el superadmin al aprobarlo.
+- El mapa del complejo nuevo arranca SIN pin, y sin pin no se guarda ("Marcá en el mapa dónde está el complejo."). Antes el marcador arrancaba en el centro de Mendoza (-32.8908, -68.8272): es exactamente el pin de padelmates, que seguramente nunca lo movió. Sus datos no se tocaron (lo revisa Igna).
+- Tests: `tests/unit/locality-resolver.test.ts`, `tests/unit/franjas.test.ts` (hora exacta y orden); E2E `inicio.spec.ts` (barra, orden, hora, ubicación), `panel.spec.ts` (sin pin), `public.spec`, `rediseno.spec`.
+
+Fútbol: formato de la cancha (2026-11-25; 027):
+- Panel: en la carga de cancha, si el deporte es fútbol aparece "Formato" con 6 botones (Fútbol 5, 6, 7, 9, 11, Futsal; radios de 44 px). Con pádel o tenis no se muestra y el servidor guarda `format = NULL` aunque el formulario lo mande (`formatForSport` en `actions/panel.ts`); así una cancha que pasa a pádel nunca choca con el trigger `enforce_court_format`.
+- Inicio y lista, solo con fútbol: chips "Todos · 5 · 6 · 7 · 9 · 11 · Futsal" (`?formato=`, `components/format-chips.tsx`) que dejan solo las canchas de ese formato (`filterByFormat`, también para "Lo antes posible"); cambiar la hora conserva el formato.
+- Tarjeta y portada: el formato va primero en las etiquetas ("Fútbol 5 · 1 cancha · turnos de 60 min"; en la portada sin repetir "Fútbol"), y en la pestaña de la cancha ("Cancha 1 · Fútbol 5").
+- Hoy la única cancha de fútbol (futmates) no tiene formato: aparece con "Todos" y no con un formato hasta que el dueño lo elija.
+- Tests: `tests/unit/court-format.test.ts`, `court-tags.test.ts`; `tests/integration/court-format.test.ts` (API: dueño, anon, CHECK, trigger, notes de 200; acciones: crear con formato, pasar a pádel → NULL); E2E `tests/e2e/formato.spec.ts` (crea y borra "E2E Formato F5" en el complejo de prueba).
+
+Aclaraciones de la cancha (2026-11-25; 027):
+- Panel: "Aclaraciones (opcional)" en la carga de cancha (textarea con `maxlength=200` y contador "46/200"). El servidor recorta espacios, guarda NULL si queda vacío y rechaza más de 200 (además del CHECK de la 027).
+- Se muestran en la portada del complejo (debajo de las pestañas, la de la cancha elegida), en la hoja de reserva y en `/reservar`, como texto: React las escapa, no hay `dangerouslySetInnerHTML`. Probado con `<b>` y `<img onerror>`: se ve el texto literal y no se arma ningún elemento.
+- Tests: `tests/integration/court-format.test.ts` (acción: espacios, vacío → NULL, 201 → error, el HTML se guarda como texto); E2E `tests/e2e/aclaraciones.spec.ts` (usa la cancha de prueba y le deja `notes = NULL`).
+
+Mapa chiquito clickeable (2026-11-25, antes del merge):
+- En la tarjeta de la lista/inicio y en la tarjeta de dirección del complejo, el mapa chiquito es un `<a>` (`MiniMapLink`, 76 o 56 px) a Google Maps con el pin real, la misma URL que "Ir" (`mapsUrl` en `lib/geo.ts`), `target="_blank"`, `rel="noopener noreferrer"` y `aria-label="Ver ubicación de {complejo} en el mapa"`.
+- En la lista, el resto de la tarjeta lleva al complejo: el nombre es un link estirado (`after:absolute inset-0`) y el mapa y los turnos quedan por encima (z-10).
+- Tests: `lista.spec` (atributos, 44 px, que el toque caiga en el mapa y que tocar la dirección abra el complejo) y `complejo.spec` (mismo href que "Ir").
+
+Plantilla de WhatsApp más fácil (2026-11-25, antes del merge; sin migración):
+- `components/panel/wa-template-editor.tsx`: editor (contenteditable, `role="textbox"`) donde las variables se ven como pastillas lima ("Nombre", "Cancha", "Día", "Hora", "Total", `contenteditable=false`: una tecla las borra enteras). Botones "+ Nombre"… de 44 px que insertan en el cursor (o al final si el cursor no está en el editor). "Volver al mensaje original". Contador /500. Vista previa como antes. Pegar pega solo texto; Enter inserta un salto de línea; `{nombre}` escrito a mano se vuelve pastilla al salir del editor.
+- Se guarda como hoy: texto con `{variables}` en un campo oculto `whatsapp_template` (`lib/wa-template.ts`: parse/serialize, ida y vuelta sin cambios; llaves desconocidas como `{link}` quedan como texto).
+- Mensaje por defecto (`DEFAULT_WA_TEMPLATE`): "¡Hola {nombre}! Tu turno en {cancha} el {dia} a las {hora} está confirmado. Total: {total}. ¡Te esperamos!". Viene cargado en un complejo sin plantilla, y la agenda lo usa si el complejo no tiene plantilla guardada (antes abría WhatsApp sin texto).
+- Tests: `tests/unit/wa-template.test.ts`; E2E `settings.spec.ts` (pastillas, botones de 44 px, insertar en el cursor y al final, borrar con una tecla, original, guardar, contraste AA claro/oscuro; restaura la plantilla del complejo de prueba).
+
+Rediseño M4 (Mi turno):
+- "Guardá este link" arriba de todo (borde primary): el link de Mi turno en un campo de solo lectura y "Copiar link" (44 px; sin permiso de portapapeles queda seleccionado para copiar a mano).
+- Con el turno confirmado: "Compartir por WhatsApp" (wa.me/?text= con cancha, día, horario, dirección y "Cómo llegar"; SIN el link de Mi turno, porque con él se puede cancelar), "Agregar al calendario" (GET /turnos/{token}/calendario → turno.ics, RFC 5545, horas en UTC, Cache-Control private/no-store; 404 si el turno no existe o no está confirmado) y "Cómo llegar" (Google Maps con el pin del complejo; sin pin, nombre y dirección).
+- lib/mi-turno.ts (reserva por token, link de Cómo llegar, origen del pedido) y lib/ics.ts (con test). El link se arma con el host del pedido, así sirve en local, en el Preview y en producción.
+- E2E tests/e2e/mi-turno.spec.ts con fecha "viernes 14+ días" (antes "26+ días" podía caer a más de 30 y la base devolvía too_far_ahead).
+
+Rediseño V2 (diseño aprobado "versión 2"; la imagen de referencia está en diseno/, fuera del repo):
+- V2a · Inicio: deporte y lugar en una sola pantalla (?localidad=&deporte=; sin elección, la búsqueda recordada o la primera con complejos). Portada verde con líneas de cancha (SVG, clase `.cover` en globals.css: primary en claro, surface en oscuro, mismas variables), "Hola, Juan" + "No soy yo", "¿Jugamos hoy?" y "Lo antes posible · 18:00 · complejo →" (primer turno libre CON precio de hoy o, si no queda, de mañana), que abre el complejo con la hoja de ese turno (?cancha=&inicio=, la hoja limpia la URL). "¿Qué querés jugar?" con íconos de línea (components/sport-art.tsx), el elegido en primary, sin complejos "Pronto" sin link. "¿Dónde?": chips "Tunuyán · 3", sin complejos "· pronto". /[localidad] redirige al inicio con esa localidad; /[localidad]/[deporte] sigue igual. Se quitó "Seguir en…" (lo reemplaza la portada).
+- lib/free-slots.ts: canchas de una localidad+deporte en UNA consulta; disponibilidad con get_court_availability una vez por cancha y fecha por request (React cache), tope MAX_COURTS = 24 canchas; solo hoy y, si hace falta, mañana.
+- V2b · Lista de complejos: franjas de hoy Ahora · 18–20 · 20–22 · 22+ (?franja=, lib/franjas.ts con test). Cada complejo en tarjeta: mapa chiquito ESQUEMÁTICO en SVG (components/mini-map.tsx: calles dibujadas y pin con las variables del tema; sin tiles ni pedidos externos; la ubicación real queda en "Ir"/"Cómo llegar"), nombre, dirección, distancia solo si el jugador YA dio permiso de ubicación (nunca se pide; components/venue-distance.tsx), etiquetas con lo que existe ("2 canchas · turnos de 90 min") y los próximos 4 horarios libres con precio de la franja en chips lima (horarios distintos), que abren el complejo con la hoja de ese turno. Primero los que tienen lugar; "N complejos con lugar". El mapa grande (Leaflet + OSM, con su atribución) sale de arriba y se carga recién con "Ver todos en el mapa". La lista acepta ?_now= solo fuera de producción (igual que el complejo) para los tests.
+- V2c · Complejo: portada verde (~200 px, clase .cover) con las líneas de cancha del deporte, flecha de volver de 44 px (en escritorio siguen las migas), nombre grande y "Pádel · 2 canchas". Tarjeta flotante con dirección, mapa chiquito esquemático (el mismo de V2b) y "Ir" (Google Maps con el pin real). Días en una fila deslizable (Hoy, Mar 25…, los 30 días reservables; el elegido se centra). Pestañas por cancha (?c=, links: funcionan sin JavaScript) y "Turnos de 90 min". Grilla de 4 columnas: libre en tarjeta neutra con precio, elegido en lima con borde primary, ocupado punteado y tachado, sin precio "Consultá". Tocar un turno lo ELIGE y aparece la barra fija "Hoy 19:00 · Cancha 1 · $10.000" + "Reservar", que abre la hoja de M2 (con datos recordados: turno → Reservar → Confirmar = 3 toques; antes 2). Sin JavaScript el turno sigue siendo un link a /reservar. Se quitó DateNavigator (lo reemplaza la fila de días).
+- Etiquetas (023, APLICADA por el revisor el 2026-11-24): en el panel, el formulario de la cancha tiene "Superficie" (select con las 5 opciones o "Sin indicar") y tres interruptores (role=switch, 44 px): Techada, Iluminada, Vestuario; createCourtAction/updateCourtAction los guardan (zod valida la superficie). La lista y la portada del complejo muestran lo cargado ("Sintético · Techada · Iluminada", lib/court-tags.ts); si no hay nada, "2 canchas · turnos de 90 min". tests/integration/court-features.test.ts: el dueño edita sus canchas; no puede editar las de otro dueño (ni por la API ni por updateCourtAction); anon lee y no escribe; el CHECK rechaza superficies inventadas. E2E: tests/e2e/etiquetas.spec.ts (deja la cancha de prueba como estaba).
+- Fila de días del complejo: el primero siempre es "Hoy" y nunca hay días pasados; una ?fecha= vieja abre hoy.
+- Migración 023 (supabase/migrations/023_court_features.sql), aplicada por el revisor: courts.surface (CHECK sintetico/pasto/cemento/polvo_ladrillo/blindex o NULL), covered, lit, has_locker_room (boolean NOT NULL DEFAULT false); SELECT a anon y authenticated de esas columnas, INSERT/UPDATE a authenticated (el dueño edita la cancha con UPDATE directo + RLS courts_owner_all; no hay RPC panel_* de canchas). La app todavía no la usa.
+- Editor de precios: "Agregar franja" propone el tramo abierto que falta cubrir (futmates: 22:00 a 00:00) o el horario de apertura de la cancha; ya no 08:00–22:00 fijo (defaultPriceRow en lib/price-coverage.ts, con test).
+- Bug de futmates (22:00 y 23:00 sin precio): la cancha abre de 10:00 a 00:00 y el precio está cargado de 08:00 a 22:00 (la fila que propone el editor por defecto). No es un error de cálculo: falta la franja de precio. La base rechaza esas reservas (price_not_set). Arreglo: la grilla ya no ofrece como libre un turno sin precio ("Consultá al complejo", sin link), "Lo antes posible" y la lista los saltean, y el panel de la cancha avisa "Hay turnos sin precio: 22:00 a 00:00 · todos los días" (lib/price-coverage.ts + tests/unit/price-coverage.test.ts). Los datos de futmates no se tocaron: el dueño tiene que agregar la franja 22:00–00:00.
+
+Pendientes de M3:
+- Teléfono bloqueado (y todo error general): los datos vuelven a la línea recordada con "Cambiar" y "No soy yo"; con los campos abiertos, "No soy yo" va dentro de la misma tarjeta. Los errores sin reintento muestran "Cerrar" (44 px) donde iba Confirmar: en la hoja la cierra; en /reservar vuelve al complejo.
+- Celular siempre "característica + espacio + número" (`formatArgentinePhone` en lib/phone.ts, con la lista de características de 3 dígitos; "11" de 2; el resto de 4): línea recordada, campos (al salir del campo) y Mi turno. Se recuerda ya formateado.
+- Error de Mercado Pago → "Pagar en el lugar": `tests/integration/mp-pay-at-venue.test.ts` (complejo propio, MP simulado) confirma que el hold se libera antes de devolver el error y queda una sola reserva activa; dos toques → una reserva + slot_taken; si otro jugador toma el turno en el medio → slot_taken con "Ver otros horarios". Si no se pudo liberar el hold, la acción devuelve `mp_hold_not_released` ("el turno queda apartado a tu nombre 10 minutos") en vez de ofrecer "Pagar en el lugar". Propuesta de base (no aplicada): ver "Propuesta: create_booking que reemplaza el hold".
+- M4 (Mi turno) hecho después, ver "Rediseño M4".
+
+Rediseño M3 (errores con acción) y ajuste de datos recordados:
+- Datos recordados (hoja y /reservar): una línea "Juan Pérez · 2622 123456" con "Cambiar" (44 px, despliega los campos) y "No soy yo". Sin datos recordados, los campos como antes. Nombre y celular son campos controlados: lo escrito no se borra cuando la reserva vuelve con error. Solo se recuerda un celular con 8+ dígitos y un nombre de 2+ letras (antes se guardaba un celular mal escrito).
+- `src/lib/booking-errors.ts`: catálogo único código → mensaje corto + acción. `lib/booking-messages.ts` ahora sale de ahí (las server actions no cambiaron; devuelven los mensajes nuevos). Acciones: `other_times` (turno tomado / pasado / fuera de grilla → "Ver otros horarios" reemplaza a Confirmar; en la hoja cierra y recarga el día; en /reservar vuelve al complejo con la fecha), `field` (nombre / celular → se marca el campo con `aria-invalid`, mensaje debajo y foco), `none` (límite de 3 turnos, teléfono bloqueado, complejo/cancha no disponible, sin precio → solo el mensaje, sin botón), `wait` (pago en curso; rate limit de S2: "Esperá un minuto y probá de nuevo"), `pay_at_venue_or_retry` (Mercado Pago → "Pagar en el lugar" si el complejo lo permite —cambia la opción y reserva en un toque— y "Reintentar el pago"), `change_payment`, `retry` (genérico).
+- La validación del servidor (zod) devolvía textos genéricos en inglés para nombre/celular: el formulario muestra los del catálogo.
+- Al mergear S2: `ABUSE_MESSAGES.tooMany` debería usar `bookingError("too_many_attempts").message` (mientras tanto el catálogo reconoce el texto actual de S2 como alias).
+- `tests/integration/booking-errors.test.ts`: lee de las migraciones la definición vigente de `create_booking`, `create_booking_hold` y `_validate_booking_slot` (más los códigos propios de la acción de pago) y exige que cada código tenga mensaje (≤ 110 caracteres) y acción; contra la base real, la server action devuelve errores del catálogo. Encontró `invalid_period`, que antes caía en el mensaje genérico.
+- E2E: `errores.spec.ts` (celular inválido marca el campo y no se borra; teléfono bloqueado sin reintento) y `hoja.spec.ts` (turno tomado → "Ver otros horarios" recarga el día; error de MP → "Pagar en el lugar" reserva en un toque).
+- Capturas: `13-hoja-recordada`, `14-error-tomado`, `15-error-celular`, `16-error-bloqueado` (claro/oscuro).
+
+Rediseño M2 (reserva en la hoja del complejo):
+- `src/components/booking-sheet.tsx`: tocar un turno libre abre una hoja (abajo en el celular, centrada en escritorio) con el mismo `BookingForm` y las MISMAS server actions que /reservar (online → `startPaymentAction` → Mercado Pago; en el lugar → `createBookingAction` → /turnos/…). Las server actions no cambiaron. Con datos recordados: turno → Confirmar = 2 toques.
+- El turno sigue siendo un `<a href="/reservar?…">`: sin JavaScript (o Ctrl/Cmd + clic) se usa la página /reservar, que sigue igual.
+- `BookingForm`: pie fijo abajo (`sticky`) con el error pegado al botón (`data-testid="reserva-error"`), en la hoja y en /reservar. Lugar reservado para Turnstile: `<div data-captcha-slot>` (se completa al mergear `s2-captcha`; no se trajo código de esa rama).
+- `src/lib/payment-options.ts`: `buildPaymentOptions` (sacado de /reservar, mismo cálculo) para la página y la hoja.
+- Celular: las migas de pan se reemplazan por "← Volver" (44 px) al paso anterior lógico (`components/breadcrumbs.tsx`): localidad → inicio, complejos → localidad, complejo → complejos, reservar → complejo con su fecha, mi turno / pago → inicio. Escritorio: migas completas.
+- Inicio: título "¿Dónde jugamos?"; el saludo usa solo el primer nombre.
+- `tests/e2e/hoja.spec.ts`: 2 toques con datos recordados, Confirmar a la vista, lugar del captcha, error pegado al botón cuando el turno se ocupa con la hoja abierta, Cerrar/Escape, sin JS → /reservar, pago online desde la hoja con la cuenta MP falsa (error de MP; se restaura el cobro), "← Volver" y migas en escritorio.
+- Capturas: `11-hoja` y `12-hoja-error` (claro/oscuro).
+
+Rediseño M1 (recordar al jugador, 44 px en el flujo público):
+- `src/lib/player-memory.ts`: localStorage `turnazo-jugador` con SOLO nombre, celular, última localidad y último deporte (`sanitizePlayerMemory` descarta cualquier otro campo, slugs raros y textos largos). Nunca el email ni nada del pago. `tests/unit/player-memory.test.ts`.
+- Nombre y celular se guardan al enviar el formulario de reserva; la próxima reserva viene precargada con "Reservás como Juan · No soy yo". Localidad y deporte se guardan al mirar la lista de complejos o un complejo.
+- Inicio: tarjeta "Hola, Juan" + "Seguir en Tunuyán · Pádel" + "No soy yo". "No soy yo" (44 px, en el inicio y al reservar) borra todo lo recordado.
+- 44 px en todo el flujo público: migas de pan, "Cómo llegar", links de texto ("Volver al inicio", "Buscar otro turno"…), casilla "Entiendo que no hay devolución" y los botones de zoom del mapa. `tests/e2e/tactil.spec.ts` recorre inicio → localidad → complejos → complejo → reservar → mi turno y las pantallas de error, y falla con la lista de lo que mida menos de 44 × 44.
+- `tests/e2e/recordar.spec.ts`: "Seguir en…", reserva real en el complejo de prueba (borrada al final) que guarda solo los 4 campos (sin email aunque se haya escrito), precarga, "No soy yo" en reservar y en el inicio, y un valor manipulado en localStorage que se ignora.
+- Capturas 390 px claro/oscuro: `9-inicio-seguir`, `10-reservar-recordado`, `2-complejo` (con el "Ocupado" nuevo).
+
+Rediseño D2 (panel del dueño, login y registro):
+- Todo el panel, login y registro con los colores por función (modo oscuro completo). El botón "Conectar Mercado Pago" pasó de `#009ee3` (3.1:1 con blanco) a `#0072a8` (5.3:1).
+- Menú: barra lateral en escritorio; en el celular, barra arriba con "Menú" / "Cerrar menú" que despliega los links (44 px), el tema, notificaciones y cerrar sesión. La agenda usa todo el ancho (antes la barra lateral fija dejaba ~140 px). Dentro de la agenda de un complejo el ítem activo es "Agenda".
+- `/panel` entra directo a la agenda (antes a Complejos).
+- Agenda: "← Anterior", "Siguiente →", "Hoy" (si no es hoy) y selector de fecha, todos de 44 px. Columnas con encabezado de 44 px y botón "+" de 44 px. Turnos confirmados en lima; pendientes en warning; textos de 11–14 px (antes 9–10 px).
+- Acciones de un turno: tocar la tarjeta abre una hoja (abajo en el celular, centrada en escritorio; `role="dialog"`, Escape o tocar afuera la cierra) con botones de ancho completo y 44 px: WhatsApp, Marcar pagado, Marcar ausente, Cancelar turno (con el aviso de devolución), Bloquear teléfono, Cerrar. Mismos textos que antes (los E2E existentes no cambiaron).
+- Bloqueo manual: campos y botón de 44 px.
+- Ajustes del revisor (2026-11-24):
+  - Celular (< 640 px): pestañas por cancha, una columna a la vez a todo el ancho; la elegida queda en localStorage (`turnazo-agenda-cancha:<venue>`, solo el id de la cancha). Escritorio: grilla completa.
+  - Color por pago: confirmado con pago total o seña = lima; sin pagar = tarjeta neutra (surface + borde line) con etiqueta "Sin pagar $X" en warning. Pendiente de pago online (`hold`) sigue en warning.
+  - Íconos de línea SVG inline (estilo lucide; `lucide-react` no está instalado y no se sumó) en lugar de emojis: WhatsApp, Marcar pagado, Marcar ausente, Cancelar, Bloquear, Cerrar, "+" de bloqueo y candado de los bloqueos.
+  - "Cancelar turno" y "Bloquear teléfono" siempre piden confirmación ("Confirmar cancelación" / "Confirmar bloqueo" o "Volver"); antes solo pedía confirmar la cancelación con pago online. `audit.spec.ts` suma ese clic.
+  - `agenda.spec.ts`: el chequeo genérico de "cancha" busca solo elementos visibles (las pestañas del celular están ocultas en escritorio).
+  - "Ocupado" (decisión del revisor): sin fondo, borde punteado `line`, hora tachada en ink-muted; se distingue del libre en los dos modos. E2E en `rediseno.spec.ts`.
+- `tests/e2e/panel-movil.spec.ts` (390 px): entrada a la agenda, menú cerrado/abierto, ítem activo, "Hoy" y selector de fecha, hoja de acciones con 44 px y dentro de la pantalla. Reserva propia "E2E Rediseño Panel" (sábado 9+ días) que se borra al final.
+- Capturas 390 px claro/oscuro: agenda, menú abierto y acciones de un turno (reservas "Captura D2", borradas).
+
+Rediseño D1 (pantallas públicas):
+- Inicio, localidad, complejos, complejo, reservar, pago, mi turno y cancelación usan solo los colores por función: en oscuro cambia todo el contenido, no solo el encabezado. Turnos libres en tarjeta neutra (surface, borde line, hora en ink 800, precio en ink-muted, 44 px o más; ajuste del revisor: en lima quedaba "una pared amarilla"). El lima queda para el turno elegido, "Confirmado" y los botones principales; éxito con lima de fondo; errores en `danger`; pendiente en `warning`. "Cancelar turno" pasó a botón con contorno rojo (se lee en los dos modos).
+- Días: los botones "Ayer"/"Manana" (que en realidad iban al día anterior/siguiente) pasan a ‹ › de 44 px con `aria-label` "Día anterior"/"Día siguiente".
+- `/turnos/[token]` ya no muestra el estado interno en inglés (`hold`, `expired`…): "Esperando el pago", "Vencido", "Jugado". La fecha se ve "Martes, 8 de diciembre" (antes `capitalize` ponía "De Diciembre").
+- `/pago` confirmado: tarjeta neutra con tilde en lima (antes el botón quedaba lima sobre lima en oscuro).
+- Inicio: las localidades sin complejos dicen "Próximamente", en ink-muted sin opacidad (pasa AA) y no son tocables (`aria-disabled`).
+- `tests/e2e/rediseno.spec.ts`: mide en el navegador el contraste real de esas tarjetas y de los turnos libres en los dos modos, que los turnos no sean lima y que midan 44 px o más.
+- Capturas en celular (390 px, claro y oscuro) tomadas con una spec temporal contra el complejo de prueba; la reserva "Captura D1" se borró.
+- Preview: comparte la base de producción; reservar ahí crea reservas reales.
 
 Fase 7 S1 (seguridad) — CERRADO (2026-11-19):
 - Con la 021 aplicada: Vitest 227/227 y Playwright 65/65; la base quedó igual que antes de correr (3 complejos, 3 usuarios, 14 reservas, 0 teléfonos bloqueados).
@@ -419,3 +609,58 @@ SELECT vault.create_secret('<mismo-valor-que-PUSH_SEND_SECRET>', 'push_secret');
 2. **No correr E2E contra la URL publicada** — los tests crean y cancelan bookings reales,
    borran outbox rows y bloquean teléfonos. Solo correr `pnpm test:e2e` contra
    `localhost:3001`.
+
+## Pendiente S5: create_booking que reemplaza el hold (p_replace_hold_token)
+
+Aprobada la idea, pero no ahora: va en S5, en una migración aparte (no en la 023).
+
+Hoy "Pagar en el lugar" después de un error de Mercado Pago hace dos pasos: la acción de pago libera el hold (`status = 'expired'`) y después el formulario llama a `create_booking`. La restricción `no_overlap` (holds + confirmadas) impide dos reservas activas, pero entre los dos pasos el turno queda libre unos segundos y otro jugador podría tomarlo (el jugador lo ve: "Este turno ya fue reservado" + "Ver otros horarios").
+
+Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma más un parámetro opcional):
+
+- `p_replace_hold_token text DEFAULT NULL`.
+- Si viene, en la misma transacción y antes del INSERT: `UPDATE bookings SET status = 'expired' WHERE cancel_token = p_replace_hold_token AND status = 'hold' AND court_id = p_court_id AND period = tstzrange(p_start, p_end, '[)') AND customer_phone = v_val.norm_phone`. Solo libera un hold del mismo jugador, la misma cancha y el mismo horario; si no coincide, no toca nada.
+- El resto igual. Si el INSERT falla, la transacción se revierte y el hold sigue a su nombre (no pierde el turno).
+- La acción de pago tendría que dejar de liberar el hold en los errores de MP y devolver su `cancel_token` (solo al cliente que lo creó) para pasarlo a `create_booking`; la orden de MP, si llegó a crearse, se cancela como en `cancelHoldAction`.
+- Grants: los mismos (solo service_role).
+
+## Antes del merge de `rediseno` a `main` (lista, 2026-11-24; NO mergeado)
+
+Ramas y orden
+- [x] `d27ec19` (cierre de S1) pusheado a `main` (2026-11-24). `rediseno` sale de ese commit: el merge es directo.
+- [x] Orden decidido: primero `rediseno` → `main` (juntos con el revisor), después `s2-captcha`. La 022 ya está aplicada; a S2 solo le faltan las claves de Turnstile (sitio + secreta), que carga el revisor en Vercel. Al integrarlo:
+  - el captcha va en el lugar reservado del pie de la hoja y de /reservar (`data-captcha-slot`);
+  - `ABUSE_MESSAGES.tooMany` tiene que salir del catálogo (`bookingError("too_many_attempts").message`); hoy el catálogo reconoce el texto viejo como alias.
+- [ ] Merge sin squash, para conservar un commit por etapa.
+
+Base de datos (es la misma para Preview y producción)
+- [x] 023 (etiquetas de cancha) aplicada por el revisor; `main` no la usa, no rompe nada.
+- [x] 024 (logo del club) aplicada.
+- [x] 025 (corrige las políticas de la 024) aplicada (2026-11-25).
+- [x] 026 (`panel_create_booking`, cargar turnos desde la agenda) aplicada por el revisor (2026-11-25); suites en verde.
+- [x] 027 (localidades con centro, formato y aclaraciones de cancha) aplicada por el revisor (2026-11-25). Inicio "¿Dónde?", formatos de fútbol y aclaraciones hechos encima.
+- [ ] padelmates: pin en Guaymallén (el centro de Mendoza que el mapa traía por defecto) con localidad Tunuyán. No se tocó: lo revisa Igna.
+- [ ] Pendiente S5 (`p_replace_hold_token`), migración aparte: no bloquea el merge.
+- [ ] Datos: futmates no tiene precio de 22:00 a 00:00 (lo carga el dueño; el panel ya lo avisa). El "Complejo Padelero Tunuyán" de prueba está aprobado y se ve en producción (inicio, "Lo antes posible", lista): **queda visible por ahora; hay que ocultarlo antes de que entren dueños reales (va con S7, base de tests separada)**.
+- [ ] Antes de mergear, verificar que no queden datos de prueba: 0 reservas "E2E*" / "Audit Test*", 0 teléfonos bloqueados, cancha de prueba sin etiquetas, cobro del complejo de prueba solo "en el lugar", complejo de prueba sin logo, bucket `venue-logos` vacío, 4 canchas (sin "E2E Cancha*"). Hoy hay 16 reservas: las 14 de antes más 2 que hizo Igna en el Preview el 2026-11-25 en el complejo de prueba (una cancelada y una confirmada a las 12:30). Además futmates tiene una cancha de pádel real desde el 2026-11-25 (por eso el inicio ya no muestra "1 complejo" de pádel).
+
+Vercel
+- [x] Los deploys de Preview de `rediseno` construyen (READY hasta `dd8cb07`, el de cle1).
+- [x] Funciones en cle1 (`vercel.json`), medido en el Preview (tabla en "Velocidad").
+- [ ] Probar en el Preview subir un logo de más de 4,5 MB (el navegador lo achica antes) y uno WebP.
+- [ ] Probar a mano en el Preview la imagen de la historia (`/panel/complejos/{id}/historia/imagen`): en Vercel lee las fuentes con fs (`outputFileTracingIncludes`) y, con un logo WebP, usa `sharp`. En local anda; en Vercel falta confirmarlo.
+- [ ] Variables: el rediseño no agrega ninguna. Producción ya tiene `NEXT_PUBLIC_APP_URL` y las `MP_*`. En Preview falta `NEXT_PUBLIC_APP_URL` (el pago online no funciona ahí; no se agrega a Preview por decisión anterior).
+- [ ] Los links de Mi turno, el .ics y la historia usan el host del pedido: en producción salen con el dominio final.
+
+Cambios de comportamiento a tener presentes
+- [ ] Reservar desde el complejo ahora son 3 toques con datos recordados (turno → Reservar → Confirmar).
+- [ ] `/[localidad]` redirige al inicio con la localidad; los links viejos a `/tunuyan/padel` y a los complejos siguen andando.
+- [ ] "Seguir en…" ya no existe (lo reemplaza la portada del inicio, que abre la búsqueda recordada).
+- [ ] Turnos sin precio ya no se ofrecen como libres ("Consultá").
+- [ ] `?_now=` solo funciona fuera de producción (NODE_ENV): confirmado en el código.
+
+Calidad
+- [x] `pnpm test` (402) y `pnpm test:e2e --workers=1` (167, en 8 tandas) en verde sobre la rama final (2026-11-25).
+- [x] Plantilla de WhatsApp del complejo de prueba: había quedado "Test template {nombre} — settings spec" (corridas viejas de `settings.spec` guardaban ese valor como "original"). El test ahora lo detecta y restaura la del seed; quedó la del seed. Repetir si entra algo más antes del merge.
+- [ ] Lint: quedan 3 errores viejos de `react-hooks/set-state-in-effect` (payment-status-panel, botón de push, guía de PWA), anteriores al rediseño. `next build` no corre lint, así que no bloquean el deploy.
+- [x] CLAUDE.md actualizado (Next 16, conteo de tests, migraciones hasta la 025 aplicadas, regla de migraciones).

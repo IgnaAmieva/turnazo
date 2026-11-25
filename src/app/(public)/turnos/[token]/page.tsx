@@ -1,51 +1,22 @@
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { headers } from 'next/headers';
+import Breadcrumbs from "@/components/breadcrumbs";
 import { formatTimeMendoza, formatDateMendoza } from '@/lib/slots';
+import { formatArgentinePhone } from '@/lib/phone';
+import { getBookingByToken, directionsUrl, originFrom } from '@/lib/mi-turno';
 import CancelForm from './cancel-form';
+import { SaveLink, TurnoActions } from './turno-actions';
 import { cancelBookingAction, type CancelActionState } from '@/app/actions/booking';
 
-// ---------------------------------------------------------------------------
-// Tipos
-// ---------------------------------------------------------------------------
-
-type BookingDetail = {
-  id: string;
-  status: string;
-  customer_name: string;
-  customer_phone: string;
-  price_total: number;
-  amount_paid: number;
-  payment_status: string;
-  cancel_token: string;
-  cancel_limit_hours: number;
-  /** Desde migración 020 (antes de aplicarla llegan undefined) */
-  refund_policy?: 'full' | 'none';
-  refund_available?: boolean;
-  refund_status?: string | null;
-  venue_name: string;
-  venue_phone: string;
-  venue_address: string;
-  court_name: string;
-  period_start: string;
-  period_end: string;
+/** Estados que no son confirmado ni cancelado, en palabras del jugador. */
+const STATUS_LABEL: Record<string, string> = {
+  hold:      'Esperando el pago',
+  expired:   'Vencido',
+  completed: 'Jugado',
+  no_show:   'No se presentó',
 };
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-async function getBookingDetails(token: string): Promise<BookingDetail | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc('get_booking_by_token', {
-    p_cancel_token: token,
-  });
-  if (error || !data) return null;
-  const d = data as Record<string, unknown>;
-  if (d.error) return null;
-  return d as unknown as BookingDetail;
-}
 
 // ---------------------------------------------------------------------------
 // Página
@@ -57,7 +28,7 @@ type Props = {
 
 export default async function TurnoPage({ params }: Props) {
   const { token } = await params;
-  const booking = await getBookingDetails(token);
+  const booking = await getBookingByToken(token);
 
   // Inline server action — captures token from closure so no hidden input needed
   async function cancelAction(prevState: CancelActionState, formData: FormData) {
@@ -68,8 +39,8 @@ export default async function TurnoPage({ params }: Props) {
   if (!booking) {
     return (
       <div className="max-w-lg mx-auto px-4 py-12 text-center">
-        <p className="text-gray-500 text-lg mb-4">Turno no encontrado.</p>
-        <Link href="/" className="text-green-700 hover:underline text-sm">
+        <p className="text-ink-muted text-lg mb-4">Turno no encontrado.</p>
+        <Link href="/" className="inline-flex min-h-11 items-center text-brand underline underline-offset-2 text-sm">
           Volver al inicio
         </Link>
       </div>
@@ -81,7 +52,19 @@ export default async function TurnoPage({ params }: Props) {
 
   const startLabel = formatTimeMendoza(periodStart);
   const endLabel   = formatTimeMendoza(periodEnd);
-  const dateLabel  = formatDateMendoza(periodStart);
+  const dateRaw    = formatDateMendoza(periodStart);
+  const dateLabel  = dateRaw.charAt(0).toUpperCase() + dateRaw.slice(1);
+
+  // M4: link para guardar, WhatsApp, calendario y cómo llegar
+  const turnoUrl = `${originFrom(await headers())}/turnos/${token}`;
+  const mapsHref = isConfirmedStatus(booking.status) ? await directionsUrl(token, booking) : '';
+  // Lo que se comparte NO lleva el link del turno: con él se puede cancelar.
+  const shareText = [
+    `Turno en ${booking.venue_name} · ${booking.court_name}`,
+    `${dateLabel}, de ${startLabel} a ${endLabel}`,
+    booking.venue_address,
+    mapsHref && `Cómo llegar: ${mapsHref}`,
+  ].filter(Boolean).join('\n');
 
   const debeEnCancha = booking.price_total - booking.amount_paid;
 
@@ -101,57 +84,55 @@ export default async function TurnoPage({ params }: Props) {
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
       {/* Breadcrumb */}
-      <nav className="text-sm text-gray-400 mb-6">
-        <Link href="/" className="hover:text-green-600">Inicio</Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-700">Mi turno</span>
-      </nav>
+      <Breadcrumbs back="/" items={[{ href: "/", label: "Inicio" }]} current="Mi turno" />
 
       {/* Badge de estado */}
       <div className="mb-6">
         {isConfirmed && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-4 py-1.5
-            text-sm font-semibold text-green-800 border border-green-200">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5
+            text-sm font-extrabold text-on-accent">
             Confirmado ✓
           </span>
         )}
         {isCancelled && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-4 py-1.5
-            text-sm font-semibold text-gray-600 border border-gray-200">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-4 py-1.5
+            text-sm font-semibold text-ink-muted border border-line">
             Cancelado
           </span>
         )}
         {!isConfirmed && !isCancelled && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-4 py-1.5
-            text-sm font-semibold text-amber-800 border border-amber-200">
-            {booking.status}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-4 py-1.5
+            text-sm font-semibold text-warning border border-warning/40">
+            {STATUS_LABEL[booking.status] ?? 'En proceso'}
           </span>
         )}
       </div>
 
+      {!isCancelled && <SaveLink url={turnoUrl} />}
+
       {/* Card con detalles */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4 mb-6">
+      <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm space-y-4 mb-6">
         <div>
-          <h1 className="text-lg font-bold text-gray-900">{booking.venue_name}</h1>
-          <p className="text-sm text-gray-500">{booking.venue_address}</p>
+          <h1 className="text-lg font-bold text-ink">{booking.venue_name}</h1>
+          <p className="text-sm text-ink-muted">{booking.venue_address}</p>
         </div>
 
-        <div className="pt-3 border-t border-gray-100 space-y-2">
+        <div className="pt-3 border-t border-line space-y-2">
           <Row label="Cancha"   value={booking.court_name} />
-          <Row label="Día"      value={<span className="capitalize">{dateLabel}</span>} />
+          <Row label="Día"      value={dateLabel} />
           <Row label="Horario"  value={`${startLabel} – ${endLabel}`} />
           <Row label="A nombre" value={booking.customer_name} />
-          <Row label="Teléfono" value={booking.customer_phone} />
+          <Row label="Teléfono" value={formatArgentinePhone(booking.customer_phone)} />
         </div>
 
         {/* Precio */}
-        <div className="pt-3 border-t border-gray-100">
-          <p className="text-sm text-gray-700">
+        <div className="pt-3 border-t border-line">
+          <p className="text-sm text-ink">
             <span className="font-medium">Total:</span>{' '}
             ${booking.price_total.toLocaleString('es-AR')}
           </p>
           {booking.amount_paid > 0 ? (
-            <p className="text-sm text-green-700 font-medium mt-0.5">
+            <p className="text-sm text-brand font-medium mt-0.5">
               {booking.payment_status === 'refunded'
                 ? `Devuelto: ${paidLabel}`
                 : booking.amount_paid >= booking.price_total
@@ -159,12 +140,20 @@ export default async function TurnoPage({ params }: Props) {
                   : `Seña pagada: ${paidLabel} · Pagás en la cancha: $${debeEnCancha.toLocaleString('es-AR')}`}
             </p>
           ) : (
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="text-sm text-ink-muted mt-0.5">
               Pagás en la cancha: ${debeEnCancha.toLocaleString('es-AR')}
             </p>
           )}
         </div>
       </div>
+
+      {isConfirmed && (
+        <TurnoActions
+          whatsappHref={`https://wa.me/?text=${encodeURIComponent(shareText)}`}
+          calendarHref={`/turnos/${token}/calendario`}
+          mapsHref={mapsHref}
+        />
+      )}
 
       {/* Cancelación */}
       {isConfirmed && (
@@ -179,9 +168,9 @@ export default async function TurnoPage({ params }: Props) {
       )}
 
       {isCancelled && (
-        <div className="rounded-2xl bg-gray-50 border border-gray-200 p-4 text-center">
-          <p className="text-gray-500 text-sm">Este turno fue cancelado.</p>
-          {refundNote && <p className="text-gray-700 text-sm mt-1">{refundNote}</p>}
+        <div className="rounded-2xl bg-surface-2 border border-line p-4 text-center">
+          <p className="text-ink-muted text-sm">Este turno fue cancelado.</p>
+          {refundNote && <p className="text-ink text-sm mt-1">{refundNote}</p>}
         </div>
       )}
     </div>
@@ -194,9 +183,13 @@ export default async function TurnoPage({ params }: Props) {
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <p className="text-sm text-gray-700">
+    <p className="text-sm text-ink">
       <span className="font-medium">{label}:</span>{' '}
       <span>{value}</span>
     </p>
   );
+}
+
+function isConfirmedStatus(status: string) {
+  return status === 'confirmed';
 }

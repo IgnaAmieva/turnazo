@@ -51,26 +51,28 @@ test("home page shows localities with venue counts", async ({ page }) => {
   // Tunuyán should appear as a link (has venues) with its venue count.
   // The exact number is not asserted: the shared DB also holds real venues
   // created from the panel (e.g. "futmates" on 2026-11-16).
-  const tunuyan = page.getByRole("link", { name: /tunuy/i });
-  await expect(tunuyan).toBeVisible();
-  await expect(tunuyan).toContainText(/\d+ complejos?/);
+  // "¿Dónde?": barra desplegable con "Tunuyán · N complejos"
+  const tunuyan = page.getByTestId("donde").locator("option", { hasText: /tunuy/i });
+  await expect(tunuyan).toHaveCount(1);
+  await expect(tunuyan).toContainText(/Tunuyán · \d+ complejos?/);
 });
 
 // ---------------------------------------------------------------------------
 // Locality page
 // ---------------------------------------------------------------------------
-test("/tunuyan shows sports with correct counts", async ({ page }) => {
+test("/tunuyan sigue funcionando: abre el inicio con la localidad y los deportes con su cantidad", async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto(`/${LOCALITY}`);
   await page.waitForLoadState("networkidle");
+  expect(new URL(page.url()).searchParams.get("localidad")).toBe(LOCALITY);
   await assertNoError(page);
   expect(errors).toHaveLength(0);
 
-  // Pádel (1 venue with courts) should be a link with its count. Other sports
-  // may also show "1 complejo" (real venues), so the count is read off the link.
+  // Pádel should be a link with its count. The exact number is not asserted:
+  // real venues also have pádel courts (futmates added one on 2026-11-25).
   const padel = page.getByRole("link", { name: /pádel/i });
   await expect(padel).toBeVisible();
-  await expect(padel).toContainText("1 complejo");
+  await expect(padel).toContainText(/\d+ complejos?/);
 });
 
 // ---------------------------------------------------------------------------
@@ -85,8 +87,8 @@ test("/tunuyan/padel loads without errors", async ({ page }) => {
 
   // The venue should appear
   await expect(page.getByText("Complejo Padelero Tunuyán")).toBeVisible();
-  // "Cómo llegar" link must exist without crashing
-  await expect(page.getByRole("link", { name: /cómo llegar/i })).toBeVisible();
+  // V2b: cada complejo con su mapa chiquito (la ubicación real está en "Ir" del complejo)
+  await expect(page.getByTestId("mapa-mini").first()).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------
@@ -256,11 +258,12 @@ test("shows 'No quedan turnos para hoy' when all slots are past", async ({ page 
 // ---------------------------------------------------------------------------
 // Locality with no venues shows empty state
 // ---------------------------------------------------------------------------
-test("/la-consulta shows empty state (no venues)", async ({ page }) => {
+test("/la-consulta (sin complejos aprobados) no se muestra: abre el inicio con una localidad que tiene complejos", async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto("/la-consulta");
   await page.waitForLoadState("networkidle");
   await assertNoError(page);
   expect(errors).toHaveLength(0);
-  await expect(page.getByText(/sin complejos|no hay complejos/i)).toBeVisible();
+  await expect(page.getByTestId("donde")).not.toHaveValue("la-consulta");
+  await expect(page.getByTestId("donde").locator("option", { hasText: "La Consulta" })).toHaveCount(0);
 });

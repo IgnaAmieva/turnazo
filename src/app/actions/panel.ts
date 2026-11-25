@@ -7,6 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refundPayment } from "@/lib/mp/refunds";
 import { triggerPushSend } from "@/lib/push";
+import { detectLogoType, LOGO_BUCKET, LOGO_UPLOAD_MAX_BYTES } from "@/lib/venue-logo";
+import { shrinkLogo } from "@/lib/venue-logo-shrink";
+import { resolveLocality, type ResolvedLocality } from "@/lib/locality-resolver";
+import { FORMAT_VALUES } from "@/lib/court-format";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,12 +55,25 @@ const PANEL_RPC_MESSAGES: Record<string, string> = {
   no_show_before_start:
     "Una reserva pagada online solo se puede marcar como ausente después de su horario. " +
     "Para liberar el turno antes, cancelala: se le devuelve lo pagado.",
+  // panel_create_booking (026): los códigos de _validate_booking_slot, dichos para el dueño
+  past_slot:            "Ese horario ya pasó.",
+  too_far_ahead:        "Se pueden cargar turnos hasta 30 días adelante.",
+  invalid_slot:         "Ese horario no coincide con los turnos de la cancha.",
+  invalid_duration:     "Ese horario no coincide con los turnos de la cancha.",
+  outside_hours:        "Ese horario está fuera del horario de la cancha.",
+  invalid_name:         "Escribí el nombre del jugador.",
+  invalid_phone:        "Revisá el celular: código de área y número, sin 0 ni 15. Ej: 2622 123456.",
+  phone_blocked:        "Ese número está bloqueado en tu complejo.",
+  too_many_bookings:    "Ese celular ya tiene 3 turnos por jugar en tu complejo.",
+  venue_not_found:      "Tu complejo todavía no está aprobado.",
+  court_not_found:      "Esa cancha no está activa.",
+  price_not_set:        "Ese horario no tiene precio. Cargalo en los precios de la cancha.",
 };
 
 /** Llama a un RPC panel_* con la sesión del dueño y traduce el resultado. */
 async function callPanelRpc(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  fn: "panel_create_block" | "panel_cancel_booking" | "panel_mark_paid" | "panel_mark_no_show",
+  fn: "panel_create_block" | "panel_create_booking" | "panel_cancel_booking" | "panel_mark_paid" | "panel_mark_no_show",
   args: Record<string, unknown>,
 ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; state: PanelActionState }> {
   const { data, error } = await supabase.rpc(fn as never, args as never);
@@ -79,17 +96,41 @@ const BookingRefSchema = z.object({
 // Venue actions
 // ---------------------------------------------------------------------------
 
+const PIN_MISSING = "Marcá en el mapa dónde está el complejo.";
+const LOCALITY_ERROR = "No pudimos ubicar el complejo. Intentá de nuevo.";
+
+/** lat/lng del pin: obligatorios (sin pin, los campos llegan vacíos y no valen 0). */
+const coord = (min: number, max: number) =>
+  z.string().trim().min(1, PIN_MISSING).transform(Number).pipe(z.number({ error: PIN_MISSING }).min(min, PIN_MISSING).max(max, PIN_MISSING));
+
+// La localidad NO viene del formulario: sale del pin en el servidor (lib/locality-resolver).
 const VenueSchema = z.object({
   name:               z.string().min(2, "Mínimo 2 caracteres").max(80),
   phone:              z.string().min(8, "Mínimo 8 dígitos").max(15),
   address:            z.string().min(5, "Mínimo 5 caracteres").max(200),
-  locality_id:        z.string().uuid("Seleccioná una localidad"),
-  lat:                z.coerce.number().min(-90).max(90),
-  lng:                z.coerce.number().min(-180).max(180),
+  lat:                coord(-90, 90),
+  lng:                coord(-180, 180),
   payment_alias:      z.string().max(100).optional(),
   payment_link:       z.string().max(500).optional(),
-  whatsapp_template:  z.string().max(500).optional(),
+  whatsapp_template:  z.string().max(500, "El mensaje puede tener hasta 500 caracteres.").optional(),
 });
+
+/** Auditoría de una localidad creada por Georef al guardar un complejo. */
+async function auditCreatedLocality(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string, venueId: string, loc: ResolvedLocality, pin: { lat: number; lng: number },
+) {
+  if (!loc.created) return null;
+  const { error } = await supabase.from("audit_log").insert({
+    profile_id: userId,
+    venue_id:   venueId,
+    entity:     "locality",
+    entity_id:  loc.id,
+    action:     "create",
+    new_data:   { name: loc.name, source: loc.source, pin },
+  });
+  return error;
+}
 
 export async function createVenueAction(
   _state: PanelActionState,
@@ -103,7 +144,17 @@ export async function createVenueAction(
   const parsed = VenueSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-  const { name, phone, address, locality_id, lat, lng, payment_alias, payment_link, whatsapp_template } = parsed.data;
+  const { name, phone, address, lat, lng, payment_alias, payment_link, whatsapp_template } = parsed.data;
+
+  let loc: ResolvedLocality | null;
+  try {
+    loc = await resolveLocality({ lat, lng });
+  } catch (e) {
+    console.error("[panel] locality resolve failed:", (e as Error).message);
+    loc = null;
+  }
+  if (!loc) return { error: LOCALITY_ERROR };
+  const locality_id = loc.id;
 
   const { data: venue, error } = await supabase
     .from("venues")
@@ -131,9 +182,12 @@ export async function createVenueAction(
     entity:     "venue",
     entity_id:  venue.id,
     action:     "create",
-    new_data:   parsed.data,
+    // locality_source 'fallback' = Georef no respondió: el superadmin revisa la localidad al aprobar
+    new_data:   { ...parsed.data, locality_id, locality_source: loc.source },
   });
   if (auditErr) return auditError(auditErr);
+  const locAuditErr = await auditCreatedLocality(supabase, user.id, venue.id, loc, { lat, lng });
+  if (locAuditErr) return auditError(locAuditErr);
 
   revalidatePath("/panel/complejos");
   redirect("/panel/complejos");
@@ -152,7 +206,28 @@ export async function updateVenueAction(
   const parsed = VenueSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-  const { name, phone, address, locality_id, lat, lng, payment_alias, payment_link, whatsapp_template } = parsed.data;
+  const { name, phone, address, lat, lng, payment_alias, payment_link, whatsapp_template } = parsed.data;
+
+  const { data: current } = await supabase
+    .from("venues")
+    .select("lat, lng, locality_id")
+    .eq("id", venueId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!current) return { error: "No autorizado" };
+
+  // Con el pin en el mismo lugar, la localidad no se toca; si se movió, se vuelve a resolver
+  const moved = Math.abs(current.lat - lat) > 1e-6 || Math.abs(current.lng - lng) > 1e-6;
+  let loc: ResolvedLocality | null = null;
+  if (moved) {
+    try {
+      loc = await resolveLocality({ lat, lng });
+    } catch (e) {
+      console.error("[panel] locality resolve failed:", (e as Error).message);
+    }
+    if (!loc) return { error: LOCALITY_ERROR };
+  }
+  const locality_id = loc?.id ?? current.locality_id;
 
   const { error } = await supabase
     .from("venues")
@@ -178,13 +253,144 @@ export async function updateVenueAction(
     entity:     "venue",
     entity_id:  venueId,
     action:     "update",
-    new_data:   parsed.data,
+    new_data:   { ...parsed.data, locality_id, ...(loc ? { locality_source: loc.source } : {}) },
   });
   if (auditErr) return auditError(auditErr);
+  if (loc) {
+    const locAuditErr = await auditCreatedLocality(supabase, user.id, venueId, loc, { lat, lng });
+    if (locAuditErr) return auditError(locAuditErr);
+  }
 
   revalidatePath(`/panel/complejos/${venueId}`);
   revalidatePath("/panel/complejos");
   redirect("/panel/complejos");
+}
+
+// ---------------------------------------------------------------------------
+// Logo del club (migración 024). Se sube con la sesión del dueño: las
+// políticas de storage limitan la carpeta '{venue_id}/' al dueño del complejo
+// y venues_logo_path_check obliga a que logo_path esté en esa carpeta.
+// ---------------------------------------------------------------------------
+
+const LOGO_ERRORS = {
+  missing:  "Elegí una imagen.",
+  tooBig:   "El logo puede pesar hasta 10 MB.",
+  badType:  "El logo tiene que ser una imagen PNG, JPG o WebP.",
+  shrink:   "No pudimos achicar esta imagen. Probá con otra.",
+  upload:   "No se pudo subir el logo. Intentá de nuevo.",
+} as const;
+
+/** El complejo, solo si es del usuario de la sesión. */
+async function ownedVenueLogo(supabase: Awaited<ReturnType<typeof createClient>>, venueId: string, userId: string) {
+  if (!z.string().guid().safeParse(venueId).success) return null;
+  const { data } = await supabase
+    .from("venues")
+    .select("id, logo_path")
+    .eq("id", venueId)
+    .eq("owner_id", userId)
+    .maybeSingle();
+  return data;
+}
+
+export async function uploadVenueLogoAction(
+  venueId: string,
+  _state: PanelActionState,
+  formData: FormData
+): Promise<PanelActionState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const venue = await ownedVenueLogo(supabase, venueId, user.id);
+  if (!venue) return { error: "No autorizado" };
+
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) return { fieldErrors: { logo: [LOGO_ERRORS.missing] } };
+  if (file.size > LOGO_UPLOAD_MAX_BYTES) return { fieldErrors: { logo: [LOGO_ERRORS.tooBig] } };
+
+  // Tipo real por los primeros bytes: la extensión y el Content-Type los elige el que sube
+  const original = new Uint8Array(await file.arrayBuffer());
+  const type = detectLogoType(original);
+  if (!type) return { fieldErrors: { logo: [LOGO_ERRORS.badType] } };
+
+  // Se achica en el servidor (1024 px, < 512 KB, mismo formato) antes de subirlo
+  const bytes = await shrinkLogo(original, type);
+  if (!bytes) return { fieldErrors: { logo: [LOGO_ERRORS.shrink] } };
+
+  // Nombre nuevo en cada subida: la URL pública cambia y nadie ve el logo viejo de caché
+  const path = `${venueId}/logo-${Date.now()}.${type.ext}`;
+  const { error: upErr } = await supabase.storage
+    .from(LOGO_BUCKET)
+    .upload(path, bytes, { contentType: type.mime, upsert: false, cacheControl: "31536000" });
+  if (upErr) {
+    console.error("[panel] logo upload failed:", upErr.message);
+    return { error: LOGO_ERRORS.upload };
+  }
+
+  const { error } = await supabase
+    .from("venues")
+    .update({ logo_path: path })
+    .eq("id", venueId)
+    .eq("owner_id", user.id);
+  if (error) {
+    await supabase.storage.from(LOGO_BUCKET).remove([path]);
+    return dbError(error);
+  }
+
+  if (venue.logo_path && venue.logo_path !== path) {
+    const { error: rmErr } = await supabase.storage.from(LOGO_BUCKET).remove([venue.logo_path]);
+    if (rmErr) console.error("[panel] old logo remove failed:", rmErr.message);
+  }
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
+    venue_id:   venueId,
+    entity:     "venue",
+    entity_id:  venueId,
+    action:     "update",
+    new_data:   { logo_path: path },
+  });
+  if (auditErr) return auditError(auditErr);
+
+  revalidatePath(`/panel/complejos/${venueId}`);
+  return {};
+}
+
+export async function removeVenueLogoAction(
+  venueId: string,
+  _state: PanelActionState,
+  _formData: FormData
+): Promise<PanelActionState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const venue = await ownedVenueLogo(supabase, venueId, user.id);
+  if (!venue) return { error: "No autorizado" };
+  if (!venue.logo_path) return {};
+
+  const { error } = await supabase
+    .from("venues")
+    .update({ logo_path: null })
+    .eq("id", venueId)
+    .eq("owner_id", user.id);
+  if (error) return dbError(error);
+
+  const { error: rmErr } = await supabase.storage.from(LOGO_BUCKET).remove([venue.logo_path]);
+  if (rmErr) console.error("[panel] logo remove failed:", rmErr.message);
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
+    venue_id:   venueId,
+    entity:     "venue",
+    entity_id:  venueId,
+    action:     "update",
+    new_data:   { logo_path: null },
+  });
+  if (auditErr) return auditError(auditErr);
+
+  revalidatePath(`/panel/complejos/${venueId}`);
+  return {};
 }
 
 // ---------------------------------------------------------------------------
@@ -349,7 +555,44 @@ const CourtSchema = z.object({
   sport_id:     z.string().uuid("Seleccioná un deporte"),
   slot_minutes: z.coerce.number().min(30).max(240),
   active:       z.coerce.boolean().default(true),
+  // Migración 023: etiquetas de la cancha ("" = sin indicar)
+  surface:         z.enum(["sintetico", "pasto", "cemento", "polvo_ladrillo", "blindex"]).nullable(),
+  covered:         z.boolean(),
+  lit:             z.boolean(),
+  has_locker_room: z.boolean(),
+  // Migración 027: formato, solo fútbol (sin elegir = NULL)
+  format:          z.enum(FORMAT_VALUES, { error: "Elegí un formato de la lista" }).nullable(),
+  // Migración 027: aclaraciones libres, 200 caracteres como máximo ("" = sin aclaraciones)
+  notes:           z.string().max(200, "Hasta 200 caracteres.").nullable(),
 });
+
+/** Etiquetas del formulario: superficie (select), tres interruptores y el formato (botones). */
+function courtFeaturesFrom(formData: FormData) {
+  const surface = String(formData.get("surface") ?? "");
+  const format = String(formData.get("format") ?? "");
+  // Texto plano: se guarda tal cual (sin espacios de más) y se muestra escapado
+  const notes = String(formData.get("notes") ?? "").replace(/\s+/g, " ").trim();
+  return {
+    notes:           notes === "" ? null : notes,
+    surface:         surface === "" ? null : surface,
+    covered:         formData.get("covered") !== null,
+    lit:             formData.get("lit") !== null,
+    has_locker_room: formData.get("has_locker_room") !== null,
+    format:          format === "" ? null : format,
+  };
+}
+
+/**
+ * El formato solo vale para fútbol: si la cancha es (o pasa a ser) de pádel o
+ * tenis se manda NULL (el trigger enforce_court_format de la 027 rechazaría otro valor).
+ */
+async function formatForSport(
+  supabase: Awaited<ReturnType<typeof createClient>>, sportId: string, format: string | null,
+): Promise<{ slug: string | null; format: string | null }> {
+  const { data: sport } = await supabase.from("sports").select("slug").eq("id", sportId).maybeSingle();
+  const slug = sport?.slug ?? null;
+  return { slug, format: slug === "futbol" ? format : null };
+}
 
 export async function createCourtAction(
   venueId: string,
@@ -365,9 +608,13 @@ export async function createCourtAction(
     sport_id:     formData.get("sport_id"),
     slot_minutes: formData.get("slot_minutes"),
     active:       formData.get("active") !== null,
+    ...courtFeaturesFrom(formData),
   };
   const parsed = CourtSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+
+  const { slug: sportSlug, format } = await formatForSport(supabase, parsed.data.sport_id, parsed.data.format);
+  parsed.data.format = format as typeof parsed.data.format;
 
   const { data: court, error } = await supabase
     .from("courts")
@@ -377,6 +624,12 @@ export async function createCourtAction(
       sport_id:     parsed.data.sport_id,
       slot_minutes: parsed.data.slot_minutes,
       active:       parsed.data.active,
+      surface:         parsed.data.surface,
+      covered:         parsed.data.covered,
+      lit:             parsed.data.lit,
+      has_locker_room: parsed.data.has_locker_room,
+      format,
+      notes:           parsed.data.notes,
     })
     .select("id")
     .single();
@@ -384,11 +637,7 @@ export async function createCourtAction(
   if (error) return dbError(error);
 
   // Horarios precargados según deporte (SPEC §12)
-  const { data: sport } = await supabase
-    .from("sports")
-    .select("slug")
-    .eq("id", parsed.data.sport_id)
-    .single();
+  const sport = sportSlug ? { slug: sportSlug } : null;
 
   const SPORT_HOURS: Record<string, { open: string; close: string }> = {
     padel:  { open: "08:00:00", close: "00:30:00" },
@@ -416,7 +665,8 @@ export async function createCourtAction(
   if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/canchas`);
-  redirect(`/panel/complejos/${venueId}/canchas/${court.id}`);
+  // Paso 2 de 3 (precios), con el aviso "Cancha cargada"
+  redirect(`/panel/complejos/${venueId}/canchas/${court.id}?paso=precios`);
 }
 
 export async function updateCourtAction(
@@ -434,9 +684,14 @@ export async function updateCourtAction(
     sport_id:     formData.get("sport_id"),
     slot_minutes: formData.get("slot_minutes"),
     active:       formData.get("active") !== null,
+    ...courtFeaturesFrom(formData),
   };
   const parsed = CourtSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+
+  // Si la cancha pasa a pádel o tenis, format = NULL
+  const { format } = await formatForSport(supabase, parsed.data.sport_id, parsed.data.format);
+  parsed.data.format = format as typeof parsed.data.format;
 
   const { error } = await supabase
     .from("courts")
@@ -445,6 +700,12 @@ export async function updateCourtAction(
       sport_id:     parsed.data.sport_id,
       slot_minutes: parsed.data.slot_minutes,
       active:       parsed.data.active,
+      surface:         parsed.data.surface,
+      covered:         parsed.data.covered,
+      lit:             parsed.data.lit,
+      has_locker_room: parsed.data.has_locker_room,
+      format,
+      notes:           parsed.data.notes,
     })
     .eq("id", courtId)
     .eq("venue_id", venueId);
@@ -882,6 +1143,72 @@ export async function createManualBlockAction(
     new_data:   { court_id: courtId, start: startDate.toISOString(), end: endDate.toISOString(), note },
   });
   if (blockCreateAuditErr) return auditError(blockCreateAuditErr);
+
+  revalidatePath(`/panel/complejos/${venueId}/agenda`);
+  if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);
+  return null;
+}
+
+const ManualBookingSchema = z.object({
+  venue_id:       z.string().guid(),
+  court_id:       z.string().guid(),
+  start:          z.iso.datetime({ offset: true }),
+  end:            z.iso.datetime({ offset: true }),
+  customer_name:  z.string().trim().max(80),
+  customer_phone: z.string().trim().max(30),
+});
+
+/**
+ * El dueño carga un turno (el jugador llamó o escribió). Migración 026:
+ * panel_create_booking valida igual que la reserva pública (horario, grilla,
+ * precio, celular, teléfono bloqueado) y lo deja confirmado y sin pagar.
+ */
+export async function createBookingPanelAction(
+  _prevState: PanelActionState,
+  formData: FormData
+): Promise<PanelActionState> {
+  const parsed = ManualBookingSchema.safeParse({
+    venue_id:       formData.get("venue_id"),
+    court_id:       formData.get("court_id"),
+    start:          formData.get("start"),
+    end:            formData.get("end"),
+    customer_name:  formData.get("customer_name") ?? "",
+    customer_phone: formData.get("customer_phone") ?? "",
+  });
+  if (!parsed.success) return { error: "Elegí un horario libre." };
+  const { venue_id: venueId, court_id: courtId, start, end, customer_name, customer_phone } = parsed.data;
+  if (customer_name.length < 2) return { fieldErrors: { customer_name: [PANEL_RPC_MESSAGES.invalid_name] } };
+  if (customer_phone.replace(/\D/g, "").length < 8) return { fieldErrors: { customer_phone: [PANEL_RPC_MESSAGES.invalid_phone] } };
+  const date = formData.get("date") as string | null;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const rpc = await callPanelRpc(supabase, "panel_create_booking", {
+    p_venue_id:       venueId,
+    p_court_id:       courtId,
+    p_start:          start,
+    p_end:            end,
+    p_customer_name:  customer_name,
+    p_customer_phone: customer_phone,
+  });
+  if (!rpc.ok) {
+    const msg = rpc.state?.error;
+    if (msg === PANEL_RPC_MESSAGES.invalid_name) return { fieldErrors: { customer_name: [msg] } };
+    if (msg === PANEL_RPC_MESSAGES.invalid_phone) return { fieldErrors: { customer_phone: [msg] } };
+    return rpc.state;
+  }
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
+    venue_id:   venueId,
+    entity:     "booking",
+    entity_id:  rpc.data.booking_id as string,
+    action:     "create",
+    new_data:   { court_id: courtId, start, end, source: "manual", price_total: Number(rpc.data.price_total ?? 0) },
+  });
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
   if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);
