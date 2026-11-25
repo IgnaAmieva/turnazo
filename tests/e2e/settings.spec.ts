@@ -101,8 +101,10 @@ let originalTemplate: string | null = null;
 
 test.beforeAll(async ({ request }) => {
   const dbTemplate = await getTemplate(request);
-  // If the DB has null (from a previous run that didn't restore), use the known default
-  originalTemplate = dbTemplate ?? DEFAULT_TEMPLATE;
+  // Si la base quedó con null o con un valor de prueba de este archivo (corridas
+  // viejas lo dejaban como "original" y lo volvían a poner), se restaura el del seed
+  const leftover = !dbTemplate || /settings spec|^Hola \{nombre\}, te esperamos a las \{hora\}\.$/.test(dbTemplate);
+  originalTemplate = leftover ? DEFAULT_TEMPLATE : dbTemplate;
   await unblockTestPhones(request, [SETTINGS_PHONE]);
   await blockPhone(request, SETTINGS_PHONE);
 });

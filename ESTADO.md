@@ -118,8 +118,8 @@ Ojo, dato a revisar: `padelmates` (aprobado, en Tunuyán) tiene el pin en Guayma
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 398 | 398 ✓ (2026-11-25, rama `rediseno`, con la 027 aplicada) |
-| E2E | Playwright | 164 (incluye el setup de login) | 164 ✓ (2026-11-25, rama `rediseno`, con la 027 aplicada; --workers=1 en 8 tandas de 3 a 5 archivos: con 4 tandas grandes la máquina se quedó sin memoria) |
+| Unitarios + integración | Vitest | 402 | 402 ✓ (2026-11-25, rama `rediseno` antes del merge) |
+| E2E | Playwright | 167 (incluye el setup de login) | 167 ✓ (2026-11-25, rama `rediseno` antes del merge; --workers=1 en 8 tandas de 3 a 5 archivos: con 4 tandas grandes la máquina se quedó sin memoria) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -660,6 +660,7 @@ Cambios de comportamiento a tener presentes
 - [ ] `?_now=` solo funciona fuera de producción (NODE_ENV): confirmado en el código.
 
 Calidad
-- [x] `pnpm test` (374) y `pnpm test:e2e --workers=1` (147, en 4 tandas) en verde con la 026 aplicada (2026-11-25). Repetir si entra algo más antes del merge.
+- [x] `pnpm test` (402) y `pnpm test:e2e --workers=1` (167, en 8 tandas) en verde sobre la rama final (2026-11-25).
+- [x] Plantilla de WhatsApp del complejo de prueba: había quedado "Test template {nombre} — settings spec" (corridas viejas de `settings.spec` guardaban ese valor como "original"). El test ahora lo detecta y restaura la del seed; quedó la del seed. Repetir si entra algo más antes del merge.
 - [ ] Lint: quedan 3 errores viejos de `react-hooks/set-state-in-effect` (payment-status-panel, botón de push, guía de PWA), anteriores al rediseño. `next build` no corre lint, así que no bloquean el deploy.
 - [x] CLAUDE.md actualizado (Next 16, conteo de tests, migraciones hasta la 025 aplicadas, regla de migraciones).
