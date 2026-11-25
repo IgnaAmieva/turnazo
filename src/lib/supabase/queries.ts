@@ -154,41 +154,45 @@ export type CourtWithSchedule = {
   prices: { weekday: number; from_time: string; to_time: string; price: number }[];
 };
 
-export async function getVenueWithCourts(
+/**
+ * Complejo aprobado con sus canchas activas del deporte. Deporte, complejo y
+ * canchas se piden a la vez (las canchas se filtran por el slug del deporte);
+ * React cache: generateMetadata y la página comparten el resultado.
+ */
+export const getVenueWithCourts = cache(async (
   venueId: string,
   sportSlug: string
-): Promise<VenueWithCourts | null> {
+): Promise<VenueWithCourts | null> => {
   const supabase = await createClient();
 
-  const sport = await getSportBySlug(sportSlug);
-  if (!sport) return null;
+  const [sport, { data: venue, error: venueErr }, { data: courts, error: courtsErr }] = await Promise.all([
+    getSportBySlug(sportSlug),
+    supabase
+      .from("venues")
+      .select(
+        `id, name, address, lat, lng, phone,
+         payment_alias, payment_link,
+         deposit_required, deposit_type, deposit_value,
+         allow_full_payment, allow_pay_at_venue, logo_path`
+      )
+      .eq("id", venueId)
+      .eq("status", "approved")
+      .single(),
+    supabase
+      .from("courts")
+      .select(
+        `id, name, slot_minutes, sport_id, surface, covered, lit, has_locker_room,
+         sports!inner(slug),
+         court_hours(weekday, open_time, close_time),
+         court_prices(weekday, from_time, to_time, price)`
+      )
+      .eq("venue_id", venueId)
+      .eq("sports.slug", sportSlug)
+      .eq("active", true)
+      .order("name"),
+  ]);
 
-  const { data: venue, error: venueErr } = await supabase
-    .from("venues")
-    .select(
-      `id, name, address, lat, lng, phone,
-       payment_alias, payment_link,
-       deposit_required, deposit_type, deposit_value,
-       allow_full_payment, allow_pay_at_venue, logo_path`
-    )
-    .eq("id", venueId)
-    .eq("status", "approved")
-    .single();
-
-  if (venueErr || !venue) return null;
-
-  const { data: courts, error: courtsErr } = await supabase
-    .from("courts")
-    .select(
-      `id, name, slot_minutes, sport_id, surface, covered, lit, has_locker_room,
-       court_hours(weekday, open_time, close_time),
-       court_prices(weekday, from_time, to_time, price)`
-    )
-    .eq("venue_id", venueId)
-    .eq("sport_id", sport.id)
-    .eq("active", true)
-    .order("name");
-
+  if (!sport || venueErr || !venue) return null;
   if (courtsErr) throw courtsErr;
 
   return {
@@ -203,7 +207,7 @@ export async function getVenueWithCourts(
       prices: (c.court_prices as { weekday: number; from_time: string; to_time: string; price: number }[]) ?? [],
     })),
   };
-}
+});
 
 // ---------------------------------------------------------------------------
 // Disponibilidad (períodos ocupados) vía RPC pública
@@ -228,50 +232,36 @@ export async function getCourtAvailability(
 // Venue counts (para home page y página de deportes)
 // ---------------------------------------------------------------------------
 
-/** Localidades con conteo de venues aprobados */
-export async function getLocalitiesWithVenueCount() {
+/**
+ * Inicio: localidades con su cantidad de complejos aprobados y, para cada
+ * localidad, los deportes con la cantidad de complejos que tienen canchas de
+ * ese deporte. Tres consultas a la vez (antes eran dos pasos seguidos).
+ */
+export async function getLocalitiesAndSportsWithCounts() {
   const supabase = await createClient();
 
-  const [{ data: localities }, { data: venueRows }] = await Promise.all([
+  const [{ data: localities }, { data: sports }, { data: venueRows }] = await Promise.all([
     supabase.from("localities").select("id, name, slug").order("name"),
-    supabase.from("venues").select("locality_id").eq("status", "approved"),
-  ]);
-
-  const countMap = new Map<string, number>();
-  for (const v of venueRows ?? []) {
-    countMap.set(v.locality_id, (countMap.get(v.locality_id) ?? 0) + 1);
-  }
-
-  return (localities ?? []).map((l) => ({
-    ...l,
-    venueCount: countMap.get(l.id) ?? 0,
-  }));
-}
-
-/** Deportes con conteo de venues aprobados en una localidad */
-export async function getSportsWithVenueCount(localityId: string) {
-  const supabase = await createClient();
-
-  const [{ data: sports }, { data: venueRows }] = await Promise.all([
     supabase.from("sports").select("id, name, slug, default_slot_minutes").order("name"),
-    supabase
-      .from("venues")
-      .select("id, courts!inner(sport_id)")
-      .eq("locality_id", localityId)
-      .eq("status", "approved"),
+    supabase.from("venues").select("id, locality_id, courts(sport_id)").eq("status", "approved"),
   ]);
 
-  // Contar venues únicos por deporte
-  const countMap = new Map<string, Set<string>>();
+  const venuesByLocality = new Map<string, number>();
+  // localidad → deporte → complejos
+  const bySport = new Map<string, Map<string, Set<string>>>();
   for (const v of venueRows ?? []) {
-    for (const c of (v.courts as { sport_id: string }[]) ?? []) {
-      if (!countMap.has(c.sport_id)) countMap.set(c.sport_id, new Set());
-      countMap.get(c.sport_id)!.add(v.id);
+    venuesByLocality.set(v.locality_id, (venuesByLocality.get(v.locality_id) ?? 0) + 1);
+    const perSport = bySport.get(v.locality_id) ?? new Map<string, Set<string>>();
+    bySport.set(v.locality_id, perSport);
+    for (const c of (v.courts as { sport_id: string }[] | null) ?? []) {
+      if (!perSport.has(c.sport_id)) perSport.set(c.sport_id, new Set());
+      perSport.get(c.sport_id)!.add(v.id);
     }
   }
 
-  return (sports ?? []).map((s) => ({
-    ...s,
-    venueCount: countMap.get(s.id)?.size ?? 0,
-  }));
+  return {
+    localities: (localities ?? []).map((l) => ({ ...l, venueCount: venuesByLocality.get(l.id) ?? 0 })),
+    sportsFor: (localityId: string) =>
+      (sports ?? []).map((s) => ({ ...s, venueCount: bySport.get(localityId)?.get(s.id)?.size ?? 0 })),
+  };
 }

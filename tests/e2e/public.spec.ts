@@ -68,11 +68,11 @@ test("/tunuyan sigue funcionando: abre el inicio con la localidad y los deportes
   await assertNoError(page);
   expect(errors).toHaveLength(0);
 
-  // Pádel (1 venue with courts) should be a link with its count. Other sports
-  // may also show "1 complejo" (real venues), so the count is read off the link.
+  // Pádel should be a link with its count. The exact number is not asserted:
+  // real venues also have pádel courts (futmates added one on 2026-11-25).
   const padel = page.getByRole("link", { name: /pádel/i });
   await expect(padel).toBeVisible();
-  await expect(padel).toContainText("1 complejo");
+  await expect(padel).toContainText(/\d+ complejos?/);
 });
 
 // ---------------------------------------------------------------------------

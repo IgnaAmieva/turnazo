@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getLocalitiesWithVenueCount, getSportsWithVenueCount } from "@/lib/supabase/queries";
+import { getLocalitiesAndSportsWithCounts } from "@/lib/supabase/queries";
 import { getVenuesForList, earliestFreeSlot, slotHref, type FreeSlot } from "@/lib/free-slots";
 import { formatTimeMendoza, todayInMendoza } from "@/lib/slots";
 import { CoverGreeting, OpenRememberedSearch } from "@/components/player-memory-ui";
@@ -21,7 +21,7 @@ const plural = (n: number) => `${n} complejo${n !== 1 ? "s" : ""}`;
  */
 export default async function HomePage({ searchParams }: Props) {
   const params = await searchParams;
-  const localities = await getLocalitiesWithVenueCount();
+  const { localities, sportsFor } = await getLocalitiesAndSportsWithCounts();
   // Una localidad pedida sin complejos (ej. /la-consulta) se muestra igual, con su aviso
   const locality =
     localities.find((l) => l.slug === params.localidad) ??
@@ -37,7 +37,7 @@ export default async function HomePage({ searchParams }: Props) {
     );
   }
 
-  const sports = await getSportsWithVenueCount(locality.id);
+  const sports = sportsFor(locality.id);
   const sport =
     sports.find((s) => s.slug === params.deporte && s.venueCount > 0) ??
     sports.find((s) => s.venueCount > 0) ??

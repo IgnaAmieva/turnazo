@@ -47,7 +47,8 @@ test("deportes con íconos de línea (sin emojis); el elegido en primary; sin co
   const cards = page.getByTestId("deporte");
   const padel = cards.filter({ hasText: "Pádel" });
   await expect(padel).toHaveAttribute("aria-current", "true");
-  await expect(padel).toContainText(/1 complejo/);
+  // Sin número exacto: futmates (real) cargó una cancha de pádel el 2026-11-25
+  await expect(padel).toContainText(/\d+ complejos?/);
   expect(await padel.locator("svg").count()).toBe(1);
 
   const all = await page.locator("main").innerText();
