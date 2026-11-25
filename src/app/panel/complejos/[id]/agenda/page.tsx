@@ -1,16 +1,16 @@
 export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { getAgendaData } from "@/lib/supabase/panel-queries";
-import { todayInMendoza } from "@/lib/slots";
-import AgendaGrid from "@/components/panel/agenda-grid";
+import { generateSlots, mendozaToUtc, todayInMendoza, weekdayInMendoza } from "@/lib/slots";
+import AgendaDay, { type FreeSlot } from "@/components/panel/agenda-day";
 import {
   cancelBookingPanelAction,
   markPaidAction,
   markNoShowAction,
   blockPhonePanelAction,
   createManualBlockAction,
+  createBookingPanelAction,
 } from "@/app/actions/panel";
 
 type Props = {
@@ -21,43 +21,49 @@ type Props = {
 export default async function AgendaPage({ params, searchParams }: Props) {
   const { id: venueId } = await params;
   const { fecha }       = await searchParams;
-  const date = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : todayInMendoza();
+  const now   = new Date();
+  const today = todayInMendoza(now);
+  const date  = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : today;
 
   const data = await getAgendaData(venueId, date);
   if (!data) notFound();
 
-  return (
-    <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
-      <div className="flex flex-wrap items-center gap-3 mb-4 shrink-0">
-        <Link href="/panel/agenda" className="inline-flex min-h-11 items-center text-sm text-ink-muted hover:text-ink">
-          ← Agenda
-        </Link>
-        <span className="text-ink-muted">/</span>
-        <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-ink">{data.venueName}</h1>
-        <Link
-          href={`/panel/complejos/${venueId}/historia`}
-          data-testid="compartir-turnos"
-          className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-primary px-4 text-sm font-extrabold text-on-primary shadow-sm hover:opacity-90"
-        >
-          Compartir turnos libres
-        </Link>
-      </div>
+  // Turnos libres del día (los de hoy, solo los que todavía no empezaron; un día pasado, ninguno)
+  const weekday = weekdayInMendoza(date);
+  const dayEnd  = mendozaToUtc(date, "00:00:00").getTime() + 24 * 3600 * 1000;
+  const free: FreeSlot[] = date < today ? [] : data.courts.flatMap((c) =>
+    generateSlots({
+      date,
+      hours: c.hours.filter((h) => h.weekday === weekday),
+      slotMinutes: c.slot_minutes,
+      booked: data.bookings
+        .filter((b) => b.court_id === c.id && (b.status === "confirmed" || b.status === "hold"))
+        .map((b) => ({ start: new Date(b.start), end: new Date(b.end) })),
+      prices: [],
+      cutoff: date === today ? now : undefined,
+    })
+      // La agenda muestra las reservas de 00:00 a 24:00: los turnos de después de medianoche, al día siguiente
+      .filter((s) => s.available && s.start.getTime() < dayEnd)
+      .map((s) => ({ courtId: c.id, start: s.start.toISOString(), end: s.end.toISOString() })),
+  );
 
-      <AgendaGrid
-        venueId={venueId}
-        venueName={data.venueName}
-        whatsappTemplate={data.whatsappTemplate}
-        date={date}
-        todayMendoza={todayInMendoza()}
-        courts={data.courts}
-        bookings={data.bookings}
-        onCancel={cancelBookingPanelAction}
-        onMarkPaid={markPaidAction}
-        onMarkNoShow={markNoShowAction}
-        onBlockPhone={blockPhonePanelAction}
-        onCreateBlock={createManualBlockAction}
-      />
-    </div>
+  return (
+    <AgendaDay
+      venueId={venueId}
+      venueName={data.venueName}
+      whatsappTemplate={data.whatsappTemplate}
+      date={date}
+      today={today}
+      nowIso={now.toISOString()}
+      courts={data.courts}
+      bookings={data.bookings}
+      free={free}
+      onCancel={cancelBookingPanelAction}
+      onMarkPaid={markPaidAction}
+      onMarkNoShow={markNoShowAction}
+      onBlockPhone={blockPhonePanelAction}
+      onCreateBlock={createManualBlockAction}
+      onCreateBooking={createBookingPanelAction}
+    />
   );
 }

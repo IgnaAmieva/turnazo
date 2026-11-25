@@ -53,12 +53,25 @@ const PANEL_RPC_MESSAGES: Record<string, string> = {
   no_show_before_start:
     "Una reserva pagada online solo se puede marcar como ausente después de su horario. " +
     "Para liberar el turno antes, cancelala: se le devuelve lo pagado.",
+  // panel_create_booking (026): los códigos de _validate_booking_slot, dichos para el dueño
+  past_slot:            "Ese horario ya pasó.",
+  too_far_ahead:        "Se pueden cargar turnos hasta 30 días adelante.",
+  invalid_slot:         "Ese horario no coincide con los turnos de la cancha.",
+  invalid_duration:     "Ese horario no coincide con los turnos de la cancha.",
+  outside_hours:        "Ese horario está fuera del horario de la cancha.",
+  invalid_name:         "Escribí el nombre del jugador.",
+  invalid_phone:        "Revisá el celular: código de área y número, sin 0 ni 15. Ej: 2622 123456.",
+  phone_blocked:        "Ese número está bloqueado en tu complejo.",
+  too_many_bookings:    "Ese celular ya tiene 3 turnos por jugar en tu complejo.",
+  venue_not_found:      "Tu complejo todavía no está aprobado.",
+  court_not_found:      "Esa cancha no está activa.",
+  price_not_set:        "Ese horario no tiene precio. Cargalo en los precios de la cancha.",
 };
 
 /** Llama a un RPC panel_* con la sesión del dueño y traduce el resultado. */
 async function callPanelRpc(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  fn: "panel_create_block" | "panel_cancel_booking" | "panel_mark_paid" | "panel_mark_no_show",
+  fn: "panel_create_block" | "panel_create_booking" | "panel_cancel_booking" | "panel_mark_paid" | "panel_mark_no_show",
   args: Record<string, unknown>,
 ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; state: PanelActionState }> {
   const { data, error } = await supabase.rpc(fn as never, args as never);
@@ -1037,6 +1050,72 @@ export async function createManualBlockAction(
     new_data:   { court_id: courtId, start: startDate.toISOString(), end: endDate.toISOString(), note },
   });
   if (blockCreateAuditErr) return auditError(blockCreateAuditErr);
+
+  revalidatePath(`/panel/complejos/${venueId}/agenda`);
+  if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);
+  return null;
+}
+
+const ManualBookingSchema = z.object({
+  venue_id:       z.string().guid(),
+  court_id:       z.string().guid(),
+  start:          z.iso.datetime({ offset: true }),
+  end:            z.iso.datetime({ offset: true }),
+  customer_name:  z.string().trim().max(80),
+  customer_phone: z.string().trim().max(30),
+});
+
+/**
+ * El dueño carga un turno (el jugador llamó o escribió). Migración 026:
+ * panel_create_booking valida igual que la reserva pública (horario, grilla,
+ * precio, celular, teléfono bloqueado) y lo deja confirmado y sin pagar.
+ */
+export async function createBookingPanelAction(
+  _prevState: PanelActionState,
+  formData: FormData
+): Promise<PanelActionState> {
+  const parsed = ManualBookingSchema.safeParse({
+    venue_id:       formData.get("venue_id"),
+    court_id:       formData.get("court_id"),
+    start:          formData.get("start"),
+    end:            formData.get("end"),
+    customer_name:  formData.get("customer_name") ?? "",
+    customer_phone: formData.get("customer_phone") ?? "",
+  });
+  if (!parsed.success) return { error: "Elegí un horario libre." };
+  const { venue_id: venueId, court_id: courtId, start, end, customer_name, customer_phone } = parsed.data;
+  if (customer_name.length < 2) return { fieldErrors: { customer_name: [PANEL_RPC_MESSAGES.invalid_name] } };
+  if (customer_phone.replace(/\D/g, "").length < 8) return { fieldErrors: { customer_phone: [PANEL_RPC_MESSAGES.invalid_phone] } };
+  const date = formData.get("date") as string | null;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const rpc = await callPanelRpc(supabase, "panel_create_booking", {
+    p_venue_id:       venueId,
+    p_court_id:       courtId,
+    p_start:          start,
+    p_end:            end,
+    p_customer_name:  customer_name,
+    p_customer_phone: customer_phone,
+  });
+  if (!rpc.ok) {
+    const msg = rpc.state?.error;
+    if (msg === PANEL_RPC_MESSAGES.invalid_name) return { fieldErrors: { customer_name: [msg] } };
+    if (msg === PANEL_RPC_MESSAGES.invalid_phone) return { fieldErrors: { customer_phone: [msg] } };
+    return rpc.state;
+  }
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    profile_id: user.id,
+    venue_id:   venueId,
+    entity:     "booking",
+    entity_id:  rpc.data.booking_id as string,
+    action:     "create",
+    new_data:   { court_id: courtId, start, end, source: "manual", price_total: Number(rpc.data.price_total ?? 0) },
+  });
+  if (auditErr) return auditError(auditErr);
 
   revalidatePath(`/panel/complejos/${venueId}/agenda`);
   if (date) revalidatePath(`/panel/complejos/${venueId}/agenda?fecha=${date}`);

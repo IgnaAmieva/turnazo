@@ -1,7 +1,7 @@
 /**
  * Rediseño D2: panel en el celular (390 px). Menú desplegable, entrada directa
- * a la agenda, botón "Hoy", pestañas por cancha, color según el pago y hoja de
- * acciones (44 px, con confirmación para cancelar y bloquear).
+ * a la agenda, días (Hoy + 6), pestañas por cancha y "Todas", color según el pago
+ * y hoja de acciones (44 px, con confirmación para cancelar y bloquear).
  * Usa reservas propias en el complejo de prueba y las borra al final.
  */
 import { test, expect, type Page } from "@playwright/test";
@@ -60,7 +60,7 @@ test("en el celular el menú está cerrado, se abre con un toque y deja la agend
   await expect(page.locator("#panel-menu").getByRole("link", { name: "Complejos", exact: true })).toBeHidden();
 
   // La agenda usa todo el ancho (antes la barra lateral se comía 224 px)
-  const grid = await page.getByRole("button", { name: /anterior/i }).boundingBox();
+  const grid = await page.getByTestId("resumen").boundingBox();
   expect(grid!.x).toBeLessThan(40);
 
   await menuBtn.click();
@@ -79,28 +79,40 @@ test("en el celular el menú está cerrado, se abre con un toque y deja la agend
   await expect(page.locator("#panel-menu").getByRole("link", { name: "Complejos", exact: true })).toBeHidden(); // se cierra al navegar
 });
 
-test("agenda: 'Hoy' y selector de fecha; botones de 44 px", async ({ page }) => {
+test("agenda: días (Hoy + 6) y selector de fecha; todo de 44 px", async ({ page }) => {
   await gotoPanel(page, AGENDA);
-  for (const name of [/anterior/i, /siguiente/i, /^hoy$/i]) {
-    const btn = page.getByRole("button", { name });
-    await expect(btn).toBeVisible();
-    expect((await btn.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  }
-  await page.getByRole("button", { name: /^hoy$/i }).click();
-  await page.waitForURL((u) => u.searchParams.get("fecha") !== FECHA);
-  await expect(page.getByRole("button", { name: /^hoy$/i })).toBeHidden();
+  const days = page.getByTestId("dia");
+  // El día elegido (9+ días adelante) va primero, después Hoy y los 6 siguientes
+  await expect(days).toHaveCount(8);
+  await expect(days.first()).toHaveAttribute("aria-current", "date");
+  for (const d of await days.all()) expect((await d.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
-  await page.getByLabel("Elegir fecha").fill(FECHA);
+  await days.filter({ hasText: "Hoy" }).click();
+  await page.waitForURL((u) => u.searchParams.get("fecha") !== FECHA);
+  await expect(days.filter({ hasText: "Hoy" })).toHaveAttribute("aria-current", "date");
+  await expect(days).toHaveCount(7);
+
+  const picker = page.getByLabel("Elegir fecha");
+  expect((await picker.locator("xpath=..").boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await picker.fill(FECHA);
   await page.waitForURL((u) => u.searchParams.get("fecha") === FECHA);
 });
 
-test("tocar un turno abre la hoja de acciones con botones de 44 px; Escape la cierra", async ({ page }) => {
+test("tocar un turno abre la hoja: 'Cobrado' y 'WhatsApp' grandes arriba, el resto abajo, todo de 44 px; Escape la cierra", async ({ page }) => {
   await gotoPanel(page, AGENDA);
   await page.getByText(NAME).first().click();
 
   const sheet = page.getByRole("dialog", { name: `Turno de ${NAME}` });
   await expect(sheet).toBeVisible();
-  for (const name of [/whatsapp/i, /marcar pagado/i, /marcar ausente/i, /cancelar turno/i, /bloquear teléfono/i, /^cerrar$/i]) {
+  const cobrado = sheet.getByRole("button", { name: /^cobrado \$/i });
+  const wa = sheet.getByRole("link", { name: /whatsapp/i });
+  const noVino = sheet.getByRole("button", { name: /marcar que no vino/i });
+  // Cobrado y WhatsApp lado a lado, arriba de las demás acciones
+  const [c, w, n] = [await cobrado.boundingBox(), await wa.boundingBox(), await noVino.boundingBox()];
+  expect(Math.abs(c!.y - w!.y)).toBeLessThan(2);
+  expect(c!.y).toBeLessThan(n!.y);
+  expect(c!.height).toBeGreaterThanOrEqual(52);
+  for (const name of [/whatsapp/i, /^cobrado/i, /marcar que no vino/i, /cancelar turno/i, /bloquear este número/i, /^cerrar$/i]) {
     const el = sheet.getByRole(name.source.includes("whatsapp") ? "link" : "button", { name });
     await expect(el).toBeVisible();
     const box = (await el.boundingBox())!;
@@ -137,13 +149,26 @@ test("celular: pestañas por cancha, una columna a la vez, la elegida queda reco
 
 test.describe("escritorio", () => {
   test.use({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false });
-  test("sin pestañas: la grilla completa con todas las canchas", async ({ page }) => {
+  test("'Todas': una columna por cancha lado a lado, con las mismas tarjetas", async ({ page }) => {
     await gotoPanel(page, AGENDA);
-    await expect(page.getByRole("tablist", { name: "Canchas" })).toBeHidden();
-    const n = await page.getByTestId("court-column").count();
-    expect(n).toBeGreaterThan(1);
-    await expect(page.getByTestId("court-column").filter({ visible: true })).toHaveCount(n);
+    await page.getByRole("tablist", { name: "Canchas" }).getByRole("tab", { name: "Todas" }).click();
+    const cols = page.getByTestId("court-column").filter({ visible: true });
+    await expect(cols).toHaveCount(2);
+    const [a, b] = [await cols.nth(0).boundingBox(), await cols.nth(1).boundingBox()];
+    expect(Math.abs(a!.y - b!.y)).toBeLessThan(2);   // lado a lado
+    expect(b!.x).toBeGreaterThan(a!.x + a!.width - 1);
+    await expect(cols.nth(0).getByTestId("booking-card").filter({ hasText: NAME })).toBeVisible();
+    await page.evaluate((k) => localStorage.removeItem(k), `turnazo-agenda-cancha:${VENUE_ID}`);
   });
+});
+
+test("celular, 'Todas': una sola lista en orden de hora, con el nombre de la cancha", async ({ page }) => {
+  await gotoPanel(page, AGENDA);
+  await page.getByRole("tablist", { name: "Canchas" }).getByRole("tab", { name: "Todas" }).click();
+  await expect(page.getByTestId("court-column").filter({ visible: false })).toHaveCount(2); // las columnas de escritorio, ocultas
+  await expect(page.getByTestId("booking-card").filter({ visible: true }).filter({ hasText: NAME })).toContainText("Cancha 1");
+  await expect(page.getByTestId("turno-libre").filter({ visible: true }).filter({ hasText: "Cancha 2" }).first()).toBeVisible();
+  await page.evaluate((k) => localStorage.removeItem(k), `turnazo-agenda-cancha:${VENUE_ID}`);
 });
 
 for (const scheme of ["light", "dark"] as const) {
@@ -161,15 +186,20 @@ for (const scheme of ["light", "dark"] as const) {
   });
 }
 
-test("al marcar pagado la tarjeta pasa a lima", async ({ page }) => {
+test("'Cobrado' pasa el turno a lima (borde y etiqueta 'Pagado') y avisa 'Cobrado'", async ({ page }) => {
   await gotoPanel(page, AGENDA);
   const card = page.getByTestId("booking-card").filter({ hasText: NAME_PAGO });
   await expect(card).toHaveAttribute("data-pago", "unpaid");
+  expect(await card.evaluate((el) => getComputedStyle(el).borderLeftColor)).not.toBe("rgb(212, 243, 74)");
   await page.getByText(NAME_PAGO).first().click();
-  await page.getByRole("dialog").getByRole("button", { name: /marcar pagado/i }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /^cobrado/i }).click();
+  await expect(page.getByTestId("guardado")).toHaveText("Cobrado");
   await expect(card).toHaveAttribute("data-pago", "paid", { timeout: 15_000 });
-  expect(await card.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(212, 243, 74)");
-  expect(await contrastOf(card.getByTestId("badge-pago"))).toBeGreaterThanOrEqual(4.5);
+  expect(await card.evaluate((el) => getComputedStyle(el).borderLeftColor)).toBe("rgb(212, 243, 74)");
+  const badge = card.getByTestId("badge-pago");
+  await expect(badge).toHaveText("Pagado");
+  expect(await badge.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(212, 243, 74)");
+  expect(await contrastOf(badge)).toBeGreaterThanOrEqual(4.5);
 });
 
 test("cancelar turno y bloquear teléfono piden confirmación; 'Volver' no ejecuta nada", async ({ page, request }) => {
@@ -182,7 +212,7 @@ test("cancelar turno y bloquear teléfono piden confirmación; 'Volver' no ejecu
   await expect(sheet.getByRole("button", { name: "Confirmar cancelación" })).toBeVisible();
   await sheet.getByRole("button", { name: "Volver" }).click();
 
-  await sheet.getByRole("button", { name: /bloquear teléfono/i }).click();
+  await sheet.getByRole("button", { name: /bloquear este número/i }).click();
   await expect(sheet.getByText(/No va a poder reservar más en este complejo/)).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Confirmar bloqueo" })).toBeVisible();
   await sheet.getByRole("button", { name: "Volver" }).click();

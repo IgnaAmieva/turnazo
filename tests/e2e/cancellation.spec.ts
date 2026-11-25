@@ -237,7 +237,7 @@ test.describe("panel: cancelar reserva con pago online", () => {
 
     // Aviso antes de confirmar; todavía no se canceló nada
     await expect(page.getByText(/Se le devolverán/)).toBeVisible();
-    await expect(page.getByText("$2.500", { exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("$2.500", { exact: true })).toBeVisible();
     expect(await bookingRow(request, b.id)).toMatchObject({ status: "confirmed" });
 
     await page.getByRole("button", { name: "Volver" }).click();

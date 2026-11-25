@@ -117,8 +117,8 @@ test("mark paid writes audit_log row (entity=booking, action=mark_paid)", async 
   const before = await countAuditRows(request, "mark_paid", "booking");
 
   await page.getByText(SLOTS.markPaid.name).first().click();
-  await expect(page.getByRole("button", { name: /marcar pagado/i })).toBeVisible({ timeout: 3_000 });
-  await page.getByRole("button", { name: /marcar pagado/i }).click();
+  await expect(page.getByRole("button", { name: /^cobrado/i })).toBeVisible({ timeout: 3_000 });
+  await page.getByRole("button", { name: /^cobrado/i }).click();
   await page.waitForTimeout(2_000);
 
   const after      = await countAuditRows(request, "mark_paid", "booking");
@@ -137,8 +137,8 @@ test("mark no-show writes audit_log row (entity=booking, action=mark_no_show)", 
   const before = await countAuditRows(request, "mark_no_show", "booking");
 
   await page.getByText(SLOTS.noShow.name).first().click();
-  await expect(page.getByRole("button", { name: /marcar ausente/i })).toBeVisible({ timeout: 3_000 });
-  await page.getByRole("button", { name: /marcar ausente/i }).click();
+  await expect(page.getByRole("button", { name: /marcar que no vino/i })).toBeVisible({ timeout: 3_000 });
+  await page.getByRole("button", { name: /marcar que no vino/i }).click();
   await page.waitForTimeout(2_000);
 
   const after      = await countAuditRows(request, "mark_no_show", "booking");
@@ -157,8 +157,8 @@ test("block phone writes audit_log row (entity=blocked_phone, action=create)", a
   const before = await countAuditRows(request, "create", "blocked_phone");
 
   await page.getByText(SLOTS.blockPhone.name).first().click();
-  await expect(page.getByRole("button", { name: /bloquear teléfono/i })).toBeVisible({ timeout: 3_000 });
-  await page.getByRole("button", { name: /bloquear teléfono/i }).click();
+  await expect(page.getByRole("button", { name: /bloquear este número/i })).toBeVisible({ timeout: 3_000 });
+  await page.getByRole("button", { name: /bloquear este número/i }).click();
   await page.getByRole("button", { name: "Confirmar bloqueo" }).click(); // pide confirmar (rediseño D2)
   await page.waitForTimeout(2_000);
 
@@ -181,8 +181,9 @@ test("create manual block writes audit_log row (entity=booking, action=create_bl
   const startVal = `${AUDIT_DATE}T14:00`;
   const endVal   = `${AUDIT_DATE}T15:30`;
 
-  await page.locator("button[title='Agregar bloqueo']").first().click();
-  await expect(page.getByText("Nuevo bloqueo")).toBeVisible();
+  // Agenda nueva: "+ Nuevo turno" → "Bloquear horario"
+  await page.getByRole("button", { name: /nuevo turno/i }).click();
+  await page.getByRole("dialog", { name: "Nuevo turno" }).getByRole("radio", { name: "Bloquear horario" }).click();
   await page.locator('input[name="start"]').fill(startVal);
   await page.locator('input[name="end"]').fill(endVal);
   await page.locator('input[name="note"]').fill("Audit Test Block");

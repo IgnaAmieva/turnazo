@@ -8,7 +8,10 @@ import {
   OWNER_EMAIL,
   OWNER_PASSWORD,
   VENUE_ID,
+  SUPABASE_URL,
   nextWeekday,
+  serviceHeaders,
+  createTestBooking,
   deleteTestBookings,
   deleteTestOutboxRows,
 } from "./helpers";
@@ -55,15 +58,17 @@ test("panel/agenda redirects to venue agenda when owner has one venue", async ({
 // ---------------------------------------------------------------------------
 // Venue agenda loads and shows the grid
 // ---------------------------------------------------------------------------
-test("venue agenda page loads courts grid", async ({ page }) => {
+test("venue agenda page loads: days, summary and court tabs", async ({ page }) => {
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AGENDA_DATE}`);
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByRole("button", { name: /anterior/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /siguiente/i })).toBeVisible();
-  await expect(page.getByText(/cancha/i).filter({ visible: true }).first()).toBeVisible(); // en escritorio las pestañas del celular están ocultas
+  await expect(page.getByTestId("dia").first()).toBeVisible();
+  await expect(page.getByTestId("resumen")).toBeVisible();
+  const tabs = page.getByRole("tablist", { name: "Canchas" });
+  await expect(tabs.getByRole("tab", { name: /^Cancha 1 · \d+$/ })).toBeVisible();
+  await expect(tabs.getByRole("tab", { name: "Todas" })).toBeVisible();
 
   expect(errors).toHaveLength(0);
 });
@@ -71,13 +76,13 @@ test("venue agenda page loads courts grid", async ({ page }) => {
 // ---------------------------------------------------------------------------
 // Date navigation changes the date in the URL
 // ---------------------------------------------------------------------------
-test("clicking next day updates the URL date", async ({ page }) => {
+test("tapping another day updates the URL date", async ({ page }) => {
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AGENDA_DATE}`);
   await page.waitForLoadState("networkidle");
 
-  await page.getByRole("button", { name: /siguiente/i }).click();
+  await page.getByTestId("dia").filter({ hasText: "Hoy" }).click();
   await page.waitForURL(
     (url) => url.searchParams.get("fecha") !== AGENDA_DATE,
     { timeout: 5_000 }
@@ -100,9 +105,9 @@ test("can create a manual block on a court", async ({ page }) => {
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AGENDA_DATE}`);
   await page.waitForLoadState("networkidle");
 
-  // Click the "+" button on the first court column
-  await page.locator("button[title='Agregar bloqueo']").first().click();
-  await expect(page.getByText("Nuevo bloqueo")).toBeVisible();
+  // "+ Nuevo turno" → "Bloquear horario" (la cancha propuesta es la del primer libre: Cancha 1)
+  await page.getByRole("button", { name: /nuevo turno/i }).click();
+  await page.getByRole("dialog", { name: "Nuevo turno" }).getByRole("radio", { name: "Bloquear horario" }).click();
 
   // Use hour derived from current time to avoid EXCLUDE constraint conflicts
   // Changes every hour → 15 non-overlapping 1-hour slots (08:00-22:00)
@@ -125,36 +130,23 @@ test("can create a manual block on a court", async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Cancelled bookings appear greyed out
+// Cancelled bookings are not listed: their slot shows as free again
 // ---------------------------------------------------------------------------
-test("cancelled bookings appear greyed on the agenda", async ({ page }) => {
+test("cancelled bookings are not listed; their slot is free again", async ({ page, request }) => {
   const errors = collectPageErrors(page);
-  await loginAsOwner(page);
+  // Otro día que el del bloqueo de arriba (ese puede caer a cualquier hora)
+  const date = nextWeekday(5, 8);
+  const id = await createTestBooking(request, date, 18, 30, "E2E block cancelado", "2622000444");
+  expect(id).toBeTruthy();
+  await request.patch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${id}`, { headers: serviceHeaders(), data: { status: "cancelled" } });
 
-  // Pick a date with the previously-cancelled E2E block (we'll check appearance)
-  // Any date where there are cancelled bookings works; we just navigate to the agenda
-  // and verify the grid loads without errors (visual: grey styling is CSS-only)
-  await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AGENDA_DATE}`);
+  await loginAsOwner(page);
+  await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${date}`);
   await page.waitForLoadState("networkidle");
 
-  // Grid should load with no JS errors
-  await expect(page.getByRole("button", { name: /anterior/i })).toBeVisible();
-  expect(errors).toHaveLength(0);
-});
-
-// ---------------------------------------------------------------------------
-// Sport filter appears only when multiple sports exist
-// ---------------------------------------------------------------------------
-test("sport filter is not shown for single-sport venue", async ({ page }) => {
-  const errors = collectPageErrors(page);
-  await loginAsOwner(page);
-  await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AGENDA_DATE}`);
-  await page.waitForLoadState("networkidle");
-
-  // The test venue only has pádel courts → no "Todos" filter button
-  // (If it had multiple sports, the filter would show)
-  // Just verify the page loads cleanly
-  await expect(page.getByRole("button", { name: /anterior/i })).toBeVisible();
+  await expect(page.getByTestId("resumen")).toBeVisible();
+  await expect(page.getByText("E2E block cancelado")).toHaveCount(0);
+  await expect(page.locator('[data-testid="turno-libre"][data-inicio="18:30"]')).toBeVisible();
   expect(errors).toHaveLength(0);
 });
 

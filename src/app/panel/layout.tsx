@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import PanelNav from './_nav';
 import PwaInstallGuide from '@/components/panel/pwa-install-guide';
 import ServiceWorkerRegistrar from '@/components/panel/service-worker-registrar';
+import SavedToast from '@/components/panel/saved-toast';
 
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -18,6 +19,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
       </main>
       <PwaInstallGuide />
       <ServiceWorkerRegistrar />
+      <SavedToast />
     </div>
   );
 }
