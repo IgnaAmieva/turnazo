@@ -2,7 +2,7 @@
 -- 025_venue_logos_policies_fix.sql — Corrige las políticas de la 024
 -- ============================================================
 -- Aplica DESPUÉS de 024_venue_logos.sql. Correr como postgres.
--- NO aplicada: la revisa y la aplica el revisor.
+-- APLICADA por el revisor (2026-11-25); pg_policies dice storage.foldername(objects.name).
 --
 -- Error de la 024: en
 --   EXISTS (SELECT 1 FROM public.venues v

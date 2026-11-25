@@ -84,7 +84,7 @@ src/
     venue-pin-map-wrapper.tsx  # dynamic() SSR:false wrapper
   proxy.ts              # (Next 16, antes middleware.ts) Protege /panel/* → redirige a /login si no autenticado
 
-supabase/migrations/    # 001 a 024 aplicadas en Supabase Cloud (022 vive en la rama s2-captcha); 025 escrita, sin aplicar. Estado en ESTADO.md
+supabase/migrations/    # 001 a 025 aplicadas en Supabase Cloud (el código de la 022 vive en la rama s2-captcha). Estado en ESTADO.md
 tests/
   unit/                 # Vitest: teléfonos, slots, tema/contraste, MP, historias, logo, etc.
   integration/          # Vitest contra la base real (fixtures propios, se borran al final)

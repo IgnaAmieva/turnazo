@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-24 (rediseño: logo del club en la rama `rediseno`; 022, 023 y 024 aplicadas por el revisor; 025 escrita, sin aplicar; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-25 (rediseño: logo del club cerrado en la rama `rediseno`; 022 a 025 aplicadas por el revisor; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -87,9 +87,8 @@
 
 | 022 | (rama `s2-captcha`) | Aplicada por el revisor. Fase 7 S2 (límites de intentos para Turnstile). El código que la usa está solo en `s2-captcha`; se integra después del merge de `rediseno` |
 | 023 | `023_court_features.sql` | Aplicada por el revisor (2026-11-24). Etiquetas de cancha: `surface` (CHECK con la lista), `covered`, `lit`, `has_locker_room`; grants por columna |
-| 024 | `024_venue_logos.sql` | Aplicada por el revisor (2026-11-24), con dos cambios sobre la propuesta (el archivo ya es igual a lo aplicado): SELECT de storage solo para el dueño (`venue_logos_owner_select`, nadie lista el bucket) y `venues_logo_path_check` (logo_path en la carpeta `{id}/` y sin `..`). `venues.logo_path`, bucket público `venue-logos` (512 KB, PNG/JPEG/WebP), políticas de dueño. **Sus políticas tienen un error** (`name` se resuelve como `venues.name`): nadie puede subir; lo corrige la 025 |
-
-**Escrita, SIN APLICAR:** `025_venue_logos_policies_fix.sql` — recrea las 4 políticas de `venue-logos` con `storage.foldername(objects.name)`. Sin ella el dueño no puede subir el logo desde el panel.
+| 024 | `024_venue_logos.sql` | Aplicada por el revisor (2026-11-24), con dos cambios sobre la propuesta (el archivo ya es igual a lo aplicado): SELECT de storage solo para el dueño (`venue_logos_owner_select`, nadie lista el bucket) y `venues_logo_path_check` (logo_path en la carpeta `{id}/` y sin `..`). `venues.logo_path`, bucket público `venue-logos` (512 KB, PNG/JPEG/WebP), políticas de dueño. Sus políticas tenían un error (`name` se resolvía como `venues.name`): lo corrige la 025 |
+| 025 | `025_venue_logos_policies_fix.sql` | Aplicada por el revisor (2026-11-25; pg_policies dice `storage.foldername(objects.name)`). Recrea las 4 políticas de `venue-logos` con `objects.name` |
 
 **Próxima migración:** `026_*.sql`
 
@@ -102,8 +101,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 362 | 361 ✓, 1 ✗ esperando la 025 (2026-11-24, rama `rediseno` logo del club) |
-| E2E | Playwright | 137 (incluye el setup de login) | 136 ✓, 1 ✗ esperando la 025 (2026-11-24, rama `rediseno` logo del club, --workers=1 en tandas por archivo) |
+| Unitarios + integración | Vitest | 362 | ✓ verde (2026-11-25, rama `rediseno` logo del club, con la 025 aplicada) |
+| E2E | Playwright | 137 (incluye el setup de login) | ✓ verde (2026-11-25, rama `rediseno` logo del club, --workers=1 en 4 tandas por archivo) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -138,13 +137,12 @@ Historias de turnos libres (panel; diseño en diseno/historias.png, fuera del re
 
 - Día de la imagen: la ruta responde `X-Historia-Fecha` con el día dibujado (hora de Mendoza). E2E: por defecto es hoy, al elegir otro día la vista previa, la descarga y la imagen usan ese día, y un día pasado vuelve a hoy; unit: "hoy" cerca de medianoche (02:30 UTC = 23:30 del día anterior en Mendoza). El "Martes 1" de las capturas anteriores era una imagen pedida a mano con ?fecha= de otro día, no un error.
 
-Logo del club (024 aplicada; 025 escrita, sin aplicar):
+Logo del club (024 y 025 aplicadas; cerrado 2026-11-25):
 - Panel del complejo → "Logo del club" (`components/panel/venue-logo-section.tsx`): el logo actual o las iniciales, "Subir logo" / "Cambiar logo" y "Quitar logo" (44 px). Más de 512 KB se avisa antes de mandar.
 - `uploadVenueLogoAction` / `removeVenueLogoAction` (actions/panel.ts), con la sesión del dueño (las políticas de storage hacen cumplir la carpeta): verifica que el complejo sea suyo, tamaño ≤ 512 KB y el tipo REAL por los primeros bytes (`detectLogoType` en lib/venue-logo.ts: PNG, JPEG, WebP; la extensión y el Content-Type no cuentan). Sube a `{venue_id}/logo-{timestamp}.{ext}` (nombre nuevo cada vez: la URL pública cambia y nadie ve el viejo de caché), guarda logo_path, borra el anterior y escribe audit_log.
 - Se muestra por la URL pública del bucket (no necesita política de lectura): portada del complejo (`components/club-logo.tsx`, círculo junto al nombre) y panel. Sin logo, iniciales en verde sobre lima.
 - Historia: `getStoryData` baja el logo por su URL pública y lo pasa como data URI (vuelve a mirar los bytes; si falla, iniciales). next/og dibuja PNG y JPEG pero deja vacío el WebP: el WebP se convierte a PNG con `sharp` (agregado como dependencia directa; ya venía con Next, misma versión 0.35.5).
 - Tests: `tests/unit/venue-logo.test.ts` (bytes), `tests/integration/venue-logos.test.ts` (A no sube, no pisa, no borra ni lista en la carpeta de B; no apunta logo_path a otra carpeta ni con `..`; la acción rechaza un SVG con nombre .png, más de 512 KB, sin archivo y el complejo ajeno; A sube, cambia y quita su logo) y `tests/e2e/logo.spec.ts` (iniciales → logo en la portada y en la historia, PNG y WebP; archivo falso rechazado; aviso de 512 KB; el dueño sube y quita desde el panel).
-- **Esperando la 025**: "A sube, cambia y quita su logo" (integración) y "el dueño sube el logo…" (E2E) fallan con "new row violates row-level security policy" hasta aplicarla. Todo lo demás pasa.
 
 Rediseño M4 (Mi turno):
 - "Guardá este link" arriba de todo (borde primary): el link de Mi turno en un campo de solo lectura y "Copiar link" (44 px; sin permiso de portapapeles queda seleccionado para copiar a mano).
@@ -557,7 +555,7 @@ Ramas y orden
 Base de datos (es la misma para Preview y producción)
 - [x] 023 (etiquetas de cancha) aplicada por el revisor; `main` no la usa, no rompe nada.
 - [x] 024 (logo del club) aplicada.
-- [ ] 025 (corrige las políticas de la 024) escrita, sin aplicar. Sin ella el panel muestra "No se pudo subir el logo" (no rompe nada más; las portadas y las historias siguen con las iniciales). Aplicarla antes del merge.
+- [x] 025 (corrige las políticas de la 024) aplicada (2026-11-25).
 - [ ] Pendiente S5 (`p_replace_hold_token`), migración aparte: no bloquea el merge.
 - [ ] Datos: futmates no tiene precio de 22:00 a 00:00 (lo carga el dueño; el panel ya lo avisa). El "Complejo Padelero Tunuyán" de prueba está aprobado y se ve en producción (inicio, "Lo antes posible", lista): **queda visible por ahora; hay que ocultarlo antes de que entren dueños reales (va con S7, base de tests separada)**.
 - [ ] Antes de mergear, verificar que no queden datos de prueba: 14 reservas, 0 teléfonos bloqueados, cancha de prueba sin etiquetas, cobro del complejo de prueba solo "en el lugar", complejo de prueba sin logo y bucket `venue-logos` vacío.
@@ -576,6 +574,6 @@ Cambios de comportamiento a tener presentes
 - [ ] `?_now=` solo funciona fuera de producción (NODE_ENV): confirmado en el código.
 
 Calidad
-- [ ] `pnpm test` y `pnpm test:e2e --workers=1` en verde sobre la rama final (si la corrida entera se corta por memoria, por tandas de archivos).
+- [x] `pnpm test` (362) y `pnpm test:e2e --workers=1` (137, en 4 tandas) en verde sobre la rama final (2026-11-25). Repetir si entra algo más antes del merge.
 - [ ] Lint: quedan 3 errores viejos de `react-hooks/set-state-in-effect` (payment-status-panel, botón de push, guía de PWA), anteriores al rediseño. `next build` no corre lint, así que no bloquean el deploy.
-- [x] CLAUDE.md actualizado (Next 16, conteo de tests, migraciones hasta la 025, regla de migraciones).
+- [x] CLAUDE.md actualizado (Next 16, conteo de tests, migraciones hasta la 025 aplicadas, regla de migraciones).
