@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-25 (rediseño: funciones en cle1, logo de hasta 10 MB, agenda nueva y carga de cancha por pasos en la rama `rediseno`; 022 a 025 aplicadas; 026 escrita, SIN APLICAR; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-25 (rediseño: funciones en cle1, logo de hasta 10 MB, agenda nueva y carga de cancha por pasos en la rama `rediseno`; 022 a 025 aplicadas; 026 aplicada; 027 escrita, SIN APLICAR; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -89,10 +89,25 @@
 | 023 | `023_court_features.sql` | Aplicada por el revisor (2026-11-24). Etiquetas de cancha: `surface` (CHECK con la lista), `covered`, `lit`, `has_locker_room`; grants por columna |
 | 024 | `024_venue_logos.sql` | Aplicada por el revisor (2026-11-24), con dos cambios sobre la propuesta (el archivo ya es igual a lo aplicado): SELECT de storage solo para el dueño (`venue_logos_owner_select`, nadie lista el bucket) y `venues_logo_path_check` (logo_path en la carpeta `{id}/` y sin `..`). `venues.logo_path`, bucket público `venue-logos` (512 KB, PNG/JPEG/WebP), políticas de dueño. Sus políticas tenían un error (`name` se resolvía como `venues.name`): lo corrige la 025 |
 | 025 | `025_venue_logos_policies_fix.sql` | Aplicada por el revisor (2026-11-25; pg_policies dice `storage.foldername(objects.name)`). Recrea las 4 políticas de `venue-logos` con `objects.name` |
+| 026 | `026_panel_create_booking.sql` | Aplicada por el revisor (2026-11-25). `panel_create_booking(venue, court, start, end, nombre, celular)`: el dueño carga un turno desde la agenda ("+ Cargar turno" / "+ Nuevo turno"). Verifica el dueño, valida con `_validate_booking_slot` (igual que la reserva pública), deja `confirmed` / `unpaid` / `source = 'manual'` con el precio de la cancha; horario ocupado → `slot_taken`; sin outbox. EXECUTE solo authenticated |
 
-**Escrita, SIN APLICAR:** `026_panel_create_booking.sql` — `panel_create_booking(venue, court, start, end, nombre, celular)`: el dueño carga un turno desde la agenda ("+ Cargar turno" / "+ Nuevo turno"). Verifica el dueño, valida con `_validate_booking_slot` (igual que la reserva pública: horario, grilla, duración, precio, celular, teléfono bloqueado, 3 turnos futuros por celular, 30 días), deja `confirmed` / `unpaid` / `source = 'manual'` con el precio de la cancha; horario ocupado → `slot_taken`; sin outbox. EXECUTE solo authenticated. Hasta aplicarla, "Cargar turno" muestra el error genérico y fallan 1 E2E y 5 de integración (los de 026).
+**Escrita, SIN APLICAR:** `027_localities_geo_court_format_notes.sql`:
+- `localities.lat` / `lng` NOT NULL (las 4 existentes con el centroide oficial de Georef) y grant de SELECT;
+- `courts.format` (`futbol_5`, `futbol_6`, `futbol_7`, `futbol_9`, `futbol_11`, `futsal` o NULL) con CHECK y un trigger `enforce_court_format` que rechaza formato en canchas que no son de fútbol (`format_only_futbol`; también si se cambia el deporte de una cancha con formato: el panel tiene que mandar NULL);
+- `courts.notes` (200 caracteres como máximo, CHECK);
+- grants por columna (lectura anon/authenticated; escritura del dueño en format y notes). Nadie salvo el servidor escribe localities.
 
-**Próxima migración:** `027_*.sql`
+**Próxima migración:** `028_*.sql`
+
+### Propuesta: localidades nuevas (falta decidir; NO implementado)
+Cuando un dueño registra un complejo fuera de las localidades cargadas:
+1. El dueño solo pone el pin (ya lo hace). La server action de crear/editar complejo recibe lat/lng, no una localidad elegida a mano. El cliente nunca crea localidades: no hay grants de escritura en `localities` para anon ni authenticated y no se agrega ninguna RPC para eso.
+2. En el servidor, primero se busca una localidad existente cuyo centro esté a menos de ~6 km del pin. Esto hace falta porque Georef devuelve el **municipio**, y en Mendoza municipio = departamento: un complejo en La Consulta da "San Carlos" (verificado con la API). Sin este paso, La Consulta nunca se usaría.
+3. Si no hay ninguna cerca: `GET https://apis.datos.gob.ar/georef/api/ubicacion?lat=…&lon=…` (sin clave, desde el servidor, timeout de 3 s). Se toma `municipio.nombre` (o `departamento.nombre` si viene vacío) y `provincia`. Si ya existe una localidad con ese slug, se usa; si no, se crea con el cliente de service role (`lib/supabase/admin.ts`) con nombre, slug y el centroide del municipio (`/georef/api/municipios?id=…&campos=centroide`). Se escribe en `audit_log` quién la originó.
+4. Si Georef falla o el punto cae fuera de Argentina: se guarda el complejo en la localidad más cercana y el superadmin lo revisa al aprobarlo (el complejo entra `pending` igual).
+5. Visibilidad: la localidad aparece en el inicio solo si tiene al menos un complejo aprobado. Lo hace la consulta del inicio (ya cuenta complejos aprobados). Si querés que también lo haga la base, sería una política RLS para anon en `localities` con `EXISTS (venue aprobado)`, en otra migración.
+
+Ojo, dato a revisar: `padelmates` (aprobado, en Tunuyán) tiene el pin en Guaymallén (-32.8908, -68.8272, Georef lo confirma). Con el orden por cercanía va a quedar lejos de Tunuyán: el pin o la localidad están mal.
 
 **Vault (ya configurado con la 020):** `refund_retry_url` = `https://turnazo-chi.vercel.app/api/mp/refund-retry`; `push_secret` es el mismo `PUSH_SEND_SECRET` de Vercel. Si cambia el dominio hay que actualizar `refund_retry_url` y `push_send_url`.
 (`push_secret` ya existe; es el mismo `PUSH_SEND_SECRET` de Vercel.)
@@ -103,8 +118,8 @@
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 374 | 369 ✓, 5 ✗ esperando la 026 (`tests/integration/panel-create-booking.test.ts`) (2026-11-25, rama `rediseno`) |
-| E2E | Playwright | 147 (incluye el setup de login) | 146 ✓, 1 ✗ esperando la 026 (`agenda-v2.spec.ts` "+ Cargar turno") (2026-11-25, rama `rediseno`, --workers=1 en 4 tandas por archivo) |
+| Unitarios + integración | Vitest | 374 | 374 ✓ (2026-11-25, rama `rediseno`, con la 026 aplicada) |
+| E2E | Playwright | 147 (incluye el setup de login) | 147 ✓ (2026-11-25, rama `rediseno`, con la 026 aplicada; --workers=1 en 4 tandas por archivo) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -591,7 +606,8 @@ Base de datos (es la misma para Preview y producción)
 - [x] 023 (etiquetas de cancha) aplicada por el revisor; `main` no la usa, no rompe nada.
 - [x] 024 (logo del club) aplicada.
 - [x] 025 (corrige las políticas de la 024) aplicada (2026-11-25).
-- [ ] **026 (`panel_create_booking`, cargar turnos desde la agenda) escrita, SIN APLICAR**: revisarla y aplicarla antes del merge; después correr `tests/integration/panel-create-booking.test.ts` y `tests/e2e/agenda-v2.spec.ts`.
+- [x] 026 (`panel_create_booking`, cargar turnos desde la agenda) aplicada por el revisor (2026-11-25); suites en verde.
+- [ ] **027 (localidades con centro, formato y aclaraciones de cancha) escrita, SIN APLICAR**. El inicio "¿Dónde?", los formatos de fútbol y las aclaraciones se escriben después de aplicarla.
 - [ ] Pendiente S5 (`p_replace_hold_token`), migración aparte: no bloquea el merge.
 - [ ] Datos: futmates no tiene precio de 22:00 a 00:00 (lo carga el dueño; el panel ya lo avisa). El "Complejo Padelero Tunuyán" de prueba está aprobado y se ve en producción (inicio, "Lo antes posible", lista): **queda visible por ahora; hay que ocultarlo antes de que entren dueños reales (va con S7, base de tests separada)**.
 - [ ] Antes de mergear, verificar que no queden datos de prueba: 0 reservas "E2E*" / "Audit Test*", 0 teléfonos bloqueados, cancha de prueba sin etiquetas, cobro del complejo de prueba solo "en el lugar", complejo de prueba sin logo, bucket `venue-logos` vacío, 4 canchas (sin "E2E Cancha*"). Hoy hay 16 reservas: las 14 de antes más 2 que hizo Igna en el Preview el 2026-11-25 en el complejo de prueba (una cancelada y una confirmada a las 12:30). Además futmates tiene una cancha de pádel real desde el 2026-11-25 (por eso el inicio ya no muestra "1 complejo" de pádel).
@@ -612,6 +628,6 @@ Cambios de comportamiento a tener presentes
 - [ ] `?_now=` solo funciona fuera de producción (NODE_ENV): confirmado en el código.
 
 Calidad
-- [x] `pnpm test` (362) y `pnpm test:e2e --workers=1` (137, en 4 tandas) en verde sobre la rama final (2026-11-25). Repetir si entra algo más antes del merge.
+- [x] `pnpm test` (374) y `pnpm test:e2e --workers=1` (147, en 4 tandas) en verde con la 026 aplicada (2026-11-25). Repetir si entra algo más antes del merge.
 - [ ] Lint: quedan 3 errores viejos de `react-hooks/set-state-in-effect` (payment-status-panel, botón de push, guía de PWA), anteriores al rediseño. `next build` no corre lint, así que no bloquean el deploy.
 - [x] CLAUDE.md actualizado (Next 16, conteo de tests, migraciones hasta la 025 aplicadas, regla de migraciones).
