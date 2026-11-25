@@ -15,6 +15,8 @@ interface Court {
   id: string;
   name: string;
   slot_minutes: number;
+  /** Aclaraciones (027), para la hoja de reserva */
+  notes?: string | null;
   hours: CourtHour[];
   prices: CourtPrice[];
 }
@@ -132,6 +134,7 @@ export default function CourtCalendar({
               date,
               timeLabel: `${label} – ${formatTimeMendoza(slot.end)}`,
               price: slot.price,
+              courtNotes: court.notes ?? null,
             }}
             className={`group ${CELL} border-line bg-surface shadow-sm hover:border-primary transition-colors
               focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}

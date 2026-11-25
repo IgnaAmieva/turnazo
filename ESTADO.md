@@ -118,8 +118,8 @@ Ojo, dato a revisar: `padelmates` (aprobado, en Tunuyán) tiene el pin en Guayma
 
 | Suite | Herramienta | Tests | Estado |
 |-------|------------|-------|--------|
-| Unitarios + integración | Vitest | 374 | 374 ✓ (2026-11-25, rama `rediseno`, con la 026 aplicada) |
-| E2E | Playwright | 147 (incluye el setup de login) | 147 ✓ (2026-11-25, rama `rediseno`, con la 026 aplicada; --workers=1 en 4 tandas por archivo) |
+| Unitarios + integración | Vitest | 398 | 398 ✓ (2026-11-25, rama `rediseno`, con la 027 aplicada) |
+| E2E | Playwright | 164 (incluye el setup de login) | Corrida completa en 4 tandas verde con el punto 2 (151 entonces). Con los puntos 3 y 4: tanda 1 ✓ (35), la 2 se cortó a la mitad porque la máquina se quedó sin memoria (no fue una falla de los tests); `formato`, `aclaraciones`, `inicio`, `lista`, `cancha` y `etiquetas` pasaron sueltos. **Falta repetir la corrida completa** (2026-11-25) |
 
 Ojo: la base es compartida con complejos reales creados desde el panel (`padelmates`, `futmates` en Tunuyán). `public.spec.ts` ya no asume "2 complejos" en la home ni un único "1 complejo" en `/tunuyan`: lee el conteo dentro del link de Tunuyán / de Pádel.
 
@@ -208,6 +208,11 @@ Fútbol: formato de la cancha (2026-11-25; 027):
 - Tarjeta y portada: el formato va primero en las etiquetas ("Fútbol 5 · 1 cancha · turnos de 60 min"; en la portada sin repetir "Fútbol"), y en la pestaña de la cancha ("Cancha 1 · Fútbol 5").
 - Hoy la única cancha de fútbol (futmates) no tiene formato: aparece con "Todos" y no con un formato hasta que el dueño lo elija.
 - Tests: `tests/unit/court-format.test.ts`, `court-tags.test.ts`; `tests/integration/court-format.test.ts` (API: dueño, anon, CHECK, trigger, notes de 200; acciones: crear con formato, pasar a pádel → NULL); E2E `tests/e2e/formato.spec.ts` (crea y borra "E2E Formato F5" en el complejo de prueba).
+
+Aclaraciones de la cancha (2026-11-25; 027):
+- Panel: "Aclaraciones (opcional)" en la carga de cancha (textarea con `maxlength=200` y contador "46/200"). El servidor recorta espacios, guarda NULL si queda vacío y rechaza más de 200 (además del CHECK de la 027).
+- Se muestran en la portada del complejo (debajo de las pestañas, la de la cancha elegida), en la hoja de reserva y en `/reservar`, como texto: React las escapa, no hay `dangerouslySetInnerHTML`. Probado con `<b>` y `<img onerror>`: se ve el texto literal y no se arma ningún elemento.
+- Tests: `tests/integration/court-format.test.ts` (acción: espacios, vacío → NULL, 201 → error, el HTML se guarda como texto); E2E `tests/e2e/aclaraciones.spec.ts` (usa la cancha de prueba y le deja `notes = NULL`).
 
 Rediseño M4 (Mi turno):
 - "Guardá este link" arriba de todo (borde primary): el link de Mi turno en un campo de solo lectura y "Copiar link" (44 px; sin permiso de portapapeles queda seleccionado para copiar a mano).
@@ -622,7 +627,8 @@ Base de datos (es la misma para Preview y producción)
 - [x] 024 (logo del club) aplicada.
 - [x] 025 (corrige las políticas de la 024) aplicada (2026-11-25).
 - [x] 026 (`panel_create_booking`, cargar turnos desde la agenda) aplicada por el revisor (2026-11-25); suites en verde.
-- [ ] **027 (localidades con centro, formato y aclaraciones de cancha) escrita, SIN APLICAR**. El inicio "¿Dónde?", los formatos de fútbol y las aclaraciones se escriben después de aplicarla.
+- [x] 027 (localidades con centro, formato y aclaraciones de cancha) aplicada por el revisor (2026-11-25). Inicio "¿Dónde?", formatos de fútbol y aclaraciones hechos encima.
+- [ ] padelmates: pin en Guaymallén (el centro de Mendoza que el mapa traía por defecto) con localidad Tunuyán. No se tocó: lo revisa Igna.
 - [ ] Pendiente S5 (`p_replace_hold_token`), migración aparte: no bloquea el merge.
 - [ ] Datos: futmates no tiene precio de 22:00 a 00:00 (lo carga el dueño; el panel ya lo avisa). El "Complejo Padelero Tunuyán" de prueba está aprobado y se ve en producción (inicio, "Lo antes posible", lista): **queda visible por ahora; hay que ocultarlo antes de que entren dueños reales (va con S7, base de tests separada)**.
 - [ ] Antes de mergear, verificar que no queden datos de prueba: 0 reservas "E2E*" / "Audit Test*", 0 teléfonos bloqueados, cancha de prueba sin etiquetas, cobro del complejo de prueba solo "en el lugar", complejo de prueba sin logo, bucket `venue-logos` vacío, 4 canchas (sin "E2E Cancha*"). Hoy hay 16 reservas: las 14 de antes más 2 que hizo Igna en el Preview el 2026-11-25 en el complejo de prueba (una cancelada y una confirmada a las 12:30). Además futmates tiene una cancha de pádel real desde el 2026-11-25 (por eso el inicio ya no muestra "1 complejo" de pádel).

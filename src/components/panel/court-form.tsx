@@ -14,9 +14,12 @@ interface CourtFormProps {
     name: string; sport_id: string; slot_minutes: number; active: boolean;
     surface?: string | null; covered?: boolean; lit?: boolean; has_locker_room?: boolean;
     format?: string | null;
+    notes?: string | null;
   };
   submitLabel?: string;
 }
+
+const NOTES_MAX = 200;
 
 /** Duraciones que se ofrecen como botones (más la de la cancha, si es otra). */
 const DURATIONS = [60, 90, 120];
@@ -52,6 +55,7 @@ export function CourtForm({ action, sports, court, submitLabel = "Guardar" }: Co
   // Formato (027): solo fútbol. Con otro deporte no se manda y el servidor guarda NULL.
   const [format, setFormat] = useState(court?.format ?? "");
   const isFutbol = sports.find((s) => s.id === sportId)?.slug === "futbol";
+  const [notes, setNotes] = useState(court?.notes ?? "");
   const [minutes, setMinutes] = useState(court?.slot_minutes ?? 90);
   // Mientras no se toca la duración, sigue a la del deporte (pádel 90, fútbol 60…)
   const [minutesTouched, setMinutesTouched] = useState(Boolean(court));
@@ -152,6 +156,23 @@ export function CourtForm({ action, sports, court, submitLabel = "Guardar" }: Co
           ))}
         </div>
       </fieldset>
+
+      {/* Aclaraciones (027): texto libre, se ve en la portada del complejo y en la hoja de reserva */}
+      <div>
+        <label htmlFor="court-notes" className="block text-sm font-extrabold text-ink mb-1.5">Aclaraciones (opcional)</label>
+        <textarea
+          id="court-notes" name="notes" rows={2} maxLength={NOTES_MAX}
+          value={notes} onChange={(e) => setNotes(e.target.value)}
+          aria-describedby="court-notes-ayuda"
+          placeholder="Ej.: piso de baldosa, red nueva, pelotas incluidas"
+          className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
+        />
+        <p id="court-notes-ayuda" className="mt-1 flex justify-between gap-3 text-xs text-ink-muted">
+          <span>Lo ven los jugadores en el complejo y al reservar.</span>
+          <span data-testid="notas-contador">{notes.length}/{NOTES_MAX}</span>
+        </p>
+        <FieldError errors={state?.fieldErrors?.notes} />
+      </div>
 
       <button
         type="submit" disabled={pending}

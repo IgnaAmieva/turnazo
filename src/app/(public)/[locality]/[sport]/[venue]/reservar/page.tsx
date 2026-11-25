@@ -112,6 +112,11 @@ export default async function ReservarPage({ params, searchParams }: Props) {
           <p className="text-sm text-ink">
             <span className="font-medium">Cancha:</span> {court.name}
           </p>
+          {court.notes && (
+            <p className="text-sm text-ink" data-testid="aclaraciones">
+              <span className="font-medium">Aclaraciones:</span> {court.notes}
+            </p>
+          )}
           <p className="text-sm text-ink">
             <span className="font-medium">Día:</span> {dateLabel}
           </p>

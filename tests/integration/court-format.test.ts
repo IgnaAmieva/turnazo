@@ -1,7 +1,7 @@
 /**
- * Migración 027 en canchas: formato (solo fútbol) por la API directa y por
- * las acciones del panel. Si una cancha pasa a pádel o tenis, el panel manda
- * format = NULL (el trigger enforce_court_format rechazaría otro valor).
+ * Migración 027 en canchas: formato (solo fútbol) y aclaraciones, por la API
+ * directa y por las acciones del panel. Si una cancha pasa a pádel o tenis,
+ * el panel manda format = NULL (el trigger enforce_court_format rechazaría otro valor).
  *
  * Fixture propio (un dueño, un complejo); afterAll borra todo.
  */
@@ -113,6 +113,25 @@ describe("027 — acciones del panel", () => {
 
     expect(await updateCourtAction(ids.venue, futbolCourt, null, form({ name: "F", sport: "padel", format: "futbol_11" }))).toBeNull();
     expect(await formatOf(futbolCourt)).toEqual({ format: null, sport_id: sport.padel });
+  });
+
+  it("aclaraciones: se guardan sin espacios de más; vacías → NULL; más de 200 → error del campo", async () => {
+    current.client = owner;
+    const notesOf = async () => (await admin.from("courts").select("notes").eq("id", padelCourt).single()).data!.notes;
+    const withNotes = (n: string) => { const fd = form({ name: "P", sport: "padel" }); fd.set("notes", n); return fd; };
+
+    expect(await updateCourtAction(ids.venue, padelCourt, null, withNotes("  Piso de baldosa,\n  red nueva  "))).toBeNull();
+    expect(await notesOf()).toBe("Piso de baldosa, red nueva");
+    // Texto plano tal cual: el escapado lo hace la vista (React), no se guarda HTML "limpiado"
+    expect(await updateCourtAction(ids.venue, padelCourt, null, withNotes("<b>red</b> & pelotas"))).toBeNull();
+    expect(await notesOf()).toBe("<b>red</b> & pelotas");
+
+    const res = await updateCourtAction(ids.venue, padelCourt, null, withNotes("x".repeat(201)));
+    expect(res?.fieldErrors?.notes?.length).toBeGreaterThan(0);
+    expect(await notesOf()).toBe("<b>red</b> & pelotas");
+
+    expect(await updateCourtAction(ids.venue, padelCourt, null, withNotes("   "))).toBeNull();
+    expect(await notesOf()).toBeNull();
   });
 
   it("un formato inventado vuelve como error del campo", async () => {

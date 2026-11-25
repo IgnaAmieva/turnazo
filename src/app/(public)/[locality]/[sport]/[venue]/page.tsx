@@ -113,6 +113,7 @@ export default async function VenuePage({ params, searchParams }: Props) {
         start: slot.start.toISOString(), end: slot.end.toISOString(), date,
         timeLabel: `${formatTimeMendoza(slot.start)} – ${formatTimeMendoza(slot.end)}`,
         price: slot.price,
+        courtNotes: chosenCourt.notes ?? null,
       };
     }
   }
@@ -254,6 +255,13 @@ export default async function VenuePage({ params, searchParams }: Props) {
             </nav>
             <span className="shrink-0 text-xs text-ink-muted">Turnos de {minutes.join(" y ")} min</span>
           </div>
+
+          {/* Aclaraciones de la cancha (027): texto del dueño, escapado por React */}
+          {activeCourt.notes && (
+            <p className="mt-3 rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" data-testid="aclaraciones">
+              <span className="font-extrabold">Aclaraciones:</span> {activeCourt.notes}
+            </p>
+          )}
 
           <section className="mt-4" aria-label={activeCourt.name}>
             <h2 className="sr-only">{activeCourt.name}</h2>

@@ -562,13 +562,18 @@ const CourtSchema = z.object({
   has_locker_room: z.boolean(),
   // Migración 027: formato, solo fútbol (sin elegir = NULL)
   format:          z.enum(FORMAT_VALUES, { error: "Elegí un formato de la lista" }).nullable(),
+  // Migración 027: aclaraciones libres, 200 caracteres como máximo ("" = sin aclaraciones)
+  notes:           z.string().max(200, "Hasta 200 caracteres.").nullable(),
 });
 
 /** Etiquetas del formulario: superficie (select), tres interruptores y el formato (botones). */
 function courtFeaturesFrom(formData: FormData) {
   const surface = String(formData.get("surface") ?? "");
   const format = String(formData.get("format") ?? "");
+  // Texto plano: se guarda tal cual (sin espacios de más) y se muestra escapado
+  const notes = String(formData.get("notes") ?? "").replace(/\s+/g, " ").trim();
   return {
+    notes:           notes === "" ? null : notes,
     surface:         surface === "" ? null : surface,
     covered:         formData.get("covered") !== null,
     lit:             formData.get("lit") !== null,
@@ -624,6 +629,7 @@ export async function createCourtAction(
       lit:             parsed.data.lit,
       has_locker_room: parsed.data.has_locker_room,
       format,
+      notes:           parsed.data.notes,
     })
     .select("id")
     .single();
@@ -699,6 +705,7 @@ export async function updateCourtAction(
       lit:             parsed.data.lit,
       has_locker_room: parsed.data.has_locker_room,
       format,
+      notes:           parsed.data.notes,
     })
     .eq("id", courtId)
     .eq("venue_id", venueId);

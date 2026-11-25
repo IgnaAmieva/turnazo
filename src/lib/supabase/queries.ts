@@ -152,7 +152,9 @@ export type CourtWithSchedule = {
   has_locker_room: boolean;
   /** Migración 027: formato de fútbol (futbol_5…futsal) o null */
   format: string | null;
-  hours:{ weekday: number; open_time: string; close_time: string }[];
+  /** Migración 027: aclaraciones del dueño (texto plano, se muestra escapado). Solo la trae getVenueWithCourts. */
+  notes?: string | null;
+  hours: { weekday: number; open_time: string; close_time: string }[];
   prices: { weekday: number; from_time: string; to_time: string; price: number }[];
 };
 
@@ -183,7 +185,7 @@ export const getVenueWithCourts = cache(async (
     supabase
       .from("courts")
       .select(
-        `id, name, slot_minutes, sport_id, surface, covered, lit, has_locker_room, format,
+        `id, name, slot_minutes, sport_id, surface, covered, lit, has_locker_room, format, notes,
          sports!inner(slug),
          court_hours(weekday, open_time, close_time),
          court_prices(weekday, from_time, to_time, price)`
@@ -206,7 +208,8 @@ export const getVenueWithCourts = cache(async (
       sport_id: c.sport_id,
       surface: c.surface, covered: c.covered, lit: c.lit, has_locker_room: c.has_locker_room,
       format: c.format,
-      hours:(c.court_hours as { weekday: number; open_time: string; close_time: string }[]) ?? [],
+      notes: c.notes,
+      hours: (c.court_hours as { weekday: number; open_time: string; close_time: string }[]) ?? [],
       prices: (c.court_prices as { weekday: number; from_time: string; to_time: string; price: number }[]) ?? [],
     })),
   };

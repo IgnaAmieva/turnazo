@@ -27,6 +27,8 @@ export type SheetSlot = {
   date: string;       // YYYY-MM-DD (Mendoza)
   timeLabel: string;  // "17:00 – 18:30"
   price: number | null;
+  /** Aclaraciones de la cancha (027), texto plano */
+  courtNotes?: string | null;
 };
 
 export type SheetVenue = VenuePaymentConfig & { id: string; name: string; address: string };
@@ -192,6 +194,12 @@ function BookingSheet({ venue, slot, onClose, onSlotGone }: {
               {formatDay(slot.date)} · {venue.name}
               {slot.price !== null && <> · ${slot.price.toLocaleString('es-AR')}</>}
             </p>
+            {/* Texto del dueño: React lo escapa (nunca dangerouslySetInnerHTML) */}
+            {slot.courtNotes && (
+              <p className="mt-1.5 text-sm text-ink" data-testid="aclaraciones">
+                <span className="font-extrabold">Aclaraciones:</span> {slot.courtNotes}
+              </p>
+            )}
           </div>
           <button type="button" onClick={onClose} aria-label="Cerrar"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-surface-2 hover:text-ink">

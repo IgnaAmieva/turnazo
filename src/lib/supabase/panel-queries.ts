@@ -78,7 +78,7 @@ export async function getCourt(courtId: string) {
     .from("courts")
     .select(`
       id, name, slot_minutes, active, venue_id, sport_id,
-      surface, covered, lit, has_locker_room, format,
+      surface, covered, lit, has_locker_room, format, notes,
       sports(name, slug),
       court_hours(id, weekday, open_time, close_time),
       court_prices(id, weekday, from_time, to_time, price)
@@ -97,6 +97,7 @@ export async function getCourt(courtId: string) {
     lit: data.lit,
     has_locker_room: data.has_locker_room,
     format: data.format,
+    notes: data.notes,
     venue_id: data.venue_id,
     sport_id: data.sport_id,
     sport_name: (data.sports as { name: string } | null)?.name ?? "",
