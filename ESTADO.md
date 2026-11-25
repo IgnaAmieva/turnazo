@@ -1,6 +1,6 @@
 # Estado del proyecto — Turnazo
 
-Última actualización: 2026-11-25 (rediseño: funciones en cle1, logo de hasta 10 MB, agenda nueva y carga de cancha por pasos en la rama `rediseno`; 022 a 025 aplicadas; 026 aplicada; 027 escrita, SIN APLICAR; S2 guardado sin push en `s2-captcha`)
+Última actualización: 2026-11-25 (rediseño MERGEADO a `main` y en producción (cle1); 022 a 027 aplicadas; próxima migración 028; S2 guardado sin push en `s2-captcha`)
 
 ---
 
@@ -624,14 +624,32 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
 - La acción de pago tendría que dejar de liberar el hold en los errores de MP y devolver su `cancel_token` (solo al cliente que lo creó) para pasarlo a `create_booking`; la orden de MP, si llegó a crearse, se cancela como en `cancelHoldAction`.
 - Grants: los mismos (solo service_role).
 
-## Antes del merge de `rediseno` a `main` (lista, 2026-11-24; NO mergeado)
+## Merge de `rediseno` a `main` — HECHO (2026-11-25)
+
+- Merge `74a1c18` (sin squash), deploy de producción `dpl_GMm5pk9qm8F8KQJmX8dwkEoRCNwm` en READY, región **cle1**, alias `turnazo-chi.vercel.app`. Sin errores de runtime en los 15 minutos siguientes.
+- Prueba de humo de solo lectura (`GET`, 9 pedidos por pantalla desde Argentina, mediana hasta el primer byte; agenda y panel con el dueño de prueba). Todas 200 y con su contenido nuevo:
+
+| Pantalla | Antes del merge (gru1, versión vieja) | Después (cle1, rediseño) |
+|---|---|---|
+| Inicio | 562 ms | 521 ms |
+| Inicio pádel (ahora con los complejos abajo) | 542 ms | 431 ms |
+| Inicio fútbol (ahora con chips de formato) | 279 ms | 375 ms |
+| Lista | 428 ms | 369 ms |
+| Complejo | 762 ms | 339 ms |
+| Agenda | 1218 ms | 523 ms |
+| Complejo en el panel | 649 ms | 499 ms |
+| Cancha nueva | 607 ms | 610 ms |
+
+  El inicio ahora calcula los turnos libres de todos los complejos del deporte (antes solo "Lo antes posible"); aun así quedó igual o más rápido salvo "inicio fútbol", que antes no mostraba la lista.
+
+## Antes del merge de `rediseno` a `main` (lista, 2026-11-24; mergeado el 2026-11-25)
 
 Ramas y orden
 - [x] `d27ec19` (cierre de S1) pusheado a `main` (2026-11-24). `rediseno` sale de ese commit: el merge es directo.
 - [x] Orden decidido: primero `rediseno` → `main` (juntos con el revisor), después `s2-captcha`. La 022 ya está aplicada; a S2 solo le faltan las claves de Turnstile (sitio + secreta), que carga el revisor en Vercel. Al integrarlo:
   - el captcha va en el lugar reservado del pie de la hoja y de /reservar (`data-captcha-slot`);
   - `ABUSE_MESSAGES.tooMany` tiene que salir del catálogo (`bookingError("too_many_attempts").message`); hoy el catálogo reconoce el texto viejo como alias.
-- [ ] Merge sin squash, para conservar un commit por etapa.
+- [x] Merge sin squash (`74a1c18`, 2026-11-25): los 32 commits de `rediseno` quedan en `main`. `s2-captcha` sigue aparte, sin mergear.
 
 Base de datos (es la misma para Preview y producción)
 - [x] 023 (etiquetas de cancha) aplicada por el revisor; `main` no la usa, no rompe nada.
