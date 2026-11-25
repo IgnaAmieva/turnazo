@@ -99,6 +99,7 @@ export function WhereBar({ localities, current, sport, explicit, keep }: Props) 
   );
 
   async function useMyLocation() {
+    if (!('geolocation' in navigator)) { setGeo('unavailable'); return; }
     setLocating(true);
     try {
       const pos = await getPosition();
@@ -136,7 +137,8 @@ export function WhereBar({ localities, current, sport, explicit, keep }: Props) 
           <path d="m6 9 6 6 6-6" />
         </svg>
       </label>
-      {geo === 'prompt' && (
+      {/* Visible desde el primer render (sin saltos de diseño); se va si ya hay permiso o no hay GPS */}
+      {(geo === 'prompt' || geo === 'unknown') && (
         <button
           type="button"
           onClick={useMyLocation}
