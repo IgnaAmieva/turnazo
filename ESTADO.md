@@ -624,6 +624,34 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
 - La acción de pago tendría que dejar de liberar el hold en los errores de MP y devolver su `cancel_token` (solo al cliente que lo creó) para pasarlo a `create_booking`; la orden de MP, si llegó a crearse, se cancela como en `cancelHoldAction`.
 - Grants: los mismos (solo service_role).
 
+## Panel de superadmin (rama `superadmin`, 2026-11-26; SIN mergear)
+
+- **Migración 028:** aplicada por el revisor tal cual el archivo. Rechazado es el cuarto estado (aprobado por el revisor). Hay dos superadmins: `superadmin@turnazo.test` y el de Igna. padelmates fue borrado; quedan futmates y el complejo de prueba.
+- **Acceso:**
+  - Sin sesión, el proxy manda a `/login`.
+  - El layout de `/admin` llama a `is_superadmin()` en el servidor; un dueño recibe 404.
+  - La base vuelve a verificar en cada `superadmin_*` y en las políticas.
+  - El login lleva al superadmin a `/admin`, y el menú del panel le muestra "Superadmin" (el rol sale del servidor).
+- **`/admin`:**
+  - Resumen arriba: pendientes (resaltado si hay), aprobados, suspendidos, rechazados, reservas de los últimos 7 días y dueños nuevos.
+  - Filtro por estado con contadores.
+  - Tarjetas con nombre, estado, mail del dueño, localidad, teléfono, alta, Mercado Pago, cantidad de canchas y motivo.
+- **`/admin/complejos/[id]`:** logo, estado y motivo, dueño, teléfono con botón de WhatsApp, dirección, alta, Mercado Pago, mapa real con el pin y "Abrir en Google Maps", y canchas con horarios y precios (también de complejos pendientes).
+- **Acciones según el estado** (las mismas transiciones que la base): Aprobar, Rechazar (motivo obligatorio), Suspender (motivo opcional) y Reactivar.
+  - Cada una con hoja de confirmación (`<dialog>`) y "Cancelar".
+  - La base escribe en `audit_log` (`venue_approve`, `venue_reject`, `venue_suspend`, `venue_reactivate`, con estado viejo/nuevo y motivo) y, al aprobar o rechazar, encola el push al dueño. La acción lo manda en el momento.
+  - Después aparece "Avisarle por WhatsApp", al teléfono del complejo y con el mensaje armado (`lib/venue-status.ts`).
+- **Push** (`lib/push.ts`):
+  - `venue_approved`: "Tu complejo fue aprobado" / "{nombre} ya está publicado: los jugadores pueden encontrarlo y reservar.".
+  - `venue_rejected`: "Tu complejo no fue aprobado" / "{nombre}: {motivo}".
+  - Los dos abren `/panel/complejos`.
+- **Panel del dueño:** "Rechazado" (y Suspendido) con "Motivo: …" y una línea que explica cada estado.
+- **Tests:**
+  - `tests/unit/superadmin.test.ts` (6).
+  - `tests/e2e/admin.spec.ts` (9): acceso; lista y filtro; detalle; las cuatro acciones con `audit_log`, `notification_outbox`, WhatsApp y el panel del dueño; 44 px y AA en claro y oscuro; transiciones inválidas en la base. El login con contraseña se saltea si falta `E2E_SUPERADMIN_PASSWORD` (hoy no está en `.env.local`).
+  - El superadmin entra en los tests con un link mágico de un solo uso (service_role) y la cookie la escribe el mismo `@supabase/ssr`: no necesita contraseña.
+  - El complejo de prueba lo crea el dueño de prueba (sin canchas: nunca aparece en la web) y `afterAll` lo borra con su `audit_log` y su `notification_outbox`.
+
 ## Merge de `marca` a `main` — HECHO (2026-11-26)
 
 - Merge `cf8d2da` (sin squash; incluye "de noche pasa a mañana"). Deploy de producción `dpl_Chb2pWFm6JqKvPZQ9wn9AAiXJ9Pz` en READY, región cle1, alias `turnazo-chi.vercel.app`. Sin errores de runtime en los 30 minutos siguientes.

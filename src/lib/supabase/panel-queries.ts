@@ -15,7 +15,7 @@ export async function getOwnerVenues() {
 
   const { data, error } = await supabase
     .from("venues")
-    .select("id, name, address, status, localities(name)")
+    .select("id, name, address, status, status_reason, localities(name)")
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -25,6 +25,8 @@ export async function getOwnerVenues() {
     name: v.name,
     address: v.address,
     status: v.status,
+    // Motivo del superadmin al rechazar o suspender (028)
+    status_reason: v.status_reason,
     locality_name: (v.localities as { name: string } | null)?.name ?? "",
   }));
 }

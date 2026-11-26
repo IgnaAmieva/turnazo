@@ -184,6 +184,39 @@ export async function createTestBooking(
   }
 }
 
+export const SUPERADMIN_EMAIL = "superadmin@turnazo.test";
+
+/**
+ * Sesión del superadmin de prueba SIN contraseña: link mágico de un solo uso
+ * generado con service_role (como iniciar sesión) y la cookie escrita por el
+ * mismo @supabase/ssr que usa la app (encoding y partes iguales).
+ */
+export async function superadminCookies(baseURL = "http://localhost:3001") {
+  const { createClient } = await import("@supabase/supabase-js");
+  const { createServerClient } = await import("@supabase/ssr");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const admin = createClient(SUPABASE_URL, key, { auth: { persistSession: false } });
+  const { data: link, error } = await admin.auth.admin.generateLink({ type: "magiclink", email: SUPERADMIN_EMAIL });
+  if (error || !link.properties?.hashed_token) throw new Error("No se pudo generar la sesión del superadmin de prueba");
+  const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  const { data: otp, error: otpErr } = await anon.auth.verifyOtp({ token_hash: link.properties.hashed_token, type: "magiclink" });
+  if (otpErr || !otp.session) throw new Error("No se pudo abrir la sesión del superadmin de prueba");
+
+  const jar: { name: string; value: string }[] = [];
+  const ssr = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookies: {
+      getAll: () => jar,
+      setAll: (list) => { for (const c of list) { const i = jar.findIndex((j) => j.name === c.name); if (i >= 0) jar.splice(i, 1); if (c.value) jar.push({ name: c.name, value: c.value }); } },
+    },
+  });
+  await ssr.auth.setSession({ access_token: otp.session.access_token, refresh_token: otp.session.refresh_token });
+  const url = new URL(baseURL);
+  return {
+    accessToken: otp.session.access_token,
+    cookies: jar.map((c) => ({ name: c.name, value: c.value, domain: url.hostname, path: "/", httpOnly: false, secure: false, sameSite: "Lax" as const })),
+  };
+}
+
 /** Contraste entre el color del texto del elemento y el fondo opaco más cercano. */
 export async function contrastOf(el: import("@playwright/test").Locator): Promise<number> {
   return el.evaluate((node) => {

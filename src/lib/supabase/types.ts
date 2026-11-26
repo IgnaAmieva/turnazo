@@ -653,6 +653,8 @@ export type Database = {
           phone: string
           refund_policy: Database["public"]["Enums"]["refund_policy"]
           status: Database["public"]["Enums"]["venue_status"]
+          status_changed_at: string | null
+          status_reason: string | null
           updated_at: string
           whatsapp_template: string | null
         }
@@ -677,6 +679,8 @@ export type Database = {
           phone: string
           refund_policy?: Database["public"]["Enums"]["refund_policy"]
           status?: Database["public"]["Enums"]["venue_status"]
+          status_changed_at?: string | null
+          status_reason?: string | null
           updated_at?: string
           whatsapp_template?: string | null
         }
@@ -701,6 +705,8 @@ export type Database = {
           phone?: string
           refund_policy?: Database["public"]["Enums"]["refund_policy"]
           status?: Database["public"]["Enums"]["venue_status"]
+          status_changed_at?: string | null
+          status_reason?: string | null
           updated_at?: string
           whatsapp_template?: string | null
         }
@@ -808,6 +814,29 @@ export type Database = {
         }
         Returns: Json
       }
+      is_superadmin: { Args: Record<PropertyKey, never>; Returns: boolean }
+      superadmin_venues: {
+        Args: { p_status?: string | null }
+        Returns: {
+          id: string
+          name: string
+          status: string
+          status_reason: string | null
+          status_changed_at: string | null
+          owner_id: string
+          owner_email: string | null
+          phone: string
+          locality_name: string | null
+          created_at: string
+          mp_connected: boolean
+          courts_count: number
+        }[]
+      }
+      superadmin_summary: { Args: Record<PropertyKey, never>; Returns: Json }
+      superadmin_set_venue_status: {
+        Args: { p_venue_id: string; p_action: string; p_reason?: string | null }
+        Returns: Json
+      }
       confirm_order_payment: {
         Args: {
           p_booking_id: string
@@ -844,7 +873,7 @@ export type Database = {
       payment_type: "deposit" | "full"
       refund_policy: "full" | "none"
       user_role: "owner" | "superadmin"
-      venue_status: "pending" | "approved" | "suspended"
+      venue_status: "pending" | "approved" | "suspended" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -988,7 +1017,7 @@ export const Constants = {
       payment_type: ["deposit", "full"],
       refund_policy: ["full", "none"],
       user_role: ["owner", "superadmin"],
-      venue_status: ["pending", "approved", "suspended"],
+      venue_status: ["pending", "approved", "suspended", "rejected"],
     },
   },
 } as const
