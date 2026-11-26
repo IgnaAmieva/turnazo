@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 import { logoutAction } from '@/app/actions/auth';
 import PushSubscribeButton from '@/components/panel/push-subscribe-button';
 import ThemeToggle from '@/components/theme-toggle';
+import { BrandLogo } from '@/components/brand-logo';
+import { APP_NAME } from '@/lib/constants';
 
 const NAV_ITEMS = [
   { href: '/panel/agenda',    label: 'Agenda' },
@@ -24,9 +26,9 @@ export default function PanelNav({ email }: { email: string }) {
     <>
       {/* Celular */}
       <header className="md:hidden sticky top-0 z-40 flex h-14 items-center justify-between gap-2 border-b border-line bg-surface px-4">
-        <Link href="/panel/agenda" className="flex min-h-11 items-center gap-1.5" onClick={() => setOpen(false)}>
-          <span className="text-lg font-extrabold text-brand">Turnazo</span>
-          <span className="text-xs text-ink-muted">panel</span>
+        <Link href="/panel/agenda" aria-label={`${APP_NAME} panel, agenda`} className="flex min-h-11 items-center gap-1.5" onClick={() => setOpen(false)}>
+          <BrandLogo size={26} />
+          <span className="text-xs text-ink-muted max-[359px]:hidden">panel</span>
         </Link>
         <button
           type="button"
@@ -50,9 +52,9 @@ export default function PanelNav({ email }: { email: string }) {
           w-full md:w-56 md:h-screen shrink-0 bg-surface border-b md:border-b-0 md:border-r border-line
           max-h-[calc(100dvh-3.5rem)] md:max-h-none overflow-y-auto`}
       >
-        <div className="hidden md:block px-5 py-4 border-b border-line">
-          <span className="font-extrabold text-brand text-base">Turnazo</span>
-          <span className="ml-1.5 text-xs text-ink-muted">panel</span>
+        <div className="hidden md:flex items-center gap-1.5 px-5 py-4 border-b border-line">
+          <BrandLogo size={24} />
+          <span className="text-xs text-ink-muted">panel</span>
         </div>
 
         <nav className="flex-1 px-3 py-3 space-y-1">

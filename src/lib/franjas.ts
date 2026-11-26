@@ -1,7 +1,8 @@
 /**
  * "¿A qué hora querés jugar?" (inicio y lista de complejos): Ahora · 18–20 ·
  * 20–22 · 22+ o una hora exacta (?hora=19 → turnos que empiezan de 18:30 a
- * 19:59, ver inWhen). Siempre del día de hoy (hora de Mendoza).
+ * 19:59, ver inWhen), del día elegido en la fila de días (hora de Mendoza).
+ * Otro día que no es hoy: "Ahora" se muestra como "Todo el día".
  */
 import { mendozaToUtc } from '@/lib/slots';
 
@@ -36,9 +37,11 @@ export function whenParams(w: When): Record<string, string> {
   return w.id === 'ahora' ? {} : { franja: w.id };
 }
 
-export function whenLabel(w: When): string {
-  if (w.kind === 'hora') return `cerca de las ${String(w.h).padStart(2, '0')}:00`;
-  return w.id === 'ahora' ? 'hoy' : `de ${FRANJAS.find((f) => f.id === w.id)!.label}`;
+/** "hoy", "de 18–20", "cerca de las 19:00"; otro día: "mañana", "de 18–20 mañana"… (day: ver dayWord). */
+export function whenLabel(w: When, day = 'hoy'): string {
+  const suffix = day === 'hoy' ? '' : ` ${day}`;
+  if (w.kind === 'hora') return `cerca de las ${String(w.h).padStart(2, '0')}:00${suffix}`;
+  return w.id === 'ahora' ? day : `de ${FRANJAS.find((f) => f.id === w.id)!.label}${suffix}`;
 }
 
 /**

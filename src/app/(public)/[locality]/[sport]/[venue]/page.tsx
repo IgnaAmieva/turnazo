@@ -8,6 +8,7 @@ import {
   todayInMendoza, mendozaToUtc, parseTstzrange, generateSlots, weekdayInMendoza, formatTimeMendoza,
 } from "@/lib/slots";
 import { nextDate } from "@/lib/free-slots";
+import { dayChip } from "@/lib/list-day";
 import CourtCalendar from "@/components/court-calendar";
 import AvailabilityWatcher from "@/components/availability-watcher";
 import { BookingSheetProvider, type SheetSlot } from "@/components/booking-sheet";
@@ -42,13 +43,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const venue = await getVenueWithCourts(venueId, sSlug);
   if (!venue) return { title: "Complejo no encontrado" };
   return { title: venue.name };
-}
-
-function dayChip(date: string, today: string) {
-  const [y, m, d] = date.split("-").map(Number);
-  const wd = new Intl.DateTimeFormat("es-AR", { timeZone: "UTC", weekday: "short" })
-    .format(new Date(Date.UTC(y, m - 1, d, 12))).replace(".", "");
-  return { top: date === today ? "Hoy" : wd.charAt(0).toUpperCase() + wd.slice(1), day: String(d) };
 }
 
 export default async function VenuePage({ params, searchParams }: Props) {

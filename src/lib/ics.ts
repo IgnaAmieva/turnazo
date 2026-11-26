@@ -43,7 +43,7 @@ export function buildIcs(e: IcsEvent, now = new Date()): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Turnazo//Mi turno//ES',
+    'PRODID:-//Depoturnos//Mi turno//ES',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',

@@ -32,6 +32,8 @@
   --warning: #7A5200;
   --warning-soft: #FAF0D7;
   --ring: #0B3D2E;
+  /* Pin de la marca: lleno en claro, solo contorno en oscuro (diseno/marca) */
+  --logo-pin-fill: #0B3D2E;
 }
 
 [data-theme="dark"] {
@@ -52,6 +54,7 @@
   --warning: #F0D188;
   --warning-soft: #3B3214;
   --ring: #D4F34A;
+  --logo-pin-fill: #00000000; /* transparente: solo el contorno */
 }
 
 /* Sin JavaScript: seguir al celular. (Con JS el script ya puso data-theme.) */
@@ -74,6 +77,7 @@
     --warning: #F0D188;
     --warning-soft: #3B3214;
     --ring: #D4F34A;
+    --logo-pin-fill: #00000000; /* transparente: solo el contorno */
   }
 }
 

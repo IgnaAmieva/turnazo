@@ -21,7 +21,7 @@ function loadFonts() {
 /** Origen del pedido, para el link que va en la imagen. */
 function hostOf(req: Request) {
   const h = req.headers;
-  return h.get('x-forwarded-host') ?? h.get('host') ?? 'turnazo';
+  return h.get('x-forwarded-host') ?? h.get('host') ?? 'depoturnos';
 }
 
 /**

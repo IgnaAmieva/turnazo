@@ -68,14 +68,26 @@ function SportBadge({ name, bg, fg }: { name: string; bg: string; fg: string }) 
   );
 }
 
-function Brand({ color, pin, dot }: { color: string; pin: string; dot: string }) {
+/**
+ * Marca Depoturnos (diseno/marca): pin + "depo" (500) + "turnos" (800).
+ * Sobre fondo claro: pin verde lleno y texto verde. Sobre fondo oscuro: pin de
+ * contorno lima, "depo" crema y "turnos" lima.
+ */
+function Brand({ dark }: { dark: boolean }) {
+  const depo = dark ? C.cream : C.green;
+  const turnos = dark ? C.lime : C.green;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 48, color, flexShrink: 0 }}>
-      <svg width="40" height="54" viewBox="0 0 24 32">
-        <path d="M12 0C5.4 0 0 5.2 0 11.7 0 20.4 12 32 12 32s12-11.6 12-20.3C24 5.2 18.6 0 12 0Z" fill={pin} />
-        <circle cx="12" cy="11.5" r="4.6" fill={dot} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 50, flexShrink: 0 }}>
+      <svg width="46" height="57" viewBox="10 1 76 94">
+        <path d="M48 92 C22 62 14 50 14 38 A34 34 0 0 1 82 38 C82 50 74 62 48 92 Z"
+          fill={dark ? 'none' : C.green} stroke={dark ? C.lime : C.green} strokeWidth="5" strokeLinejoin="round" />
+        <circle cx="48" cy="38" r="20" fill={C.lime} />
+        <path d="M34 28 Q46 38 34 48 M62 28 Q50 38 62 48" stroke={C.green} strokeWidth="3.5" fill="none" strokeLinecap="round" />
       </svg>
-      <span style={{ fontWeight: 800 }}>Turnazo</span>
+      <span style={{ display: 'flex' }}>
+        <span style={{ fontWeight: 500, color: depo }}>depo</span>
+        <span style={{ fontWeight: 800, color: turnos }}>turnos</span>
+      </span>
     </div>
   );
 }
@@ -140,7 +152,7 @@ export function StoryArt({ data, style, link }: { data: StoryData; style: StoryS
           <span style={{ fontSize: 76, color: C.lime }}>→</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 36 }}>
-          <Brand color={C.green} pin={C.green} dot={C.lime} />
+          <Brand dark={false} />
         </div>
       </div>
     );
@@ -175,7 +187,7 @@ export function StoryArt({ data, style, link }: { data: StoryData; style: StoryS
           <span>Reservá en</span><span>{link}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
-          <Brand color={C.green} pin={C.green} dot={C.lime} />
+          <Brand dark={false} />
         </div>
       </div>
     );
@@ -214,7 +226,7 @@ export function StoryArt({ data, style, link }: { data: StoryData; style: StoryS
           <span style={{ fontSize: 38, color: C.creamMuted }}>Reservá en 1 minuto</span>
           <span style={{ fontSize: 44, fontWeight: 800 }}>{link}</span>
         </div>
-        <Brand color={C.cream} pin={C.lime} dot={C.green} />
+        <Brand dark />
       </div>
     </div>
   );

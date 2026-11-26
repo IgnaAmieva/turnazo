@@ -15,6 +15,7 @@ import {
   VENUE_PATH,
   deleteTestBookings,
   deleteTestOutboxRows,
+  MORNING_NOW,
 } from "./helpers";
 
 test.afterAll(async ({ request }) => {
@@ -80,7 +81,7 @@ test("/tunuyan sigue funcionando: abre el inicio con la localidad y los deportes
 // ---------------------------------------------------------------------------
 test("/tunuyan/padel loads without errors", async ({ page }) => {
   const errors = collectPageErrors(page);
-  await page.goto(`/${LOCALITY}/${SPORT}`);
+  await page.goto(`/${LOCALITY}/${SPORT}?_now=${MORNING_NOW}`);
   await page.waitForLoadState("networkidle");
   await assertNoError(page);
   expect(errors).toHaveLength(0);

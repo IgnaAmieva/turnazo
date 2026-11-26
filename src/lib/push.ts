@@ -107,7 +107,7 @@ export function buildPushPayload(type: string, payload: Record<string, unknown>)
       };
     default:
       return {
-        title: "Turnazo",
+        title: "Depoturnos",
         body:  "Tenés una notificación nueva",
         url: "/panel/agenda",
         tag: "turnazo-notification",

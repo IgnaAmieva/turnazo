@@ -1,5 +1,5 @@
 /**
- * Service Worker — Turnazo
+ * Service Worker — Depoturnos
  * Maneja notificaciones push y el click para abrir el panel.
  */
 
@@ -10,10 +10,10 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data.json();
   } catch {
-    data = { title: "Turnazo", body: event.data.text() };
+    data = { title: "Depoturnos", body: event.data.text() };
   }
 
-  const title   = data.title   || "Turnazo";
+  const title   = data.title   || "Depoturnos";
   const options = {
     body:    data.body    || "",
     icon:    data.icon    || "/icon-192.png",

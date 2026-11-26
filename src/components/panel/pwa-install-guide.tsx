@@ -41,7 +41,7 @@ export default function PwaInstallGuide() {
       >
         ×
       </button>
-      <p className="font-semibold text-ink text-sm mb-1">Instalá Turnazo en tu iPhone</p>
+      <p className="font-semibold text-ink text-sm mb-1">Instalá Depoturnos en tu iPhone</p>
       <p className="text-xs text-ink-muted mb-3 leading-relaxed">
         Para recibir notificaciones de nuevos turnos, instalá la app desde Safari:
       </p>
@@ -63,7 +63,7 @@ export default function PwaInstallGuide() {
         <li>
           <span className="inline-flex items-center gap-1.5">
             <span className="text-base">3.</span>
-            Abrí Turnazo desde el ícono que aparece en tu pantalla.
+            Abrí Depoturnos desde el ícono que aparece en tu pantalla.
           </span>
         </li>
       </ol>

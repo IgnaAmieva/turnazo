@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import LoginForm from './login-form';
+import { BrandLogo } from '@/components/brand-logo';
+import { APP_NAME } from '@/lib/constants';
 
 export const metadata: Metadata = { title: 'Iniciar sesión' };
 
@@ -9,7 +11,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <a href="/" className="text-brand font-bold text-2xl tracking-tight">Turnazo</a>
+          <Link href="/" aria-label={`${APP_NAME}, inicio`} className="inline-flex min-h-11 items-center"><BrandLogo size={40} /></Link>
           <p className="text-ink-muted text-sm mt-1">Panel del dueño</p>
         </div>
         <div className="bg-surface rounded-2xl border border-line shadow-sm p-6">
