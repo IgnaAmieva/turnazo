@@ -17,7 +17,7 @@ const NOW = `${nextWeekday(1, 12)}T12:00:00.000Z`;
 
 test("'Lo antes posible' lleva al complejo con la hoja de ese turno abierta", async ({ page }) => {
   const errors = collectPageErrors(page);
-  await page.goto(HOME);
+  await page.goto(`${HOME}&_now=${NOW}`);
   const cover = page.getByTestId("portada");
   await expect(cover.getByRole("heading", { level: 1 })).toHaveText("¿Jugamos hoy?");
   await expect(cover).toContainText("Tunuyán · Pádel");
@@ -161,7 +161,8 @@ test("sin permiso: 'Usar mi ubicación' (44 px) y no se pide la ubicación sola"
 test("las URLs de antes siguen funcionando", async ({ page }) => {
   await page.goto("/tunuyan");
   await expect(page).toHaveURL(/\/\?localidad=tunuyan/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("¿Jugamos hoy?");
+  // Sin ?_now= (la redirección no lo lleva): de noche el inicio pasa solo a mañana
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^¿Jugamos (hoy|mañana)\?$/);
   await page.goto(`/tunuyan/padel?_now=${NOW}`);
   await expect(page.getByText("Complejo Padelero Tunuyán").first()).toBeVisible();
 });

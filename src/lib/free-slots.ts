@@ -114,12 +114,35 @@ export async function freeSlots(venues: VenueForList[], date: string, now = new 
   return perCourt.flat().sort((a, b) => a.start.getTime() - b.start.getTime() || a.venueName.localeCompare(b.venueName, 'es'));
 }
 
-/** "Lo antes posible": el primer turno libre de hoy o, si hoy no queda nada, de mañana. */
+/**
+ * "Falta poco para cerrar": un turno que empieza en menos de LATE_MINUTES ya no
+ * alcanza para quedarse en hoy (no llegás). Si hoy solo quedan esos, o ninguno,
+ * el inicio, "Lo antes posible" y la lista pasan solos a mañana.
+ */
+export const LATE_MINUTES = 30;
+
+export function noRoomLeftToday(todaySlots: FreeSlot[], now: Date): boolean {
+  return !todaySlots.some((s) => s.start.getTime() - now.getTime() >= LATE_MINUTES * 60_000);
+}
+
+/** "Lo antes posible": el primer turno libre de hoy o, si hoy ya no hay lugar, de mañana. */
 export async function earliestFreeSlot(venues: VenueForList[], now = new Date()): Promise<FreeSlot | null> {
   const today = todayInMendoza(now);
-  const first = (await freeSlots(venues, today, now))[0];
-  if (first) return first;
+  const todays = await freeSlots(venues, today, now);
+  if (!noRoomLeftToday(todays, now)) return todays[0];
   return (await freeSlots(venues, nextDate(today), now))[0] ?? null;
+}
+
+/**
+ * Día que muestra la lista: el pedido (?fecha=), o hoy, o mañana si hoy ya no
+ * hay lugar (rolled). Devuelve también los libres de ese día.
+ */
+export async function listDaySlots(venues: VenueForList[], today: string, chosen: string | null, now: Date) {
+  const todays = await freeSlots(venues, today, now);
+  const rolled = chosen === null && venues.length > 0 && noRoomLeftToday(todays, now);
+  const date = chosen ?? (rolled ? nextDate(today) : today);
+  const slots = date === today ? todays : await freeSlots(venues, date, now);
+  return { date, rolled, slots };
 }
 
 /** Link al complejo con la hoja de ese turno abierta. */

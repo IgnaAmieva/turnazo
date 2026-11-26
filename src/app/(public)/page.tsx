@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getLocalitiesAndSportsWithCounts } from "@/lib/supabase/queries";
-import { getVenuesForList, freeSlots, earliestFreeSlot, slotHref, type FreeSlot } from "@/lib/free-slots";
+import { getVenuesForList, listDaySlots, earliestFreeSlot, slotHref, type FreeSlot } from "@/lib/free-slots";
+import { dayWord, parseListDate } from "@/lib/list-day";
 import { parseWhen, whenParams } from "@/lib/franjas";
 import { formatTimeMendoza, todayInMendoza } from "@/lib/slots";
 import { CoverGreeting, RememberSearch } from "@/components/player-memory-ui";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "¿Jugamos hoy?" };
 
 type Props = {
-  searchParams: Promise<{ localidad?: string; deporte?: string; franja?: string; hora?: string; formato?: string; _now?: string }>;
+  searchParams: Promise<{ localidad?: string; deporte?: string; franja?: string; hora?: string; formato?: string; fecha?: string; _now?: string }>;
 };
 
 const plural = (n: number) => `${n} complejo${n !== 1 ? "s" : ""}`;
@@ -60,13 +61,17 @@ export default async function HomePage({ searchParams }: Props) {
   // Fútbol: ?formato= deja solo las canchas de ese formato (027)
   const formato = sport?.slug === "futbol" && isFormat(params.formato) ? params.formato : null;
   const venues = sport ? filterByFormat(await getVenuesForList(locality.id, sport.id), formato) : [];
-  // Los libres de hoy se piden una vez por cancha (React cache): los usan la lista y "Lo antes posible"
-  const [slots, earliest] = sport
-    ? await Promise.all([freeSlots(venues, today, now), earliestFreeSlot(venues, now)])
-    : [[] as FreeSlot[], null];
+  // Los libres se piden una vez por cancha y fecha (React cache): los usan la lista y "Lo antes posible".
+  // Sin ?fecha=, de noche, si hoy ya no hay lugar, los dos pasan solos a mañana.
+  const chosen = parseListDate(params.fecha, today);
+  const [day, earliest] = sport
+    ? await Promise.all([listDaySlots(venues, today, chosen, now), earliestFreeSlot(venues, now)])
+    : [{ date: today, rolled: false, slots: [] as FreeSlot[] }, null];
 
   const explicit = params.localidad !== undefined || params.deporte !== undefined;
-  const keep: Record<string, string> = { ...(fixedNow ? { _now: fixedNow } : {}), ...whenParams(when) };
+  const keep: Record<string, string> = {
+    ...(fixedNow ? { _now: fixedNow } : {}), ...(chosen ? { fecha: chosen } : {}), ...whenParams(when),
+  };
   const homeHref = (l: string, d?: string) =>
     `/?${new URLSearchParams({ localidad: l, ...(d ? { deporte: d } : {}), ...keep }).toString()}`;
 
@@ -81,7 +86,7 @@ export default async function HomePage({ searchParams }: Props) {
         <CourtLines slug={sport?.slug ?? "futbol"} className="opacity-[0.14]" />
         <div className="relative">
           <CoverGreeting />
-          <h1 className="text-[2rem] font-extrabold leading-tight">¿Jugamos hoy?</h1>
+          <h1 className="text-[2rem] font-extrabold leading-tight">¿Jugamos {dayWord(day.date, today)}?</h1>
 
           {sport && earliest ? (
             <Link
@@ -170,15 +175,18 @@ export default async function HomePage({ searchParams }: Props) {
         <div id="complejos" data-testid="complejos-inicio">
           <VenueResults
             venues={venues}
-            slots={slots}
+            slots={day.slots}
             when={when}
             today={today}
+            date={day.date}
+            rolled={day.rolled}
             localitySlug={locality.slug}
             sportSlug={sport.slug}
             basePath="/"
             baseParams={{
               localidad: locality.slug, deporte: sport.slug,
               ...(keep._now ? { _now: keep._now } : {}),
+              ...(chosen ? { fecha: chosen } : {}),
               ...(formato ? { formato } : {}),
             }}
             noVenuesText={formato ? `Ningún complejo de ${locality.name} cargó canchas de ${formatLabel(formato)} todavía.` : undefined}

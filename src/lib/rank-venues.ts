@@ -6,10 +6,10 @@ import { inWhen, type When } from '@/lib/franjas';
  * libres (así los turnos se reparten entre todos); desempata el nombre.
  * Los que no tienen lugar no aparecen. `next`: hasta 4 horarios distintos.
  */
-export function rankVenues(venues: VenueForList[], slots: FreeSlot[], when: When, today: string) {
+export function rankVenues(venues: VenueForList[], slots: FreeSlot[], when: When, date: string) {
   return venues
     .map((v) => {
-      const mine = slots.filter((s) => s.venueId === v.id && inWhen(s.start, when, today));
+      const mine = slots.filter((s) => s.venueId === v.id && inWhen(s.start, when, date));
       // Horarios distintos (con dos canchas libres a la misma hora, un solo chip: la primera cancha)
       const times = mine.filter((s, i, all) => all.findIndex((o) => o.start.getTime() === s.start.getTime()) === i);
       return { v, free: mine.length, next: times.slice(0, 4) };

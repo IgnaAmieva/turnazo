@@ -647,6 +647,15 @@ Pendiente para cuando esté **depoturnos.com.ar** (depende del dominio; no se to
 - `VAPID_SUBJECT` (`mailto:admin@turnazo.app`) → un mail del dominio nuevo.
 - El link de las historias y de Mi turno usa el host del pedido: con el dominio nuevo sale solo.
 
+## De noche, la lista pasa sola a mañana (rama `marca`, 2026-11-26)
+
+- Regla (`noRoomLeftToday` en `lib/free-slots.ts`): hoy ya no hay lugar si no queda ningún turno libre que empiece dentro de 30 minutos o más (`LATE_MINUTES`). Así cubre los dos casos: no queda nada, o falta poco para cerrar y lo único libre empieza enseguida. No depende de una hora fija: sirve igual para canchas que cierran a las 23:00 o a las 02:00.
+- Sin `?fecha=`: el inicio, la lista y "Lo antes posible" pasan solos a mañana (`listDaySlots`, `earliestFreeSlot`). El título dice "Hoy ya no hay lugar · Mañana, jueves 27" y el inicio pregunta "¿Jugamos mañana?".
+- Fila de días (7 días, `lib/list-day.ts`) en el inicio y en la lista, igual a la del complejo. Elegir un día pone `?fecha=`; con `?fecha=` de hoy se ve hoy aunque esté vacío, que es como se vuelve a hoy. La franja elegida se mantiene al cambiar de día. Una fecha vieja, lejana o mal escrita se ignora.
+- En otro día que no es hoy, "Ahora" se llama "Todo el día". Los textos dicen "con lugar mañana" o "de 20–22 el sábado 28", y la tarjeta y los turnos abren el complejo en ese día.
+- La lista ya no tiene el subtítulo "Hoy · …": lo reemplaza el título del día.
+- Tests: `tests/unit/list-day.test.ts` y `tests/e2e/noche.spec.ts` (lunes futuro a las 23:10, 22:40 y 21:00 con `?_now=`; contraste AA del título y los días). Para las 22:40 se usa el último turno de futmates (23:00): si futmates cambia sus horarios, ese test hay que revisarlo.
+
 ## Merge de `rediseno` a `main` — HECHO (2026-11-25)
 
 - Merge `74a1c18` (sin squash), deploy de producción `dpl_GMm5pk9qm8F8KQJmX8dwkEoRCNwm` en READY, región **cle1**, alias `turnazo-chi.vercel.app`. Sin errores de runtime en los 15 minutos siguientes.
