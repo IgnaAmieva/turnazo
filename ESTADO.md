@@ -632,7 +632,7 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
   - Con la sesión del dueño de prueba → 404 (781 y 743 ms). Su panel sigue en 200 sin el link "Superadmin".
   - La base le niega `superadmin_summary` y `superadmin_venues` al dueño (42501).
   - Complejos sin cambios: Complejo Padelero Tunuyán y futmates aprobados, 0 filas `venue_*` en `audit_log`.
-- Pendiente: `E2E_SUPERADMIN_PASSWORD` todavía no está en `.env.local` (el archivo no cambió desde las 11:48). El test de login con contraseña se saltea hasta que esté.
+- Contraseña de `superadmin@turnazo.test` rotada (2026-11-26, autorizado por Igna): era insegura; la nueva es aleatoria de 43 caracteres. Se cambió con `auth.admin.updateUserById` desde un script de un solo uso que verificó el mail antes y después se borró. Está solo en `.env.local` como `E2E_SUPERADMIN_PASSWORD` (nunca en logs ni commits). El test de login con contraseña pasa en `main` y en `s2`.
 - Orden decidido por el revisor: primero `superadmin` (hecho), después `s2` (rebasado sobre este `main`, espera las variables de Turnstile en Preview y el hostname del Preview en Cloudflare para probarlo con el captcha real).
 
 ## Panel de superadmin (rama `superadmin`, 2026-11-26; mergeado el 2026-11-26)
