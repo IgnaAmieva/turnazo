@@ -8,6 +8,7 @@ import { triggerPushSend } from '@/lib/push';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { refundPayment } from '@/lib/mp/refunds';
 import { RPC_ERROR_MESSAGES, GENERIC_BOOKING_ERROR } from '@/lib/booking-messages';
+import { checkBookingAbuse } from '@/lib/abuse';
 
 // ---------------------------------------------------------------------------
 // Schema de validación
@@ -66,8 +67,12 @@ export async function createBookingAction(
 
   const data = parsed.data;
 
+  // Captcha + límites por IP y teléfono (S2), antes de tocar la base.
   // create_booking solo lo ejecuta service_role (migración 021): reservar
-  // pasa siempre por acá, donde van el captcha y el límite por IP (S2).
+  // pasa siempre por acá.
+  const abuse = await checkBookingAbuse(formData, data.customer_phone);
+  if (abuse) return { error: abuse };
+
   const admin = createAdminClient();
 
   const { data: result, error: rpcError } = await admin.rpc('create_booking', {

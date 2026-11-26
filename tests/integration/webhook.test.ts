@@ -48,6 +48,8 @@ vi.mock("@/lib/push", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error("NEXT_REDIRECT " + url); } }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// Captcha y límites (S2) se prueban en security-s2.test.ts; acá no interfieren.
+vi.mock("@/lib/abuse", () => ({ checkBookingAbuse: async () => null, checkAuthAbuse: async () => null, allowReconcile: async () => true }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => { throw new Error("no usado"); } }));
 
 import { POST } from "@/app/api/mp/webhook/route";

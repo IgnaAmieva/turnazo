@@ -16,8 +16,7 @@ import {
   getOwnerToken,
   serviceHeaders,
   unblockTestPhones,
-  contrastOf,
-} from "./helpers";
+  contrastOf, waitIdle } from "./helpers";
 
 // Phone used exclusively by this test file
 const SETTINGS_PHONE = "2615009001";
@@ -28,7 +27,7 @@ const SETTINGS_PHONE = "2615009001";
 
 async function loginAsOwner(page: import("@playwright/test").Page) {
   await page.goto("/panel/complejos");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   if (page.url().includes("/login")) {
     await page.fill('[name="email"]', OWNER_EMAIL);
     await page.fill('[name="password"]', OWNER_PASSWORD);
@@ -226,7 +225,7 @@ test("plantilla: vista previa con datos de ejemplo y se guarda como texto con {v
 test("blocked phones page lists blocked numbers", async ({ page }) => {
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/bloqueados`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByText("Teléfonos bloqueados")).toBeVisible();
   await expect(page.getByText(SETTINGS_PHONE)).toBeVisible();
@@ -242,7 +241,7 @@ test("unblocking a phone removes it from the blocked list", async ({ page, reque
 
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/bloqueados`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByText(SETTINGS_PHONE)).toBeVisible();
 

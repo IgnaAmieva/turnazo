@@ -17,8 +17,7 @@ import path from "path";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import {
   VENUE_ID, COURT_ID, SUPABASE_URL, SUPABASE_ANON_KEY, OWNER_EMAIL, OWNER_PASSWORD,
-  deleteTestBookings, deleteTestOutboxRows, nextWeekday,
-} from "./helpers";
+  deleteTestBookings, deleteTestOutboxRows, nextWeekday, waitIdle } from "./helpers";
 
 process.loadEnvFile(path.join(__dirname, "../../.env.local"));
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -178,7 +177,7 @@ test.describe("panel: política de cancelación", () => {
     await writePolicy(request, { cancel_limit_hours: 2, refund_policy: "none" });
 
     await page.goto(`/panel/complejos/${VENUE_ID}`);
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
 
     const section = page.locator("div", { has: page.getByRole("heading", { name: "Cancelaciones" }) }).last();
     await expect(section.getByLabel("Plazo para cancelar (horas antes del turno)")).toHaveValue("2");
@@ -192,7 +191,7 @@ test.describe("panel: política de cancelación", () => {
     expect(await readPolicy(request)).toEqual({ cancel_limit_hours: 5, refund_policy: "full" });
 
     await page.reload();
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     const again = page.locator("div", { has: page.getByRole("heading", { name: "Cancelaciones" }) }).last();
     await expect(again.getByLabel("Plazo para cancelar (horas antes del turno)")).toHaveValue("5");
     await expect(again.getByRole("radio", { name: /Devolución total/ })).toBeChecked();
@@ -200,7 +199,7 @@ test.describe("panel: política de cancelación", () => {
 
   test("rechaza un plazo fuera de rango", async ({ page }) => {
     await page.goto(`/panel/complejos/${VENUE_ID}`);
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     const section = page.locator("div", { has: page.getByRole("heading", { name: "Cancelaciones" }) }).last();
     const input = section.getByLabel("Plazo para cancelar (horas antes del turno)");
     // El input tiene max=168: forzamos el valor para que lo rechace el servidor
@@ -222,14 +221,14 @@ test.describe("panel: cancelar reserva con pago online", () => {
     const b = await insertConfirmed(request, "E2E Cancel Dueño", FECHA, 9, 30, 2500);
 
     await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${FECHA}`);
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     if (page.url().includes("/login")) {
       await page.fill('[name="email"]', OWNER_EMAIL);
       await page.fill('[name="password"]', OWNER_PASSWORD);
       await page.getByRole("button", { name: /entrar/i }).click();
       await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 25_000 });
       await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${FECHA}`);
-      await page.waitForLoadState("networkidle");
+      await waitIdle(page);
     }
 
     await page.getByText("E2E Cancel Dueño").first().click();
@@ -270,7 +269,7 @@ test.describe("jugador: cancelación con devolución", () => {
     const b = await insertConfirmed(request, "E2E Cancel Full", FECHA, 15, 30, 2500);
 
     await page.goto(`/turnos/${b.token}`);
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     await expect(page.getByText(/Seña pagada: \$2\.500/)).toBeVisible();
     await expect(page.getByText(/te devolvemos/)).toBeVisible();
     await expect(page.getByText("$2.500", { exact: false }).first()).toBeVisible();
@@ -289,7 +288,7 @@ test.describe("jugador: cancelación con devolución", () => {
     const b = await insertConfirmed(request, "E2E Cancel None", FECHA, 18, 30, 5000);
 
     await page.goto(`/turnos/${b.token}`);
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     await expect(page.getByText(/NO se te devuelve lo que pagaste \(\$5\.000\)/)).toBeVisible();
     await expect(page.getByText("Este complejo no hace devoluciones por cancelación.")).toBeVisible();
 

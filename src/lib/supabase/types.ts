@@ -837,6 +837,15 @@ export type Database = {
         Args: { p_venue_id: string; p_action: string; p_reason?: string | null }
         Returns: Json
       }
+      rate_limit_hit: {
+        Args: {
+          p_bucket: string
+          p_key_hash: string
+          p_max: number
+          p_window_seconds: number
+        }
+        Returns: boolean
+      }
       confirm_order_payment: {
         Args: {
           p_booking_id: string

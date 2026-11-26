@@ -8,6 +8,8 @@ export default defineConfig({
   // gets overloaded and login timeouts become a non-issue.
   workers: 1,
   reporter: [["list"]],
+  // Contadores de S2 (rate_limit_hits) que dejan los tests
+  globalTeardown: "./tests/e2e/setup/teardown.ts",
   use: {
     baseURL: "http://localhost:3001",
     headless: true,

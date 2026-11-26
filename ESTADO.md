@@ -662,6 +662,34 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
   - `tests/e2e/admin.spec.ts` (9): acceso; lista y filtro; detalle; las cuatro acciones con `audit_log`, `notification_outbox`, WhatsApp y el panel del dueño; 44 px y AA en claro y oscuro; transiciones inválidas en la base. El login con contraseña se saltea si falta `E2E_SUPERADMIN_PASSWORD` (hoy no está en `.env.local`).
   - El superadmin entra en los tests con un link mágico de un solo uso (service_role) y la cookie la escribe el mismo `@supabase/ssr`: no necesita contraseña.
   - El complejo de prueba lo crea el dueño de prueba (sin canchas: nunca aparece en la web) y `afterAll` lo borra con su `audit_log` y su `notification_outbox`.
+## S2 anti-abuso integrado (rama `s2`, desde `main`, 2026-11-26; SIN mergear)
+
+Reemplaza a la rama vieja `s2-captcha` (no se mergea: se rehízo encima del rediseño). La 022 ya estaba aplicada.
+- **Captcha Turnstile, modo Managed** (`components/turnstile.tsx`), en el lugar reservado `data-captcha-slot`:
+  - Va en el formulario de reserva (es el mismo en la hoja y en `/reservar`), en el login y en el registro.
+  - Usa `appearance: interaction-only`: si Cloudflare no duda, no se ve nada.
+  - Si se toca Confirmar antes de que llegue el token, espera y envía solo ("Verificando…").
+  - El token se renueva después de cada respuesta del servidor.
+  - Si el script no carga o el widget falla, aparece un aviso con "Reintentar" (44 px) y nunca queda trabado; a los 15 s sin token también avisa.
+- **Verificación siempre en el servidor** (`lib/turnstile.ts`), antes de cualquier RPC, hold, orden de Mercado Pago o pedido a Supabase Auth:
+  - Devuelve `ok`, `invalid` o `unavailable`.
+  - Si Cloudflare no responde (red, timeout de 4 s, HTTP 5xx/429 o `internal-error`), reintenta una vez a los 300 ms con el mismo `idempotency_key`.
+  - Si sigue sin responder, `captcha_unavailable`: "No pudimos hacer la verificación en este momento. Probá de nuevo en unos segundos." Confirmar sigue.
+  - Sin `TURNSTILE_SECRET_KEY` no se reserva ni se entra.
+- **Límites** (`lib/abuse.ts`): HMAC-SHA256 con `RATE_LIMIT_SECRET`; la rama vieja usaba la clave del servicio.
+  - Reserva: 20 por IP por hora y 8 por teléfono por día. Login: 20 por IP cada 15 min. Registro: 10 por IP por hora. Consultas a Mercado Pago desde `/pago`: 1 cada 10 s por reserva.
+  - Si la base no responde o falta la clave, se loguea y se deja pasar.
+- **Mensajes:** salen del catálogo (`too_many_attempts`, `captcha_failed`, `captcha_unavailable`). Se quitó el alias del texto viejo y "Esperá un minuto" pasó a "Esperá un rato", porque los límites son de una hora y de un día.
+- **Login y registro:** pasan de ~40 px a 44 px.
+- **Tests**, solo con las claves de prueba oficiales de Cloudflare:
+  - `tests/unit/turnstile.test.ts` (7, con fetch simulado: reintento, caído, sin clave).
+  - `tests/integration/turnstile-cloudflare.test.ts` (4, contra el siteverify real: la clave que pasa, la que falla y la de "token ya usado"; reservar con la que falla no crea nada).
+  - `tests/integration/security-s2.test.ts` (12: captcha, Cloudflare caído y reintento, login sin captcha, límites por IP, teléfono, pago, login y `/pago`, HMAC, anon sin acceso).
+  - `tests/e2e/captcha.spec.ts` (4: token sin tocar nada, sin token no reserva y el reintento sí, widget que no carga con "Reintentar", login y registro).
+- **E2E:**
+  - `waitIdle()` reemplaza a `networkidle`, porque el widget no deja la red quieta.
+  - El setup y el `globalTeardown` borran solo los contadores de las IPs locales y de los teléfonos de los tests (`clearTestRateLimits`). Después de la corrida: 0 contadores y 16 reservas.
+  - Vitest 433 ✓ y E2E 184 ✓ en 8 tandas (2026-11-26).
 
 ## Merge de `marca` a `main` — HECHO (2026-11-26)
 

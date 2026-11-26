@@ -13,15 +13,14 @@ import {
   serviceHeaders,
   createTestBooking,
   deleteTestBookings,
-  deleteTestOutboxRows,
-} from "./helpers";
+  deleteTestOutboxRows, waitIdle } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Login helper (no-op when storageState already has auth)
 // ---------------------------------------------------------------------------
 async function loginAsOwner(page: import("@playwright/test").Page) {
   await page.goto("/panel/complejos");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   if (page.url().includes("/login")) {
     await page.fill('[name="email"]', OWNER_EMAIL);
     await page.fill('[name="password"]', OWNER_PASSWORD);
@@ -49,7 +48,7 @@ test("panel/agenda redirects to venue agenda when owner has one venue", async ({
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto("/panel/agenda");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   expect(page.url()).toContain(`/panel/complejos/${VENUE_ID}/agenda`);
   expect(errors).toHaveLength(0);
@@ -62,7 +61,7 @@ test("venue agenda page loads: days, summary and court tabs", async ({ page }) =
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AGENDA_DATE}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByTestId("dia").first()).toBeVisible();
   await expect(page.getByTestId("resumen")).toBeVisible();
@@ -80,7 +79,7 @@ test("tapping another day updates the URL date", async ({ page }) => {
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AGENDA_DATE}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await page.getByTestId("dia").filter({ hasText: "Hoy" }).click();
   await page.waitForURL(
@@ -103,7 +102,7 @@ test("can create a manual block on a court", async ({ page }) => {
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AGENDA_DATE}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   // "+ Nuevo turno" → "Bloquear horario" (la cancha propuesta es la del primer libre: Cancha 1)
   await page.getByRole("button", { name: /nuevo turno/i }).click();
@@ -142,7 +141,7 @@ test("cancelled bookings are not listed; their slot is free again", async ({ pag
 
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${date}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByTestId("resumen")).toBeVisible();
   await expect(page.getByText("E2E block cancelado")).toHaveCount(0);

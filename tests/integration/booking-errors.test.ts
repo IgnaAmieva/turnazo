@@ -14,6 +14,8 @@ import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// Captcha y límites (S2) se prueban en security-s2.test.ts; acá no interfieren.
+vi.mock("@/lib/abuse", () => ({ checkBookingAbuse: async () => null, checkAuthAbuse: async () => null, allowReconcile: async () => true }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error("NEXT_REDIRECT " + url); } }));
 vi.mock("@/lib/push", () => ({ triggerPushSend: async () => {} }));
 
@@ -76,7 +78,7 @@ describe("catálogo de errores de la reserva", () => {
     expect(ACTION_CODES).toEqual(expect.arrayContaining(["mp_order_failed", "mp_token_unavailable", "mp_hold_not_released"]));
   });
 
-  it.each([...DB_CODES, ...ACTION_CODES, "too_many_attempts", "generic"])("'%s' tiene mensaje corto y acción", (code) => {
+  it.each([...DB_CODES, ...ACTION_CODES, "too_many_attempts", "captcha_failed", "captcha_unavailable", "generic"])("'%s' tiene mensaje corto y acción", (code) => {
     expect(BOOKING_ERROR_CODES, `falta '${code}' en src/lib/booking-errors.ts`).toContain(code);
     const e = bookingError(code);
     expect(e.code).toBe(code);
@@ -102,7 +104,7 @@ describe("catálogo de errores de la reserva", () => {
     expect(bookingError("too_many_bookings").action.kind).toBe("none");
     expect(bookingError("phone_blocked").action.kind).toBe("none");
     expect(bookingError("too_many_attempts").action.kind).toBe("wait");
-    expect(bookingError("too_many_attempts").message).toContain("Esperá un minuto y probá de nuevo");
+    expect(bookingError("too_many_attempts").message).toBe("Hiciste demasiados intentos. Esperá un rato y probá de nuevo.");
     for (const c of ["mp_order_failed", "mp_token_unavailable", "mp_not_connected"]) {
       expect(bookingError(c).action.kind).toBe("pay_at_venue_or_retry");
     }

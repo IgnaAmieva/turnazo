@@ -6,8 +6,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   VENUE_PATH, COURT_ID, nextWeekday, slotParams, contrastOf,
-  deleteTestBookings, deleteTestOutboxRows,
-} from "./helpers";
+  deleteTestBookings, deleteTestOutboxRows, waitIdle } from "./helpers";
 
 test.use({ storageState: { cookies: [], origins: [] }, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
@@ -128,6 +127,6 @@ test("un valor manipulado en localStorage se ignora (solo campos permitidos)", a
   await expect(page.getByLabel("Tu nombre")).toHaveValue("Ana");
   await page.goto("/");
   // localidad inválida → no se abre ninguna búsqueda recordada
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   expect(new URL(page.url()).search).toBe("");
 });

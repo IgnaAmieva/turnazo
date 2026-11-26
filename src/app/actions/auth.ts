@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { checkAuthAbuse } from '@/lib/abuse';
 
 const LoginSchema = z.object({
   email:    z.string().email('Email inválido'),
@@ -37,6 +38,10 @@ export async function loginAction(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
+  // Captcha (verificado acá, en el servidor) y límite por IP (S2)
+  const abuse = await checkAuthAbuse(formData, 'login');
+  if (abuse) return { error: abuse };
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
@@ -60,6 +65,9 @@ export async function registerAction(
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
+
+  const abuse = await checkAuthAbuse(formData, 'signup');
+  if (abuse) return { error: abuse };
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({

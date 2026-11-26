@@ -8,7 +8,7 @@
  *   6. iPhone install guide does NOT appear after dismissal
  */
 import { test, expect } from "@playwright/test";
-import { OWNER_EMAIL, OWNER_PASSWORD } from "./helpers";
+import { OWNER_EMAIL, OWNER_PASSWORD, waitIdle } from "./helpers";
 import path from "path";
 
 // Reuse the saved auth session from setup/auth.setup.ts
@@ -16,7 +16,7 @@ const AUTH_FILE = path.join(__dirname, "setup/.auth.json");
 
 async function loginAsOwner(page: import("@playwright/test").Page) {
   await page.goto("/panel/complejos");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   if (page.url().includes("/login")) {
     await page.fill('[name="email"]', OWNER_EMAIL);
     await page.fill('[name="password"]', OWNER_PASSWORD);
@@ -59,7 +59,7 @@ test("panel nav shows 'Activar notificaciones' button", async ({ browser }) => {
 
   await loginAsOwner(page);
   await page.goto("/panel/complejos");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   // Browser supports Push and permission is granted → button should appear
   await expect(page.getByRole("button", { name: /activar notificaciones/i })).toBeVisible({
@@ -81,7 +81,7 @@ test("subscribe flow: button activates push and transitions state", async ({ bro
 
   await loginAsOwner(page);
   await page.goto("/panel/complejos");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   const activateBtn = page.getByRole("button", { name: /activar notificaciones/i });
 
@@ -128,7 +128,7 @@ test("iPhone install guide appears on iOS Safari (not standalone)", async ({ bro
 
   await loginAsOwner(page);
   await page.goto("/panel/complejos");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByText(/instalá depoturnos en tu iphone/i)).toBeVisible({ timeout: 8_000 });
   await expect(page.getByText(/agregar a pantalla de inicio/i)).toBeVisible();
@@ -158,7 +158,7 @@ test("iPhone install guide stays hidden after being dismissed", async ({ browser
 
   await loginAsOwner(page);
   await page.goto("/panel/complejos");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByText(/instalá depoturnos en tu iphone/i)).not.toBeVisible({ timeout: 5_000 });
 

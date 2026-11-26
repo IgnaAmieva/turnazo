@@ -9,15 +9,14 @@ import {
   OWNER_PASSWORD,
   VENUE_ID,
   SUPABASE_URL,
-  serviceHeaders,
-} from "./helpers";
+  serviceHeaders, waitIdle } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Login helper (no-op when storageState already has auth)
 // ---------------------------------------------------------------------------
 async function loginAsOwner(page: import("@playwright/test").Page) {
   await page.goto("/panel/complejos");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   if (page.url().includes("/login")) {
     await page.fill('[name="email"]', OWNER_EMAIL);
     await page.fill('[name="password"]', OWNER_PASSWORD);
@@ -51,7 +50,7 @@ test("panel/complejos lists venues after login", async ({ page }) => {
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto("/panel/complejos");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByText("Complejo Padelero Tunuyán")).toBeVisible();
   await expect(page.getByText(/aprobado/i)).toBeVisible();
@@ -65,7 +64,7 @@ test("panel/complejos/[id] loads the edit form", async ({ page }) => {
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.locator('input[name="name"]')).toHaveValue("Complejo Padelero Tunuyán");
   expect(errors).toHaveLength(0);
@@ -78,7 +77,7 @@ test("panel/complejos/[id]/canchas lists courts", async ({ page }) => {
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/canchas`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByText("Cancha 1")).toBeVisible();
   await expect(page.getByText("Cancha 2")).toBeVisible();
@@ -92,7 +91,7 @@ test("panel/complejos/nuevo loads the new venue form", async ({ page }) => {
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto("/panel/complejos/nuevo");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByRole("button", { name: /crear complejo/i })).toBeVisible();
   expect(errors).toHaveLength(0);
@@ -125,7 +124,7 @@ test("panel/complejos/[id]/canchas/nuevo loads the new court form", async ({ pag
   const errors = collectPageErrors(page);
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/canchas/nuevo`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByRole("button", { name: /siguiente: precios/i })).toBeVisible();
   expect(errors).toHaveLength(0);
@@ -139,7 +138,7 @@ test("panel/complejos/[id]/canchas/[cid] loads hours and prices editors", async 
   await loginAsOwner(page);
   const COURT_ID = "c3d4e5f6-0000-0000-0000-000000000001";
   await page.goto(`/panel/complejos/${VENUE_ID}/canchas/${COURT_ID}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   await expect(page.getByText("Horarios de apertura")).toBeVisible();
   await expect(page.getByText("Precios por franja")).toBeVisible();
@@ -156,7 +155,7 @@ test("saving court hours writes an audit_log row", async ({ page, request }) => 
   await loginAsOwner(page);
   const COURT_ID = "c3d4e5f6-0000-0000-0000-000000000001";
   await page.goto(`/panel/complejos/${VENUE_ID}/canchas/${COURT_ID}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   // Record the current audit_log count before the action (service_role: el
   // dueño no lee audit_log desde la migración 021)

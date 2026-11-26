@@ -42,6 +42,8 @@ vi.mock("@/lib/mp/orders", async (importOriginal) => {
 vi.mock("@/lib/push", () => ({ triggerPushSend: async () => { pushMock(); } }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error("NEXT_REDIRECT " + url); } }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// Captcha y límites (S2) se prueban en security-s2.test.ts; acá no interfieren.
+vi.mock("@/lib/abuse", () => ({ checkBookingAbuse: async () => null, checkAuthAbuse: async () => null, allowReconcile: async () => true }));
 
 // La acción del jugador corre como anon; la del panel, con la sesión del dueño.
 let currentClient: SupabaseClient;

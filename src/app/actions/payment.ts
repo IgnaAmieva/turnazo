@@ -10,6 +10,7 @@ import { getPaymentStatus, type PaymentStatus } from '@/lib/payment-status';
 import { PAYMENT_ERROR_MESSAGES, GENERIC_BOOKING_ERROR } from '@/lib/booking-messages';
 import { APP_TIMEZONE } from '@/lib/constants';
 import type { BookingActionState } from '@/app/actions/booking';
+import { checkBookingAbuse, allowReconcile } from '@/lib/abuse';
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -73,6 +74,10 @@ export async function startPaymentAction(
     console.error('[pago] falta NEXT_PUBLIC_APP_URL');
     return { error: PAYMENT_ERROR_MESSAGES.mp_order_failed };
   }
+
+  // Captcha + límites por IP y teléfono (S2), antes del hold y de la orden en MP.
+  const abuse = await checkBookingAbuse(formData, data.customer_phone);
+  if (abuse) return { error: abuse };
 
   // 1. Hold en la base: valida todo y calcula el monto. Si el jugador toca dos
   //    veces, el segundo intento devuelve hold_limit_reached o slot_taken:
@@ -213,7 +218,11 @@ export async function reconcilePaymentAction(token: string): Promise<PaymentStat
     .eq('cancel_token', token)
     .maybeSingle();
 
-  if (booking && (booking.status === 'hold' || booking.status === 'expired') && booking.mp_order_id) {
+  // Como mucho una consulta a MP cada 10 s por reserva (A3): un loop con un
+  // token propio no agota el cupo de la API del dueño. Si se pasa, solo
+  // devuelve el estado de la base; el webhook igual confirma.
+  if (booking && (booking.status === 'hold' || booking.status === 'expired') && booking.mp_order_id
+      && await allowReconcile(token)) {
     try {
       const result = await processMpOrder(booking.mp_order_id, 'reconcile');
       // Solo ids y el resultado: deja rastro en los logs de que el polling corrió.

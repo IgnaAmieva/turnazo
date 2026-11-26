@@ -11,7 +11,7 @@
 import { test, expect, type Browser } from "@playwright/test";
 import {
   SUPABASE_URL, SUPABASE_ANON_KEY, VENUE_ID, serviceHeaders, getOwnerToken, superadminCookies,
-  contrastOf,
+  contrastOf, waitIdle,
 } from "./helpers";
 
 const NAME = "E2E Superadmin Complejo";
@@ -215,7 +215,7 @@ for (const scheme of ["light", "dark"] as const) {
   test(`44 px y contraste AA en la lista y el detalle (${scheme})`, async ({ browser }) => {
     const { ctx, page } = await adminPage(browser, { colorScheme: scheme, mobile: true });
     await page.goto("/admin");
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     for (const chip of await page.getByTestId("filtro-estado").all()) {
       expect((await chip.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       expect(await contrastOf(chip)).toBeGreaterThanOrEqual(4.5);
@@ -250,7 +250,7 @@ test("login con contraseña del superadmin → /admin (si está E2E_SUPERADMIN_P
   const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await ctx.newPage();
   await page.goto("/login");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   await page.getByLabel("Email").fill("superadmin@turnazo.test");
   await page.getByLabel("Contraseña").fill(password!);
   await page.getByRole("button", { name: /entrar/i }).click();

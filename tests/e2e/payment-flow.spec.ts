@@ -21,8 +21,7 @@ import {
   SUPABASE_ANON_KEY,
   nextWeekday,
   deleteTestBookings,
-  deleteTestOutboxRows,
-} from "./helpers";
+  deleteTestOutboxRows, waitIdle } from "./helpers";
 
 process.loadEnvFile(path.join(__dirname, "../../.env.local"));
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -232,7 +231,7 @@ test.describe("opciones de pago en la pantalla de reserva", () => {
     await writeSettings(request, DEPOSIT_AND_FULL);
 
     await page.goto(reservarUrl(FECHA, 14, 0));
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
 
     await expect(page.getByRole("heading", { name: "Confirmar reserva" })).toBeVisible();
     const deposit = page.getByRole("radio", { name: /pagar la seña online/i });
@@ -259,7 +258,7 @@ test.describe("opciones de pago en la pantalla de reserva", () => {
     await writeSettings(request, FULL_AND_VENUE);
 
     await page.goto(reservarUrl(FECHA, 14, 0));
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
 
     await expect(page.getByRole("radio", { name: /pagar la seña online/i })).toHaveCount(0);
     await expect(page.getByRole("radio", { name: /pagar el total online/i })).toBeChecked();
@@ -291,7 +290,7 @@ test.describe("opciones de pago en la pantalla de reserva", () => {
     await writeSettings(request, DEPOSIT_AND_FULL);
 
     await page.goto(reservarUrl(FECHA, 15, 30));
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
 
     await page.locator('[name="customer_name"]').fill("E2E Pago Online");
     await page.locator('[name="customer_phone"]').fill("2622 777003");
@@ -345,7 +344,7 @@ test.describe("pantalla de vuelta /pago/[token]", () => {
 
     // Parámetros de MP en la URL: se ignoran por completo
     await page.goto(`/pago/${token}?status=approved&collection_status=approved`);
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
 
     await expect(page.getByText("Estamos confirmando tu pago")).toBeVisible();
     await expect(page.getByTestId("countdown")).toHaveText(/^(09|10):\d\d$/);
@@ -368,7 +367,7 @@ test.describe("pantalla de vuelta /pago/[token]", () => {
     const token = await insertHold(request, "E2E Pago Cancelar", FECHA, 12, 30, 10 * 60 * 1000);
 
     await page.goto(`/pago/${token}`);
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     await expect(page.getByText("Estamos confirmando tu pago")).toBeVisible();
 
     await page.getByRole("button", { name: "Cancelar y elegir otro horario" }).click();
@@ -389,7 +388,7 @@ test.describe("pantalla de vuelta /pago/[token]", () => {
 
     // Volver a /pago con ese token ya muestra vencida (no hay botón)
     await page.goto(`/pago/${token}`);
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     await expect(page.getByText("Se venció el tiempo para pagar")).toBeVisible();
     await expect(page.getByRole("button", { name: "Cancelar y elegir otro horario" })).toHaveCount(0);
   });
@@ -397,17 +396,17 @@ test.describe("pantalla de vuelta /pago/[token]", () => {
   test("vencida cuando el hold expiró, cancelada, y token inexistente", async ({ page, request }) => {
     const expired = await insertHold(request, "E2E Pago Vencido", FECHA, 18, 30, -60 * 1000);
     await page.goto(`/pago/${expired}?status=approved`);
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     await expect(page.getByText("Se venció el tiempo para pagar")).toBeVisible();
     await expect(page.getByText("Estamos confirmando tu pago")).toHaveCount(0);
 
     await updateBooking(request, expired, { status: "cancelled" });
     await page.reload();
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     await expect(page.getByText("Este turno fue cancelado")).toBeVisible();
 
     await page.goto("/pago/token-que-no-existe");
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     await expect(page.getByText("Pago no encontrado.")).toBeVisible();
   });
 
@@ -416,7 +415,7 @@ test.describe("pantalla de vuelta /pago/[token]", () => {
     await updateBooking(request, token, { status: "confirmed", payment_status: "deposit_paid", amount_paid: 2500 });
 
     await page.goto(`/turnos/${token}`);
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     await expect(page.getByText(/confirmado/i)).toBeVisible();
     await expect(page.getByText("E2E Pago Turno")).toBeVisible();
   });

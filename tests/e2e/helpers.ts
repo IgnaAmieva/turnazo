@@ -4,6 +4,35 @@ import { Page } from "@playwright/test";
 // Secretos de los tests (nunca en el repo): .env.local
 process.loadEnvFile(path.join(__dirname, "../../.env.local"));
 
+/**
+ * Como waitForLoadState("networkidle"), pero sin contar los pedidos de
+ * Cloudflare Turnstile: el widget del captcha (login, reserva) no deja la red
+ * quieta nunca. Espera la carga y después 500 ms sin pedidos propios.
+ */
+export async function waitIdle(page: Page, quietMs = 500, timeoutMs = 20_000): Promise<void> {
+  await page.waitForLoadState("load");
+  const inflight = new Set<import("@playwright/test").Request>();
+  const mine = (r: import("@playwright/test").Request) => !/challenges\.cloudflare\.com/.test(r.url());
+  const add = (r: import("@playwright/test").Request) => { if (mine(r)) inflight.add(r); };
+  const del = (r: import("@playwright/test").Request) => { inflight.delete(r); };
+  page.on("request", add);
+  page.on("requestfinished", del);
+  page.on("requestfailed", del);
+  try {
+    const deadline = Date.now() + timeoutMs;
+    let quietSince = Date.now();
+    while (Date.now() < deadline) {
+      if (inflight.size > 0) quietSince = Date.now();
+      else if (Date.now() - quietSince >= quietMs) return;
+      await page.waitForTimeout(50);
+    }
+  } finally {
+    page.off("request", add);
+    page.off("requestfinished", del);
+    page.off("requestfailed", del);
+  }
+}
+
 /** Collect page-level JS errors (uncaught exceptions / server component errors rendered to page) */
 export function collectPageErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -215,6 +244,30 @@ export async function superadminCookies(baseURL = "http://localhost:3001") {
     accessToken: otp.session.access_token,
     cookies: jar.map((c) => ({ name: c.name, value: c.value, domain: url.hostname, path: "/", httpOnly: false, secure: false, sameSite: "Lax" as const })),
   };
+}
+
+/**
+ * Límites de S2 (rate_limit_hits): borra SOLO los contadores de esta máquina
+ * (IPs locales) y de los teléfonos que usan los tests, con el mismo HMAC que
+ * el servidor (RATE_LIMIT_SECRET de .env.local). Los de jugadores reales no se tocan.
+ */
+const LOCAL_IPS = ["::1", "127.0.0.1", "::ffff:127.0.0.1"];
+const UI_TEST_PHONES = [
+  "2622999999", "2622777002", "2622777003", "2622777004", "2622000999", "2622000998",
+  "2622000321", "2622000666", "2622123456", "2622000777", "2622000888",
+];
+/** Al empezar (setup) y al terminar (globalTeardown) cada corrida. */
+export async function clearTestRateLimits(): Promise<void> {
+  const secret = process.env.RATE_LIMIT_SECRET;
+  if (!secret) return;
+  const { createHmac } = await import("node:crypto");
+  const h = (bucket: string, v: string) => createHmac("sha256", secret).update(`${bucket}:${v}`).digest("hex");
+  const hashes = [
+    ...["booking_ip", "login_ip", "signup_ip"].flatMap((b) => LOCAL_IPS.map((ip) => h(b, ip))),
+    ...UI_TEST_PHONES.map((p) => h("booking_phone", `549${p}`)),
+  ];
+  await fetch(`${SUPABASE_URL}/rest/v1/rate_limit_hits?key_hash=in.(${hashes.join(",")})`,
+    { method: "DELETE", headers: { ...serviceHeaders(), Prefer: "return=minimal" } });
 }
 
 /** Contraste entre el color del texto del elemento y el fondo opaco más cercano. */

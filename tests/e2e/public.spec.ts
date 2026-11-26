@@ -15,8 +15,7 @@ import {
   VENUE_PATH,
   deleteTestBookings,
   deleteTestOutboxRows,
-  MORNING_NOW,
-} from "./helpers";
+  MORNING_NOW, waitIdle } from "./helpers";
 
 test.afterAll(async ({ request }) => {
   await deleteTestBookings(request, ["Test E2E"]);
@@ -45,7 +44,7 @@ async function assertNoError(page: ReturnType<typeof test["info"]> extends never
 test("home page shows localities with venue counts", async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto("/");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   await assertNoError(page);
   expect(errors).toHaveLength(0);
 
@@ -64,7 +63,7 @@ test("home page shows localities with venue counts", async ({ page }) => {
 test("/tunuyan sigue funcionando: abre el inicio con la localidad y los deportes con su cantidad", async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto(`/${LOCALITY}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   expect(new URL(page.url()).searchParams.get("localidad")).toBe(LOCALITY);
   await assertNoError(page);
   expect(errors).toHaveLength(0);
@@ -82,7 +81,7 @@ test("/tunuyan sigue funcionando: abre el inicio con la localidad y los deportes
 test("/tunuyan/padel loads without errors", async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto(`/${LOCALITY}/${SPORT}?_now=${MORNING_NOW}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   await assertNoError(page);
   expect(errors).toHaveLength(0);
 
@@ -98,7 +97,7 @@ test("/tunuyan/padel loads without errors", async ({ page }) => {
 test("venue detail page loads courts", async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto(VENUE_PATH);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   await assertNoError(page);
   expect(errors).toHaveLength(0);
 
@@ -144,7 +143,7 @@ test("full booking flow: select slot, book, cancel", async ({ page }) => {
     `?cancha=${COURT_ID}&fecha=${fecha}&inicio=${encodeURIComponent(inicio)}&fin=${encodeURIComponent(fin)}`;
 
   await page.goto(url);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   await assertNoError(page);
 
   // The booking summary should be visible
@@ -213,7 +212,7 @@ test("full booking flow: select slot, book, cancel", async ({ page }) => {
 test("/turnos/invalid-token shows not-found message", async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto("/turnos/token-invalido-123");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   await assertNoError(page);
   expect(errors).toHaveLength(0);
   await expect(page.getByText(/turno no encontrado/i)).toBeVisible();
@@ -229,7 +228,7 @@ test("past slots are hidden and future slots visible with _now override", async 
   // 18:31 UTC = 15:31 Mendoza → slots before 15:30 (Mendoza) are hidden, 17:00+ are visible
   const nowParam = encodeURIComponent(`${fecha}T18:31:00.000Z`);
   await page.goto(`${VENUE_PATH}?fecha=${fecha}&_now=${nowParam}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   // 08:00 slot (11:00 UTC) is in the past → should not appear
   // Use first() to handle 2 courts (each showing slots)
@@ -249,7 +248,7 @@ test("shows 'No quedan turnos para hoy' when all slots are past", async ({ page 
   const nextDay = fechaDate.toISOString().slice(0, 10);
   const nowParam = encodeURIComponent(`${nextDay}T01:00:00.000Z`);
   await page.goto(`${VENUE_PATH}?fecha=${fecha}&_now=${nowParam}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   // 2 courts → 2 messages; use first()
   await expect(page.getByText(/no quedan turnos para hoy/i).first()).toBeVisible();
@@ -262,7 +261,7 @@ test("shows 'No quedan turnos para hoy' when all slots are past", async ({ page 
 test("/la-consulta (sin complejos aprobados) no se muestra: abre el inicio con una localidad que tiene complejos", async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto("/la-consulta");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   await assertNoError(page);
   expect(errors).toHaveLength(0);
   await expect(page.getByTestId("donde")).not.toHaveValue("la-consulta");

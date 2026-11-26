@@ -55,12 +55,13 @@ const CATALOG: Record<string, { message: string; action: BookingErrorAction; ali
 
   // Esperar
   hold_limit_reached: { message: 'Ya tenés un pago en curso en este complejo. Terminalo o esperá 10 minutos.', action: { kind: 'wait' } },
-  too_many_attempts:  {
-    message: 'Hiciste muchos intentos. Esperá un minuto y probá de nuevo.',
-    action: { kind: 'wait' },
-    // Texto actual de la rama s2-captcha (ABUSE_MESSAGES.tooMany); al mergear S2, que use este mensaje.
-    aliases: ['Hiciste demasiados intentos. Esperá un rato y probá de nuevo.'],
-  },
+  // Límites de S2 (lib/abuse.ts): por IP en una hora, por teléfono en un día
+  too_many_attempts:  { message: 'Hiciste demasiados intentos. Esperá un rato y probá de nuevo.', action: { kind: 'wait' } },
+
+  // Captcha (S2, lib/turnstile.ts): el servidor siempre verifica el token
+  captcha_failed:      { message: 'No pudimos verificar que no seas un robot. Probá de nuevo.', action: { kind: 'retry' } },
+  // Cloudflare no respondió (ya se reintentó una vez): no es culpa del jugador, puede volver a tocar
+  captcha_unavailable: { message: 'No pudimos hacer la verificación en este momento. Probá de nuevo en unos segundos.', action: { kind: 'retry' } },
 
   // Forma de pago
   deposit_required:         { message: 'Este complejo pide seña: elegí "Pagar la seña online".', action: { kind: 'change_payment' } },

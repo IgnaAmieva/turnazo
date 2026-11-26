@@ -16,8 +16,7 @@ import {
   createTestBooking,
   deleteTestBookings,
   deleteTestOutboxRows,
-  unblockTestPhones,
-} from "./helpers";
+  unblockTestPhones, waitIdle } from "./helpers";
 
 // Thursday, at least 3 weeks out — isolated from agenda.spec.ts (Wednesday)
 const AUDIT_DATE = nextWeekday(4, 21);
@@ -38,7 +37,7 @@ const TEST_PHONES = Object.values(SLOTS).map((s) => s.phone);
 
 async function loginAsOwner(page: import("@playwright/test").Page) {
   await page.goto("/panel/complejos");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   if (page.url().includes("/login")) {
     await page.fill('[name="email"]', OWNER_EMAIL);
     await page.fill('[name="password"]', OWNER_PASSWORD);
@@ -90,7 +89,7 @@ test.afterAll(async ({ request }) => {
 test("cancel booking writes audit_log row (entity=booking, action=cancel)", async ({ page, request }) => {
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AUDIT_DATE}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   const before = await countAuditRows(request, "cancel", "booking");
 
@@ -112,7 +111,7 @@ test("cancel booking writes audit_log row (entity=booking, action=cancel)", asyn
 test("mark paid writes audit_log row (entity=booking, action=mark_paid)", async ({ page, request }) => {
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AUDIT_DATE}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   const before = await countAuditRows(request, "mark_paid", "booking");
 
@@ -132,7 +131,7 @@ test("mark paid writes audit_log row (entity=booking, action=mark_paid)", async 
 test("mark no-show writes audit_log row (entity=booking, action=mark_no_show)", async ({ page, request }) => {
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AUDIT_DATE}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   const before = await countAuditRows(request, "mark_no_show", "booking");
 
@@ -152,7 +151,7 @@ test("mark no-show writes audit_log row (entity=booking, action=mark_no_show)", 
 test("block phone writes audit_log row (entity=blocked_phone, action=create)", async ({ page, request }) => {
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AUDIT_DATE}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   const before = await countAuditRows(request, "create", "blocked_phone");
 
@@ -173,7 +172,7 @@ test("block phone writes audit_log row (entity=blocked_phone, action=create)", a
 test("create manual block writes audit_log row (entity=booking, action=create_block)", async ({ page, request }) => {
   await loginAsOwner(page);
   await page.goto(`/panel/complejos/${VENUE_ID}/agenda?fecha=${AUDIT_DATE}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
 
   const before = await countAuditRows(request, "create_block", "booking");
 

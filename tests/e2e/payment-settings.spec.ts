@@ -22,8 +22,7 @@ import {
   SUPABASE_ANON_KEY,
   getOwnerToken,
   nextWeekday,
-  slotParams,
-} from "./helpers";
+  slotParams, waitIdle } from "./helpers";
 
 process.loadEnvFile(path.join(__dirname, "../../.env.local"));
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -125,7 +124,7 @@ async function disconnectFakeMp(request: APIRequestContext) {
 
 async function openVenuePage(page: Page) {
   await page.goto(`/panel/complejos/${VENUE_ID}`);
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   await expect(page.getByRole("heading", { name: "Cobro de reservas" })).toBeVisible();
 }
 
@@ -364,7 +363,7 @@ test.describe("cobro con Mercado Pago conectado", () => {
       `${VENUE_PATH}/reservar?cancha=${COURT_ID}&fecha=${fecha}` +
       `&inicio=${encodeURIComponent(inicio)}&fin=${encodeURIComponent(fin)}`
     );
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
 
     await expect(page.getByRole("heading", { name: "Confirmar reserva" })).toBeVisible();
     await expect(page.getByRole("radio", { name: /pagar el total online/i })).toBeChecked();
@@ -376,7 +375,7 @@ test.describe("cobro con Mercado Pago conectado", () => {
     // Back to pay-at-venue: only that option, and the classic confirm button
     await writeSettings(request, PAY_AT_VENUE_ONLY);
     await page.reload();
-    await page.waitForLoadState("networkidle");
+    await waitIdle(page);
     await expect(page.getByRole("radio", { name: /pagar en el lugar/i })).toBeChecked();
     await expect(page.getByRole("radio", { name: /pagar el total online/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /confirmar reserva/i })).toBeVisible();

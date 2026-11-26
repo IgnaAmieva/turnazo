@@ -41,6 +41,8 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// Captcha y límites (S2) se prueban en security-s2.test.ts; acá no interfieren.
+vi.mock("@/lib/abuse", () => ({ checkBookingAbuse: async () => null, checkAuthAbuse: async () => null, allowReconcile: async () => true }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => anonClient,
 }));

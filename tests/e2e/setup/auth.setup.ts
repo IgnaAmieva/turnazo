@@ -4,14 +4,16 @@
  * inherit the storageState so each test starts already authenticated.
  */
 import { test as setup } from "@playwright/test";
-import { OWNER_EMAIL, OWNER_PASSWORD } from "../helpers";
+import { OWNER_EMAIL, OWNER_PASSWORD, clearTestRateLimits, waitIdle } from "../helpers";
 import path from "path";
 
 export const AUTH_FILE = path.join(__dirname, ".auth.json");
 
 setup("authenticate as owner", async ({ page }) => {
+  // Límites de S2: los tests reservan y entran muchas veces desde esta máquina
+  await clearTestRateLimits();
   await page.goto("/login");
-  await page.waitForLoadState("networkidle");
+  await waitIdle(page);
   await page.fill('[name="email"]', OWNER_EMAIL);
   await page.fill('[name="password"]', OWNER_PASSWORD);
   await page.getByRole("button", { name: /entrar/i }).click();

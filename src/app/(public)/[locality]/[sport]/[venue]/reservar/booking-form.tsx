@@ -8,6 +8,7 @@ import { NotMeButton } from '@/components/player-memory-ui';
 import { bookingError, bookingErrorFromMessage } from '@/lib/booking-errors';
 import { formatArgentinePhone } from '@/lib/phone';
 import type { PaymentOption } from '@/lib/payment-options';
+import { TurnstileSlot, useTurnstile } from '@/components/turnstile';
 
 export type { PaymentOption };
 
@@ -87,7 +88,12 @@ export default function BookingForm({ action, options, variant = 'page', onOther
     formRef.current?.requestSubmit();
   }, [selected]);
 
+  // Captcha (S2): token nuevo después de cada respuesta del servidor
+  const captcha = useTurnstile(formRef, state, 'reserva');
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    // Sin token todavía: espera y envía solo apenas llega
+    if (!captcha.guardSubmit(e)) return;
     const fd = new FormData(e.currentTarget);
     const nombre  = String(fd.get('customer_name') ?? '').trim();
     const celular = String(fd.get('customer_phone') ?? '').trim();
@@ -101,7 +107,9 @@ export default function BookingForm({ action, options, variant = 'page', onOther
 
   const confirmLabel = isPending
     ? (paysOnline ? 'Preparando el pago…' : 'Reservando…')
+    : captcha.waiting ? 'Verificando…'
     : (paysOnline ? 'Ir a pagar con Mercado Pago' : 'Confirmar reserva');
+  const busy = isPending || captcha.waiting;
 
   return (
     <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-5">
@@ -259,8 +267,8 @@ export default function BookingForm({ action, options, variant = 'page', onOther
           </div>
         )}
 
-        {/* Lugar reservado para el captcha (Turnstile, rama s2-captcha): se integra al mergear S2. */}
-        <div data-captcha-slot="" />
+        {/* Captcha (Turnstile, modo Managed): si Cloudflare no duda, no se ve nada */}
+        <TurnstileSlot boxRef={captcha.boxRef} status={captcha.status} retry={captcha.retry} />
 
         {kind === 'other_times' ? (
           onOtherTimes ? (
@@ -284,19 +292,19 @@ export default function BookingForm({ action, options, variant = 'page', onOther
           <>
             <button
               type="button"
-              disabled={isPending}
+              disabled={busy}
               onClick={() => { submitAfterSwitch.current = true; setSelected('venue'); }}
               className={BTN_PRIMARY}
             >
               Pagar en el lugar
             </button>
-            <button type="submit" disabled={isPending} className={BTN_SECONDARY}>
+            <button type="submit" disabled={busy} className={BTN_SECONDARY}>
               Reintentar el pago
             </button>
           </>
         ) : (
-          <button type="submit" disabled={isPending} className={BTN_PRIMARY}>
-            {kind === 'pay_at_venue_or_retry' ? (isPending ? confirmLabel : 'Reintentar el pago') : confirmLabel}
+          <button type="submit" disabled={busy} className={BTN_PRIMARY}>
+            {kind === 'pay_at_venue_or_retry' ? (busy ? confirmLabel : 'Reintentar el pago') : confirmLabel}
           </button>
         )}
 
