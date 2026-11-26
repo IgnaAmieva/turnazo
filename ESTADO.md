@@ -662,7 +662,22 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
   - `tests/e2e/admin.spec.ts` (9): acceso; lista y filtro; detalle; las cuatro acciones con `audit_log`, `notification_outbox`, WhatsApp y el panel del dueño; 44 px y AA en claro y oscuro; transiciones inválidas en la base. El login con contraseña se saltea si falta `E2E_SUPERADMIN_PASSWORD` (hoy no está en `.env.local`).
   - El superadmin entra en los tests con un link mágico de un solo uso (service_role) y la cookie la escribe el mismo `@supabase/ssr`: no necesita contraseña.
   - El complejo de prueba lo crea el dueño de prueba (sin canchas: nunca aparece en la web) y `afterAll` lo borra con su `audit_log` y su `notification_outbox`.
-## S2 anti-abuso integrado (rama `s2`, desde `main`, 2026-11-26; SIN mergear)
+## S2 anti-abuso integrado (rama `s2`, rebasada sobre `main` con superadmin, 2026-11-26; SIN mergear)
+
+**Estado:** rebasada sobre el `main` con superadmin.
+- Conflictos resueltos dejando las dos partes:
+  - `types.ts`: funciones de la 028 y `rate_limit_hit`.
+  - `tests/e2e/helpers.ts`: `superadminCookies`, `waitIdle` y `clearTestRateLimits`.
+  - `actions/auth.ts`: captcha y límite antes del login, y después redirección a `/admin` si es superadmin.
+  - CLAUDE.md y ESTADO.md.
+- `admin.spec` usa `waitIdle`, porque el login ahora tiene captcha.
+- Vitest 439 ✓ y E2E 192 ✓ en 8 tandas (1 salteado: login del superadmin con contraseña). Base limpia: 16 reservas, 0 contadores, complejos sin cambios.
+
+**No se mergea todavía.** Falta que Igna:
+- cargue `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` y `RATE_LIMIT_SECRET` también en Preview (hoy están solo en Production);
+- agregue `turnazo-git-s2-juan-ignacio-amieva-tardittis-projects.vercel.app` a los hostnames del widget en Cloudflare.
+
+Después: redeploy del Preview, reserva real con el captcha en el complejo de prueba y se borra.
 
 Reemplaza a la rama vieja `s2-captcha` (no se mergea: se rehízo encima del rediseño). La 022 ya estaba aplicada.
 - **Captcha Turnstile, modo Managed** (`components/turnstile.tsx`), en el lugar reservado `data-captcha-slot`:
