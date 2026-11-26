@@ -132,7 +132,7 @@ export async function createMpOrder(input: CreateMpOrderInput): Promise<CreateMp
     items: [
       {
         title:       input.title,
-        description: "Reserva de cancha en Turnazo",
+        description: "Reserva de cancha en Depoturnos",
         category_id: "services",
         unit_price:  amount,
         quantity:    1,

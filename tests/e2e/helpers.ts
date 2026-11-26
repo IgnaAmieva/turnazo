@@ -26,6 +26,13 @@ export function nextWeekday(targetDow: number, minDaysAhead = 1): string {
 }
 
 /**
+ * "Ahora" fijo para la lista y el inicio (?_now=, solo fuera de producción):
+ * un lunes futuro a las 09:00 de Mendoza. La lista muestra solo los complejos
+ * con lugar, así que sin esto un test corrido de noche no ve el complejo de prueba.
+ */
+export const MORNING_NOW = `${nextWeekday(1, 12)}T12:00:00.000Z`;
+
+/**
  * Build a slot URL param set for the booking form.
  * date: YYYY-MM-DD, timeHH: "10" for 10:00
  * Mendoza is UTC-3 year-round (no DST).

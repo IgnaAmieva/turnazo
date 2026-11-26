@@ -5,7 +5,7 @@
  * "2 canchas · turnos de 90 min". Al final se deja la cancha como estaba.
  */
 import { test, expect } from "@playwright/test";
-import { VENUE_ID, COURT_ID, VENUE_PATH, LOCALITY, SPORT, SUPABASE_URL, serviceHeaders, contrastOf } from "./helpers";
+import { VENUE_ID, COURT_ID, VENUE_PATH, LOCALITY, SPORT, SUPABASE_URL, serviceHeaders, contrastOf, MORNING_NOW } from "./helpers";
 
 const FEATURES = "surface,covered,lit,has_locker_room";
 let original: Record<string, unknown> = {};
@@ -28,7 +28,7 @@ test("sin etiquetas cargadas, la tarjeta y la portada dicen cuántas canchas y l
   await request.patch(`${SUPABASE_URL}/rest/v1/courts?venue_id=eq.${VENUE_ID}`, {
     headers: serviceHeaders(), data: { surface: null, covered: false, lit: false, has_locker_room: false },
   });
-  await page.goto(`/${LOCALITY}/${SPORT}`);
+  await page.goto(`/${LOCALITY}/${SPORT}?_now=${MORNING_NOW}`);
   const card = page.getByTestId("complejo").filter({ hasText: "Complejo Padelero Tunuyán" });
   await expect(card.getByTestId("etiquetas")).toHaveText(/^\d+ canchas? · turnos de 90 min$/);
   await page.goto(VENUE_PATH);
@@ -54,7 +54,7 @@ test("el dueño carga superficie e interruptores; la lista y la portada muestran
   await expect(page.getByLabel("Superficie")).toHaveValue("sintetico");
   await expect(page.getByRole("switch", { name: "Techada" })).toBeChecked();
 
-  await page.goto(`/${LOCALITY}/${SPORT}`);
+  await page.goto(`/${LOCALITY}/${SPORT}?_now=${MORNING_NOW}`);
   const card = page.getByTestId("complejo").filter({ hasText: "Complejo Padelero Tunuyán" });
   await expect(card.getByTestId("etiquetas")).toHaveText("Sintético · Techada · Iluminada");
   expect(await contrastOf(card.getByTestId("etiquetas"))).toBeGreaterThanOrEqual(4.5);

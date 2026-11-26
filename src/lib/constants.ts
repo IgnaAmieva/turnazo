@@ -1,4 +1,4 @@
-export const APP_NAME = "Turnazo";
+export const APP_NAME = "Depoturnos";
 
 export const APP_TIMEZONE = "America/Argentina/Mendoza";
 

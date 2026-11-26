@@ -624,6 +624,29 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
 - La acción de pago tendría que dejar de liberar el hold en los errores de MP y devolver su `cancel_token` (solo al cliente que lo creó) para pasarlo a `create_booking`; la orden de MP, si llegó a crearse, se cancela como en `cancelHoldAction`.
 - Grants: los mismos (solo service_role).
 
+## Marca: Turnazo → Depoturnos (rama `marca`, 2026-11-25; SIN mergear, la revisa el revisor)
+
+Material en `diseno/marca/` (no versionado). Cambiado todo lo visible; el código interno (variables, carpetas, repo, proyectos de Vercel y Supabase) NO.
+- `APP_NAME = "Depoturnos"` (títulos y metadatos de todas las páginas: `%s — Depoturnos`, `appleWebApp.title`).
+- Logo `components/brand-logo.tsx`: pin + "depo" (Outfit 500) + "turnos" (800), con las variables del tema: claro = pin verde lleno y texto verde; oscuro = pin de contorno lima (`--logo-pin-fill` transparente), "depo" crema y "turnos" lima. Por debajo de 360 px queda solo el pin (el nombre sigue para lectores de pantalla). En el encabezado público, el del panel (celular y escritorio), login y registro.
+- Íconos (del `icono-oscuro` del diseño): `public/icon-192.png` y `icon-512.png` (purpose any), `icon-maskable-192/512.png` (pin más chico, holgado en la zona segura del 80%), `src/app/apple-icon.png` (180), `src/app/icon.svg` y `src/app/favicon.ico` (16/32/48). Antes el manifest apuntaba a `icon-192/512.png` que no existían y el favicon era el de Next.
+- Manifest: name/short_name "Depoturnos", `theme_color` y `background_color` #0B3D2E.
+- Notificaciones push (título por defecto, service worker), descripción del pago en Mercado Pago ("Reserva de cancha en Depoturnos"), historias (marca nueva abajo a la derecha), guía para instalar en iPhone, PRODID del .ics.
+- Sin cambios porque no hay: términos (no hay página), mails propios (la app no manda mails; los de Supabase Auth están en su panel, ver abajo), páginas de error (no nombran la marca), mensajes de WhatsApp (no la nombran).
+- Tests: Vitest 402 ✓ y E2E 174 ✓ en 8 tandas (2026-11-25). Cuatro tests abrían la lista sin `?_now=` y de noche (sin turnos libres hoy) no veían el complejo de prueba: ahora usan `MORNING_NOW` (helpers). `tests/e2e/marca.spec.ts` (logo, pesos y colores AA en claro y oscuro, solo pin a 320 px, manifest, íconos, favicon, apple-touch-icon, y que ninguna pantalla pública ni del panel muestre "Turnazo").
+
+Queda "turnazo" a propósito (interno, no se ve):
+- Claves de localStorage `turnazo-theme`, `turnazo-jugador`, `turnazo-agenda-cancha:*`, `turnazo_pwa_guide_dismissed` y eventos `turnazo-guardado` / `turnazo-agenda-cancha`: cambiarlas borraría lo que cada celular ya recuerda.
+- `tag` de las notificaciones (`turnazo-notification`), UID del .ics (`{id}@turnazo`: cambiarlo duplicaría los eventos ya agregados al calendario), nombres de los cron (`turnazo-push-send`, `turnazo-refund-retry`), `package.json`, comentario de `globals.css`, migraciones viejas, docs (CLAUDE.md, ESTADO.md, SPEC.md), `.env.example` y el usuario de prueba `dueno@turnazo.test`.
+
+Pendiente para cuando esté **depoturnos.com.ar** (depende del dominio; no se tocó):
+- Vercel: agregar el dominio; `NEXT_PUBLIC_APP_URL` (Production; arma las URLs de vuelta del pago en `actions/payment.ts`) → `https://depoturnos.com.ar`; `MP_REDIRECT_URI` → `https://depoturnos.com.ar/api/mp/oauth/callback` (y registrarla en la app de Mercado Pago).
+- Mercado Pago: nombre de la aplicación (lo ven los dueños al conectar la cuenta) y la URL del webhook, que se carga en el panel de MP (Orders no lleva `notification_url` por orden).
+- Supabase Auth: Site URL y Redirect URLs; plantillas de mail (asunto/remitente si dicen Turnazo) y remitente SMTP.
+- Vault: `refund_retry_url` y `push_send_url` (hoy `turnazo-chi.vercel.app`).
+- `VAPID_SUBJECT` (`mailto:admin@turnazo.app`) → un mail del dominio nuevo.
+- El link de las historias y de Mi turno usa el host del pedido: con el dominio nuevo sale solo.
+
 ## Merge de `rediseno` a `main` — HECHO (2026-11-25)
 
 - Merge `74a1c18` (sin squash), deploy de producción `dpl_GMm5pk9qm8F8KQJmX8dwkEoRCNwm` en READY, región **cle1**, alias `turnazo-chi.vercel.app`. Sin errores de runtime en los 15 minutos siguientes.

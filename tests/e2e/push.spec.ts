@@ -130,12 +130,12 @@ test("iPhone install guide appears on iOS Safari (not standalone)", async ({ bro
   await page.goto("/panel/complejos");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByText(/instalá turnazo en tu iphone/i)).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByText(/instalá depoturnos en tu iphone/i)).toBeVisible({ timeout: 8_000 });
   await expect(page.getByText(/agregar a pantalla de inicio/i)).toBeVisible();
 
   // Dismiss
   await page.getByRole("button", { name: /entendido/i }).click();
-  await expect(page.getByText(/instalá turnazo en tu iphone/i)).not.toBeVisible();
+  await expect(page.getByText(/instalá depoturnos en tu iphone/i)).not.toBeVisible();
 
   await context.close();
 });
@@ -160,7 +160,7 @@ test("iPhone install guide stays hidden after being dismissed", async ({ browser
   await page.goto("/panel/complejos");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByText(/instalá turnazo en tu iphone/i)).not.toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/instalá depoturnos en tu iphone/i)).not.toBeVisible({ timeout: 5_000 });
 
   await context.close();
 });

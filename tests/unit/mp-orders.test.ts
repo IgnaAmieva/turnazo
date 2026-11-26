@@ -74,7 +74,7 @@ describe("createMpOrder", () => {
       payer: { email: "jugador@test.com", first_name: "Juan", last_name: "García Pérez" },
       items: [{
         title: "Seña de turno", unit_price: "2500.00", quantity: 1,
-        description: "Reserva de cancha en Turnazo", category_id: "services",
+        description: "Reserva de cancha en Depoturnos", category_id: "services",
       }],
       config: {
         online: {

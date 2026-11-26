@@ -128,7 +128,7 @@ tests/
 
 > **Fase por fase, con tests, sin dar nada por probado si no se cargó en un navegador real.**
 
-- Antes de cerrar una fase: `pnpm test` (Vitest, 402 tests) + `pnpm test:e2e --workers=1` (Playwright, 167 tests con el setup) deben pasar todos. Si la corrida entera se corta por memoria, correr por tandas chicas de 3 a 5 archivos (8 tandas). Nunca contra la URL publicada.
+- Antes de cerrar una fase: `pnpm test` (Vitest, 402 tests) + `pnpm test:e2e --workers=1` (Playwright, 174 tests con el setup) deben pasar todos. Si la corrida entera se corta por memoria, correr por tandas chicas de 3 a 5 archivos (8 tandas). Nunca contra la URL publicada.
 - No avanzar a la siguiente fase hasta tener verde en ambos.
 - No crear helpers, abstracciones ni features que no pida la spec.
 - Los cambios de esquema van en migraciones numeradas (`028_...sql`) en archivo. **Claude no aplica migraciones ni corre SQL que modifique datos**: las aplica el revisor; el código que las usa se escribe después de aplicadas.

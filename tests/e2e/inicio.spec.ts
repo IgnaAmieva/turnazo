@@ -162,7 +162,7 @@ test("las URLs de antes siguen funcionando", async ({ page }) => {
   await page.goto("/tunuyan");
   await expect(page).toHaveURL(/\/\?localidad=tunuyan/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("¿Jugamos hoy?");
-  await page.goto("/tunuyan/padel");
+  await page.goto(`/tunuyan/padel?_now=${NOW}`);
   await expect(page.getByText("Complejo Padelero Tunuyán").first()).toBeVisible();
 });
 
