@@ -42,8 +42,10 @@ export async function loginAction(
 
   if (error) return { error: 'Email o contraseña incorrectos.' };
 
+  // El superadmin entra a su panel (la base decide el rol)
+  const { data: admin } = await supabase.rpc('is_superadmin');
   revalidatePath('/panel', 'layout');
-  redirect('/panel');
+  redirect(admin === true ? '/admin' : '/panel');
 }
 
 export async function registerAction(

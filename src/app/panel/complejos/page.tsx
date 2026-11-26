@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getOwnerVenues } from "@/lib/supabase/panel-queries";
+import { venueStatus } from "@/lib/venue-status";
 
-const STATUS_LABEL: Record<string, { label: string; className: string }> = {
-  pending:   { label: "Pendiente",  className: "bg-warning-soft text-warning ring-warning/40" },
-  approved:  { label: "Aprobado",   className: "bg-accent  text-on-accent  ring-transparent"  },
-  suspended: { label: "Suspendido", className: "bg-danger-soft    text-danger    ring-danger/40"    },
+/** Qué significa cada estado para el dueño (el motivo lo escribe el superadmin). */
+const STATUS_HELP: Record<string, string> = {
+  pending:   "Lo estamos revisando. Cuando lo aprobemos te avisamos y aparece en la web.",
+  rejected:  "No lo pudimos aprobar. Corregí lo que dice el motivo y escribinos.",
+  suspended: "Está suspendido: no aparece en la web y no se puede reservar.",
 };
 
 export default async function ComplejosPage() {
@@ -35,20 +37,28 @@ export default async function ComplejosPage() {
       ) : (
         <div className="space-y-3">
           {venues.map((v) => {
-            const st = STATUS_LABEL[v.status] ?? STATUS_LABEL.pending;
+            const st = venueStatus(v.status);
+            const help = STATUS_HELP[v.status];
             return (
-              <div key={v.id} className="bg-surface rounded-2xl border border-line px-5 py-4 flex items-center gap-4">
+              // Celular: nombre y estado arriba, el texto a lo ancho y los botones abajo
+              <div key={v.id} data-testid="mi-complejo" className="bg-surface rounded-2xl border border-line px-5 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-ink truncate">{v.name}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium text-ink truncate">{v.name}</p>
+                    <span data-testid="estado" className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${st.className}`}>
+                      {st.label}
+                    </span>
+                  </div>
                   <p className="text-sm text-ink-muted truncate">{v.address} · {v.locality_name}</p>
+                  {help && <p className="mt-1 text-sm text-ink">{help}</p>}
+                  {v.status_reason && (v.status === "rejected" || v.status === "suspended") && (
+                    <p className="mt-1 text-sm text-ink" data-testid="motivo">Motivo: {v.status_reason}</p>
+                  )}
                 </div>
-                <span className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${st.className}`}>
-                  {st.label}
-                </span>
                 <div className="shrink-0 flex gap-2">
                   <Link
                     href={`/panel/complejos/${v.id}/canchas`}
-                    className="text-sm text-ink-muted hover:text-ink border border-line rounded-lg px-3 py-1.5"
+                    className="text-sm text-ink hover:text-ink border border-line rounded-lg px-3 min-h-11 inline-flex items-center"
                   >
                     Canchas
                   </Link>

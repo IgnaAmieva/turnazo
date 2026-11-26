@@ -105,6 +105,21 @@ export function buildPushPayload(type: string, payload: Record<string, unknown>)
         url: "/panel/agenda",
         tag: `pay-${payload.booking_id}`,
       };
+    // Superadmin (028, superadmin_set_venue_status): al aprobar o rechazar el complejo
+    case "venue_approved":
+      return {
+        title: "Tu complejo fue aprobado",
+        body:  `${payload.venue_name ?? "Tu complejo"} ya está publicado: los jugadores pueden encontrarlo y reservar.`,
+        url:   "/panel/complejos",
+        tag:   `venue-status-${payload.venue_name ?? ""}`,
+      };
+    case "venue_rejected":
+      return {
+        title: "Tu complejo no fue aprobado",
+        body:  `${payload.venue_name ?? "Tu complejo"}: ${payload.reason ?? "revisá los datos y escribinos"}`,
+        url:   "/panel/complejos",
+        tag:   `venue-status-${payload.venue_name ?? ""}`,
+      };
     default:
       return {
         title: "Depoturnos",

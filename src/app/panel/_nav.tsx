@@ -18,9 +18,11 @@ const NAV_ITEMS = [
  * Escritorio: barra lateral fija. Celular: barra arriba con "Menú", que abre
  * el mismo contenido como un panel desplegable (la agenda usa todo el ancho).
  */
-export default function PanelNav({ email }: { email: string }) {
+export default function PanelNav({ email, isSuperadmin = false }: { email: string; isSuperadmin?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // El rol lo decide el servidor (is_superadmin); esto solo muestra el link
+  const items = isSuperadmin ? [...NAV_ITEMS, { href: '/admin', label: 'Superadmin' }] : NAV_ITEMS;
 
   return (
     <>
@@ -58,7 +60,7 @@ export default function PanelNav({ email }: { email: string }) {
         </div>
 
         <nav className="flex-1 px-3 py-3 space-y-1">
-          {NAV_ITEMS.map(({ href, label }) => {
+          {items.map(({ href, label }) => {
             // La agenda de un complejo vive en /panel/complejos/[id]/agenda
             const inAgenda = pathname.startsWith('/panel/agenda') || /\/agenda(\/|$)/.test(pathname);
             const active = href === '/panel/agenda' ? inAgenda : pathname.startsWith(href) && !inAgenda;
