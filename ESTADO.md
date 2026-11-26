@@ -624,7 +624,14 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
 - La acción de pago tendría que dejar de liberar el hold en los errores de MP y devolver su `cancel_token` (solo al cliente que lo creó) para pasarlo a `create_booking`; la orden de MP, si llegó a crearse, se cancela como en `cancelHoldAction`.
 - Grants: los mismos (solo service_role).
 
-## Marca: Turnazo → Depoturnos (rama `marca`, 2026-11-25; SIN mergear, la revisa el revisor)
+## Merge de `marca` a `main` — HECHO (2026-11-26)
+
+- Merge `cf8d2da` (sin squash; incluye "de noche pasa a mañana"). Deploy de producción `dpl_Chb2pWFm6JqKvPZQ9wn9AAiXJ9Pz` en READY, región cle1, alias `turnazo-chi.vercel.app`. Sin errores de runtime en los 30 minutos siguientes.
+- Prueba de humo de solo lectura (GET, mediana de 5): inicio 661 ms, lista 476 ms, complejo 448 ms, login 84 ms. Todas 200 y con "— Depoturnos" en el título y el logo nuevo; ningún "turnazo" en el texto visible; el inicio y la lista muestran el título del día ("Hoy, jueves 26").
+- Manifest: Depoturnos / Depoturnos / #0B3D2E, con los 4 íconos (192 y 512 any, 192 y 512 maskable) en 200 image/png. `/icon.svg`, `/apple-icon.png`, `/favicon.ico` y `sw.js` (dice Depoturnos) también en 200.
+- Dominio `depoturnos.com.ar`: comprado. El paso a paso está más abajo, en "Pendiente para cuando esté depoturnos.com.ar".
+
+## Marca: Turnazo → Depoturnos (rama `marca`, 2026-11-25; aprobada y mergeada el 2026-11-26)
 
 Material en `diseno/marca/` (no versionado). Cambiado todo lo visible; el código interno (variables, carpetas, repo, proyectos de Vercel y Supabase) NO.
 - `APP_NAME = "Depoturnos"` (títulos y metadatos de todas las páginas: `%s — Depoturnos`, `appleWebApp.title`).
