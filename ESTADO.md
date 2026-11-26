@@ -624,7 +624,18 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
 - La acción de pago tendría que dejar de liberar el hold en los errores de MP y devolver su `cancel_token` (solo al cliente que lo creó) para pasarlo a `create_booking`; la orden de MP, si llegó a crearse, se cancela como en `cancelHoldAction`.
 - Grants: los mismos (solo service_role).
 
-## Panel de superadmin (rama `superadmin`, 2026-11-26; SIN mergear)
+## Merge de `superadmin` a `main` — HECHO (2026-11-26)
+
+- Merge `f7eaa52` (sin squash). Deploy de producción `dpl_G1CdguyjaV5L9XYcyTcBuMYYjXzq` en READY, cle1, alias `turnazo-chi.vercel.app`. Sin errores de runtime en los 30 minutos siguientes.
+- Prueba de humo de solo lectura (GET, mediana de 5; sin cambiar el estado de ningún complejo):
+  - `/admin` y `/admin/complejos/{id}` sin sesión → 307 a `/login` (91 y 82 ms).
+  - Con la sesión del dueño de prueba → 404 (781 y 743 ms). Su panel sigue en 200 sin el link "Superadmin".
+  - La base le niega `superadmin_summary` y `superadmin_venues` al dueño (42501).
+  - Complejos sin cambios: Complejo Padelero Tunuyán y futmates aprobados, 0 filas `venue_*` en `audit_log`.
+- Pendiente: `E2E_SUPERADMIN_PASSWORD` todavía no está en `.env.local` (el archivo no cambió desde las 11:48). El test de login con contraseña se saltea hasta que esté.
+- Orden decidido por el revisor: primero `superadmin` (hecho), después `s2` (rebasado sobre este `main`, espera las variables de Turnstile en Preview y el hostname del Preview en Cloudflare para probarlo con el captcha real).
+
+## Panel de superadmin (rama `superadmin`, 2026-11-26; mergeado el 2026-11-26)
 
 - **Migración 028:** aplicada por el revisor tal cual el archivo. Rechazado es el cuarto estado (aprobado por el revisor). Hay dos superadmins: `superadmin@turnazo.test` y el de Igna. padelmates fue borrado; quedan futmates y el complejo de prueba.
 - **Acceso:**
