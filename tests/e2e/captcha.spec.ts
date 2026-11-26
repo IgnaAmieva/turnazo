@@ -92,6 +92,21 @@ test("si el widget no carga: aviso con 'Reintentar' (44 px, AA), Confirmar no se
   await page.waitForURL(/\/turnos\//, { timeout: 25_000 });
 });
 
+test("si Cloudflare carga pero no puede verificar (navegador sospechoso): mensaje distinto, con Reintentar", async ({ page }) => {
+  // Widget simulado que carga y falla al verificar (como le pasa a un navegador automatizado)
+  await page.addInitScript(() => {
+    (window as unknown as { turnstile: unknown }).turnstile = {
+      render: (_el: HTMLElement, opts: { "error-callback"?: () => void }) => { setTimeout(() => opts["error-callback"]?.(), 50); return "w1"; },
+      reset: () => {}, remove: () => {},
+    };
+  });
+  await page.goto(reservarUrl(17)); // no se reserva nada
+  const err = page.getByTestId("captcha-error");
+  await expect(err).toContainText("No pudimos verificar que no seas un robot. Tocá Reintentar.");
+  await expect(err).not.toContainText("Revisá tu conexión");
+  expect((await page.getByTestId("captcha-reintentar").boundingBox())!.height).toBeGreaterThanOrEqual(44);
+});
+
 test("login y registro tienen captcha; sin token no se entra", async ({ page }) => {
   await page.goto("/registro");
   await expect(page.locator("form [data-captcha-slot]")).toHaveCount(1);

@@ -268,7 +268,7 @@ export default function BookingForm({ action, options, variant = 'page', onOther
         )}
 
         {/* Captcha (Turnstile, modo Managed): si Cloudflare no duda, no se ve nada */}
-        <TurnstileSlot boxRef={captcha.boxRef} status={captcha.status} retry={captcha.retry} />
+        <TurnstileSlot boxRef={captcha.boxRef} status={captcha.status} errorKind={captcha.errorKind} retry={captcha.retry} />
 
         {kind === 'other_times' ? (
           onOtherTimes ? (

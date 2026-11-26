@@ -62,6 +62,8 @@ export function useTurnstile(formRef: RefObject<HTMLFormElement | null>, resetKe
   const [status, setStatus] = useState<CaptchaStatus>(SITE_KEY ? 'loading' : 'error');
   const [waiting, setWaiting] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // 'load': no cargó el script (red); 'verify': cargó pero Cloudflare no pudo verificar
+  const [errorKind, setErrorKind] = useState<'load' | 'verify'>('load');
 
   const stopWaiting = useCallback(() => {
     waitingRef.current = false;
@@ -74,8 +76,9 @@ export function useTurnstile(formRef: RefObject<HTMLFormElement | null>, resetKe
   useEffect(() => {
     if (!SITE_KEY) return;
     let cancelled = false;
-    const fail = () => {
+    const fail = (kind: 'load' | 'verify') => {
       tokenRef.current = null;
+      setErrorKind(kind);
       setStatus('error');
       if (waitingRef.current) stopWaiting();
     };
@@ -100,9 +103,9 @@ export function useTurnstile(formRef: RefObject<HTMLFormElement | null>, resetKe
         },
         'expired-callback': () => { tokenRef.current = null; setStatus('loading'); },
         'timeout-callback': () => { tokenRef.current = null; setStatus('loading'); },
-        'error-callback': () => { fail(); return true; },
+        'error-callback': () => { fail('verify'); return true; },
       });
-    }).catch(() => { if (!cancelled) fail(); });
+    }).catch(() => { if (!cancelled) fail('load'); });
     return () => {
       cancelled = true;
       if (widgetId.current) window.turnstile?.remove(widgetId.current);
@@ -137,18 +140,20 @@ export function useTurnstile(formRef: RefObject<HTMLFormElement | null>, resetKe
     return false;
   }, [status, retry, stopWaiting]);
 
-  return { boxRef, status, waiting, retry, guardSubmit };
+  return { boxRef, status, errorKind, waiting, retry, guardSubmit };
 }
 
 /** Lugar del widget (data-captcha-slot) y aviso si falló. */
-export function TurnstileSlot({ boxRef, status, retry }: Pick<ReturnType<typeof useTurnstile>, 'boxRef' | 'status' | 'retry'>) {
+export function TurnstileSlot({ boxRef, status, errorKind = 'load', retry }: Pick<ReturnType<typeof useTurnstile>, 'boxRef' | 'status' | 'retry'> & { errorKind?: 'load' | 'verify' }) {
   return (
     <div data-captcha-slot="" data-captcha-status={status}>
       <div ref={boxRef} className="flex justify-center empty:hidden" />
       {status === 'error' && (
         <div role="alert" data-testid="captcha-error"
           className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface-2 px-4 py-2 text-sm text-ink">
-          <span>No pudimos cargar la verificación anti-robots. Revisá tu conexión.</span>
+          <span>{errorKind === 'verify'
+            ? 'No pudimos verificar que no seas un robot. Tocá Reintentar.'
+            : 'No pudimos cargar la verificación anti-robots. Revisá tu conexión.'}</span>
           <button type="button" onClick={retry} data-testid="captcha-reintentar"
             className="inline-flex min-h-11 items-center rounded-full border border-line bg-surface px-4 text-sm font-extrabold text-ink hover:bg-surface-2">
             Reintentar

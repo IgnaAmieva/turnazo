@@ -679,6 +679,16 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
 
 Después: redeploy del Preview, reserva real con el captcha en el complejo de prueba y se borra.
 
+**Prueba en el Preview con el captcha real (2026-11-26):**
+- **Configuración:** las 3 variables ya están en Preview y el hostname del Preview está en Cloudflare. Redeploy `dpl_sq2zbirbZt8QmHboQ4FYWgKYiDuw` en READY.
+- **Resultado con Chromium headless:**
+  - El widget real carga en el Preview, así que la clave del sitio y el hostname están bien.
+  - Cloudflare desconfió del navegador automatizado y mostró la casilla ("Verifique que es un ser humano"); al tocarla, rechazó la verificación. Es lo que tiene que hacer con un bot.
+  - No se intentó engañarlo (eso sería saltear el captcha propio). No se reservó nada: 16 reservas, 0 de prueba, 0 contadores.
+- **Falta:** la reserva real la tiene que hacer una persona desde su navegador (Igna o el revisor), con nombre "E2E Preview Captcha". Después se borra por nombre.
+- **Mejora que salió de la prueba:** el aviso ahora distingue si el widget no cargó ("Revisá tu conexión") o si cargó pero Cloudflare no pudo verificar ("No pudimos verificar que no seas un robot. Tocá Reintentar."). Tiene un test E2E nuevo con un widget simulado.
+- `errores.spec` (teléfono bloqueado) falló una vez en una tanda y no se repitió: pasó solo y en la misma tanda repetida (23/23).
+
 Reemplaza a la rama vieja `s2-captcha` (no se mergea: se rehízo encima del rediseño). La 022 ya estaba aplicada.
 - **Captcha Turnstile, modo Managed** (`components/turnstile.tsx`), en el lugar reservado `data-captcha-slot`:
   - Va en el formulario de reserva (es el mismo en la hoja y en `/reservar`), en el login y en el registro.

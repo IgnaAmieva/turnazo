@@ -35,7 +35,7 @@ export default function LoginForm() {
         {state.fieldErrors?.password && <p className="mt-1 text-xs text-danger">{state.fieldErrors.password[0]}</p>}
       </div>
 
-      <TurnstileSlot boxRef={captcha.boxRef} status={captcha.status} retry={captcha.retry} />
+      <TurnstileSlot boxRef={captcha.boxRef} status={captcha.status} errorKind={captcha.errorKind} retry={captcha.retry} />
 
       <button type="submit" disabled={busy}
         className="w-full min-h-11 rounded-xl bg-primary py-2.5 text-sm font-semibold text-on-primary shadow-sm
