@@ -636,17 +636,27 @@ Pedidos por Igna después de probar la app. Un commit por punto:
    - Gris claro, calles blancas, avenida amarilla, plaza verde, agua celeste y pin rojo; versión oscura del mismo estilo (tokens `--map-*`).
    - Abajo, "Ver en el mapa ↗︎" (flecha en presentación de texto). Sigue siendo SVG sin pedidos externos y abre Google Maps con la ubicación real.
 4. **Logo redondo del club** en la tarjeta y en "Lo antes posible" (`e6d6f70`). Sin logo, las iniciales (invertidas sobre el lima). El mapa sigue de 76 px.
-5. **Foto de portada:** migración `029_venue_cover.sql` escrita y SIN aplicar (`7a164fe`): `venues.cover_path` con CHECK igual a `logo_path` y grants por columna. Reusa el bucket `venue-logos` (512 KB alcanza: la foto se deja por debajo de 500 KB). El código va cuando esté aplicada.
+5. **Foto de portada** (029 aplicada por el revisor; código en `61d6316`):
+   - Panel: "Foto de portada", hasta 10 MB; el servidor la deja en 1600 px como máximo y < 500 KB con sharp, mismo formato, validando los primeros bytes. Subida y borrado genéricos con el logo, en `venue-logos/{venue_id}/cover-…`.
+   - Página del complejo: la foto ocupa la portada con un degradado oscuro abajo y el nombre en blanco (AA). Sin foto, la portada verde con líneas.
+   - Test `portada.spec` (3).
 6. **Líneas de la cancha en oscuro** (`1eba07b`): `#F6F3EA` al 13% en las portadas (`.court-lines`) y en la historia pizarra (antes verde `#14523F`). En claro, igual.
 
-**Tests:**
+**Corrección:** `f152c77` arregla el punto 6 en la historia. El cambio de firma de `FieldLines` no se había aplicado (finales de línea CRLF) y la pizarra dibujaba las líneas crema al 100%; ahora van al 13%.
+
+**Punto 2 del revisor (logo en la tarjeta):** la captura de antes era del punto 3, sacada antes de hacer el punto 4. En la captura nueva se ven el logo o las iniciales al lado del nombre.
+
+**Tests (2026-11-27):**
 - Vitest 412 ✓.
-- E2E de los specs tocados en verde: inicio, lista, noche, formato, logo, complejo, rediseño, historias y theme.
-- Corrida en tandas cortada por falta de memoria de la máquina (2026-11-27), no por los tests:
-  - Las tandas 1–6 terminaron: 151 pasaron y 1 falló (`audit.spec` › mark no-show, sin relación aparente con estos cambios; hay que volver a correrlo).
-  - Las tandas 7 (settings, tactil, theme, admin) y 8 (inicio, lista, noche) no terminaron.
-- Limpieza después del corte: `settings.spec` había dejado bloqueado `2615009001` y la plantilla de prueba. Se restauró lo mismo que hace su `afterAll`.
-- La reserva 17, "Juan ignacio Amieva" (26/11 18:38, complejo de prueba), no es de los tests: parece la prueba real de Igna en el Preview de s2 y no se tocó.
+- E2E 193 ✓ (con el setup) en 12 tandas chicas de 2 o 3 archivos, cada tanda en primer plano para que el corte por memoria no se lleve la corrida entera.
+- `audit.spec` › mark no-show pasó: la falla anterior no se repitió.
+- Base limpia: 17 reservas (incluye la de Igna), 0 de prueba, bucket vacío, plantilla del seed.
+- Después del corte por memoria de la corrida anterior se restauró lo que había dejado `settings.spec` (teléfono `2615009001` y la plantilla).
+- Un aviso de React en la salida del servidor sobre "/" apareció una vez durante las capturas. Revisado en el navegador: inicio de fútbol, de pádel y lista con hora, sin errores ni avisos en consola. No se repitió.
+
+**Capturas** en `scratchpad/capturas-d1/`:
+- `ajustes-inicio-futbol-{light,dark}.png`, `ajustes-lista-1830-{light,dark}.png`, `ajustes-tarjeta-{light,dark}.png`.
+- `ajustes-portada-sin-foto-{light,dark}.png`, `ajustes-portada-con-foto-{light,dark}.png`, `ajustes-historia-pizarra.png`.
 
 ## Merge de `superadmin` a `main` — HECHO (2026-11-26)
 
