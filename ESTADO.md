@@ -624,6 +624,30 @@ Para que sea atómico cambiaría `create_booking` (migración nueva, misma firma
 - La acción de pago tendría que dejar de liberar el hold en los errores de MP y devolver su `cancel_token` (solo al cliente que lo creó) para pasarlo a `create_booking`; la orden de MP, si llegó a crearse, se cancela como en `cancelHoldAction`.
 - Grants: los mismos (solo service_role).
 
+## Ajustes de la reserva (rama `ajustes-reserva`, 2026-11-27; SIN mergear)
+
+Pedidos por Igna después de probar la app. Un commit por punto:
+1. **"Tipo de cancha"** (`fa9a2b0`): desplegable con "Todos" por defecto en lugar de los chips de formato. Usa `FilterSelect`, que funciona sin JavaScript (formulario GET); 44 px y AA.
+2. **"¿A qué hora querés jugar?" con horarios reales** (`e27b53d`):
+   - Desplegable con "Cualquier hora" y solo los horarios de inicio que existen libres ese día en esa localidad y deporte (`?hora=HH:MM`; con turnos de 90 min: 18:30, 20:00, 21:30…).
+   - Al elegir uno quedan solo los complejos con un turno libre que empieza a esa hora, con ese turno primero.
+   - Las franjas `?franja=` viejas se ignoran. "Lo antes posible" no cambia.
+3. **Mapa chiquito con look de mapa** (`b55a403`):
+   - Gris claro, calles blancas, avenida amarilla, plaza verde, agua celeste y pin rojo; versión oscura del mismo estilo (tokens `--map-*`).
+   - Abajo, "Ver en el mapa ↗︎" (flecha en presentación de texto). Sigue siendo SVG sin pedidos externos y abre Google Maps con la ubicación real.
+4. **Logo redondo del club** en la tarjeta y en "Lo antes posible" (`e6d6f70`). Sin logo, las iniciales (invertidas sobre el lima). El mapa sigue de 76 px.
+5. **Foto de portada:** migración `029_venue_cover.sql` escrita y SIN aplicar (`7a164fe`): `venues.cover_path` con CHECK igual a `logo_path` y grants por columna. Reusa el bucket `venue-logos` (512 KB alcanza: la foto se deja por debajo de 500 KB). El código va cuando esté aplicada.
+6. **Líneas de la cancha en oscuro** (`1eba07b`): `#F6F3EA` al 13% en las portadas (`.court-lines`) y en la historia pizarra (antes verde `#14523F`). En claro, igual.
+
+**Tests:**
+- Vitest 412 ✓.
+- E2E de los specs tocados en verde: inicio, lista, noche, formato, logo, complejo, rediseño, historias y theme.
+- Corrida en tandas cortada por falta de memoria de la máquina (2026-11-27), no por los tests:
+  - Las tandas 1–6 terminaron: 151 pasaron y 1 falló (`audit.spec` › mark no-show, sin relación aparente con estos cambios; hay que volver a correrlo).
+  - Las tandas 7 (settings, tactil, theme, admin) y 8 (inicio, lista, noche) no terminaron.
+- Limpieza después del corte: `settings.spec` había dejado bloqueado `2615009001` y la plantilla de prueba. Se restauró lo mismo que hace su `afterAll`.
+- La reserva 17, "Juan ignacio Amieva" (26/11 18:38, complejo de prueba), no es de los tests: parece la prueba real de Igna en el Preview de s2 y no se tocó.
+
 ## Merge de `superadmin` a `main` — HECHO (2026-11-26)
 
 - Merge `f7eaa52` (sin squash). Deploy de producción `dpl_G1CdguyjaV5L9XYcyTcBuMYYjXzq` en READY, cle1, alias `turnazo-chi.vercel.app`. Sin errores de runtime en los 30 minutos siguientes.
