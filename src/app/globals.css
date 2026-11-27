@@ -34,6 +34,15 @@
   --ring: #0B3D2E;
   /* Pin de la marca: lleno en claro, solo contorno en oscuro (diseno/marca) */
   --logo-pin-fill: #0B3D2E;
+  /* Mapa chiquito con look de mapa (mini-map.tsx): gris claro, calles blancas, avenida amarilla */
+  --map-land: #E8EAED;
+  --map-road: #FFFFFF;
+  --map-avenue: #FFE38A;
+  --map-avenue-edge: #F2C94C;
+  --map-park: #C5E4C1;
+  --map-water: #A8D8F8;
+  --map-pin: #EA4335;
+  --map-pin-edge: #A50E0E;
 }
 
 [data-theme="dark"] {
@@ -55,6 +64,15 @@
   --warning-soft: #3B3214;
   --ring: #D4F34A;
   --logo-pin-fill: #00000000; /* transparente: solo el contorno */
+  /* Mapa chiquito: la versión oscura del mismo estilo */
+  --map-land: #242F3E;
+  --map-road: #3C4656;
+  --map-avenue: #8A6D3B;
+  --map-avenue-edge: #6B5428;
+  --map-park: #2E4A3F;
+  --map-water: #17324E;
+  --map-pin: #EA4335;
+  --map-pin-edge: #A50E0E;
 }
 
 /* Sin JavaScript: seguir al celular. (Con JS el script ya puso data-theme.) */
@@ -78,6 +96,15 @@
     --warning-soft: #3B3214;
     --ring: #D4F34A;
     --logo-pin-fill: #00000000; /* transparente: solo el contorno */
+    /* Mapa chiquito: la versión oscura del mismo estilo */
+    --map-land: #242F3E;
+    --map-road: #3C4656;
+    --map-avenue: #8A6D3B;
+    --map-avenue-edge: #6B5428;
+    --map-park: #2E4A3F;
+    --map-water: #17324E;
+    --map-pin: #EA4335;
+    --map-pin-edge: #A50E0E;
   }
 }
 
