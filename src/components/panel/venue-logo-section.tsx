@@ -16,7 +16,7 @@ const CANT_PREPARE = "No pudimos preparar esta imagen. Probá con una más livia
  * achicado de verdad (1024 px, < 512 KB) lo hace el servidor. null si el
  * navegador no puede (por ejemplo, no sabe guardar WebP).
  */
-async function fitForUpload(file: File): Promise<File | null> {
+export async function fitForUpload(file: File): Promise<File | null> {
   if (file.size <= LOGO_SEND_MAX_BYTES) return file;
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return null;
   try {

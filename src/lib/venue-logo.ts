@@ -16,6 +16,9 @@ export const LOGO_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 export const LOGO_SEND_MAX_BYTES = 4 * 1024 * 1024;
 /** Lado más largo del logo guardado. */
 export const LOGO_MAX_SIDE = 1024;
+/** Foto de portada (029, mismo bucket, '{venue_id}/cover-…'): 1600 px y menos de 500 KB. */
+export const COVER_MAX_SIDE = 1600;
+export const COVER_MAX_BYTES = 500 * 1024;
 
 export type LogoType = { mime: 'image/png' | 'image/jpeg' | 'image/webp'; ext: 'png' | 'jpg' | 'webp' };
 

@@ -21,6 +21,7 @@ import { ScrollIntoViewOnMount } from "@/components/scroll-into-view";
 import { venueTagsLine } from "@/lib/court-tags";
 import { formatLabel, venueFormats } from "@/lib/court-format";
 import { ClubLogo } from "@/components/club-logo";
+import { venueLogoUrl } from "@/lib/venue-logo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Breadcrumbs from "@/components/breadcrumbs";
@@ -117,6 +118,7 @@ export default async function VenuePage({ params, searchParams }: Props) {
   const activeCourt =
     venue.courts.find((ct) => ct.id === (initialSlot?.courtId ?? c)) ?? venue.courts[0];
 
+  const coverUrl = venueLogoUrl(venue.cover_path);
   const minutes = [...new Set(venue.courts.map((ct) => ct.slot_minutes))].sort((a, b) => a - b);
   // Etiquetas (023): "Pádel · Sintético · Techada", o "Pádel · 2 canchas · turnos de 90 min" si no hay nada cargado
   // Fútbol con formato (027): "Fútbol 5 · …" en lugar de "Fútbol · Fútbol 5 · …"
@@ -145,28 +147,40 @@ export default async function VenuePage({ params, searchParams }: Props) {
         current={venue.name}
       />
 
-      {/* Portada verde con las líneas de la cancha */}
-      <header className="cover relative -mx-4 -mt-6 overflow-hidden px-5 pt-4 pb-16 sm:mx-0 sm:mt-0 sm:rounded-3xl" data-testid="portada-complejo">
-        <CourtLines slug={sport.slug} className="opacity-[0.16]" />
+      {/* Portada: la foto del complejo (029) con un degradado oscuro abajo para que el nombre se lea;
+          sin foto, la portada verde con las líneas de la cancha */}
+      <header
+        className={`relative -mx-4 -mt-6 overflow-hidden px-5 pt-4 pb-16 sm:mx-0 sm:mt-0 sm:rounded-3xl ${coverUrl ? "bg-black text-white" : "cover"}`}
+        data-testid="portada-complejo"
+        data-foto={coverUrl ? "si" : "no"}
+      >
+        {coverUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- archivo del bucket público, ya achicado (1600 px) */}
+            <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" data-testid="portada-foto" />
+            <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/55 to-black/20" />
+          </>
+        ) : (
+          <CourtLines slug={sport.slug} className="opacity-[0.16]" />
+        )}
         <div className="relative flex min-h-[9.5rem] flex-col justify-between gap-6">
           <Link
             href={listPath}
             data-testid="volver"
             aria-label="Volver"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-current/15 text-xl sm:hidden"
+            className={`flex h-11 w-11 items-center justify-center rounded-full text-xl sm:hidden ${coverUrl ? "bg-black/50" : "bg-current/15"}`}
           >
             <span aria-hidden="true">←</span>
           </Link>
           <div className="flex items-center gap-3">
             <ClubLogo name={venue.name} logoPath={venue.logo_path} size={60} />
             <div className="min-w-0">
-              <h1 className="text-[2rem] font-extrabold leading-tight">{venue.name}</h1>
-              <p className="text-sm" data-testid="etiquetas">{subtitle}</p>
+              <h1 className={`text-[2rem] font-extrabold leading-tight ${coverUrl ? "[text-shadow:0_1px_8px_rgb(0_0_0/0.6)]" : ""}`}>{venue.name}</h1>
+              <p className={`text-sm ${coverUrl ? "[text-shadow:0_1px_6px_rgb(0_0_0/0.6)]" : ""}`} data-testid="etiquetas">{subtitle}</p>
             </div>
           </div>
         </div>
       </header>
-
       {/* Tarjeta flotante: dirección, mapa chiquito e "Ir" */}
       <div className="relative z-10 -mt-12 flex items-center gap-3 rounded-3xl border border-line bg-surface p-3 shadow-md" data-testid="ubicacion">
         <MiniMapLink id={venue.id} name={venue.name} lat={venue.lat} lng={venue.lng} size={56} />

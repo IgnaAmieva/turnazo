@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { refundPayment } from "@/lib/mp/refunds";
 import { triggerPushSend } from "@/lib/push";
 import { detectLogoType, LOGO_BUCKET, LOGO_UPLOAD_MAX_BYTES } from "@/lib/venue-logo";
-import { shrinkLogo } from "@/lib/venue-logo-shrink";
+import { shrinkCover, shrinkLogo } from "@/lib/venue-logo-shrink";
 import { resolveLocality, type ResolvedLocality } from "@/lib/locality-resolver";
 import { FORMAT_VALUES } from "@/lib/court-format";
 
@@ -267,69 +267,92 @@ export async function updateVenueAction(
 }
 
 // ---------------------------------------------------------------------------
-// Logo del club (migración 024). Se sube con la sesión del dueño: las
-// políticas de storage limitan la carpeta '{venue_id}/' al dueño del complejo
-// y venues_logo_path_check obliga a que logo_path esté en esa carpeta.
+// Logo del club (migración 024) y foto de portada (029), en el bucket
+// 'venue-logos'. Se suben con la sesión del dueño: las políticas de storage
+// limitan la carpeta '{venue_id}/' al dueño del complejo y los CHECK
+// (venues_logo_path_check / venues_cover_path_check) obligan a que la ruta
+// esté en esa carpeta. El tipo se valida por los primeros bytes y la imagen se
+// achica en el servidor (sharp) sin cambiarle el formato.
 // ---------------------------------------------------------------------------
 
-const LOGO_ERRORS = {
-  missing:  "Elegí una imagen.",
-  tooBig:   "El logo puede pesar hasta 10 MB.",
-  badType:  "El logo tiene que ser una imagen PNG, JPG o WebP.",
-  shrink:   "No pudimos achicar esta imagen. Probá con otra.",
-  upload:   "No se pudo subir el logo. Intentá de nuevo.",
-} as const;
+type VenueImageKind = "logo" | "cover";
+
+const IMAGE: Record<VenueImageKind, {
+  column: "logo_path" | "cover_path";
+  shrink: (b: Uint8Array, t: NonNullable<ReturnType<typeof detectLogoType>>) => Promise<Buffer | null>;
+  errors: Record<"missing" | "tooBig" | "badType" | "shrink" | "upload", string>;
+}> = {
+  logo: {
+    column: "logo_path",
+    shrink: shrinkLogo,
+    errors: {
+      missing: "Elegí una imagen.",
+      tooBig:  "El logo puede pesar hasta 10 MB.",
+      badType: "El logo tiene que ser una imagen PNG, JPG o WebP.",
+      shrink:  "No pudimos achicar esta imagen. Probá con otra.",
+      upload:  "No se pudo subir el logo. Intentá de nuevo.",
+    },
+  },
+  cover: {
+    column: "cover_path",
+    shrink: shrinkCover,
+    errors: {
+      missing: "Elegí una foto.",
+      tooBig:  "La foto puede pesar hasta 10 MB.",
+      badType: "La foto tiene que ser PNG, JPG o WebP.",
+      shrink:  "No pudimos achicar esta foto. Probá con otra.",
+      upload:  "No se pudo subir la foto. Intentá de nuevo.",
+    },
+  },
+};
 
 /** El complejo, solo si es del usuario de la sesión. */
-async function ownedVenueLogo(supabase: Awaited<ReturnType<typeof createClient>>, venueId: string, userId: string) {
+async function ownedVenueImages(supabase: Awaited<ReturnType<typeof createClient>>, venueId: string, userId: string) {
   if (!z.string().guid().safeParse(venueId).success) return null;
   const { data } = await supabase
     .from("venues")
-    .select("id, logo_path")
+    .select("id, logo_path, cover_path")
     .eq("id", venueId)
     .eq("owner_id", userId)
     .maybeSingle();
   return data;
 }
 
-export async function uploadVenueLogoAction(
-  venueId: string,
-  _state: PanelActionState,
-  formData: FormData
-): Promise<PanelActionState> {
+async function uploadVenueImage(kind: VenueImageKind, venueId: string, formData: FormData): Promise<PanelActionState> {
+  const cfg = IMAGE[kind];
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado" };
 
-  const venue = await ownedVenueLogo(supabase, venueId, user.id);
+  const venue = await ownedVenueImages(supabase, venueId, user.id);
   if (!venue) return { error: "No autorizado" };
 
-  const file = formData.get("logo");
-  if (!(file instanceof File) || file.size === 0) return { fieldErrors: { logo: [LOGO_ERRORS.missing] } };
-  if (file.size > LOGO_UPLOAD_MAX_BYTES) return { fieldErrors: { logo: [LOGO_ERRORS.tooBig] } };
+  const file = formData.get(kind);
+  if (!(file instanceof File) || file.size === 0) return { fieldErrors: { [kind]: [cfg.errors.missing] } };
+  if (file.size > LOGO_UPLOAD_MAX_BYTES) return { fieldErrors: { [kind]: [cfg.errors.tooBig] } };
 
   // Tipo real por los primeros bytes: la extensión y el Content-Type los elige el que sube
   const original = new Uint8Array(await file.arrayBuffer());
   const type = detectLogoType(original);
-  if (!type) return { fieldErrors: { logo: [LOGO_ERRORS.badType] } };
+  if (!type) return { fieldErrors: { [kind]: [cfg.errors.badType] } };
 
-  // Se achica en el servidor (1024 px, < 512 KB, mismo formato) antes de subirlo
-  const bytes = await shrinkLogo(original, type);
-  if (!bytes) return { fieldErrors: { logo: [LOGO_ERRORS.shrink] } };
+  // Se achica en el servidor (logo: 1024 px, < 512 KB; portada: 1600 px, < 500 KB; mismo formato)
+  const bytes = await cfg.shrink(original, type);
+  if (!bytes) return { fieldErrors: { [kind]: [cfg.errors.shrink] } };
 
-  // Nombre nuevo en cada subida: la URL pública cambia y nadie ve el logo viejo de caché
-  const path = `${venueId}/logo-${Date.now()}.${type.ext}`;
+  // Nombre nuevo en cada subida: la URL pública cambia y nadie ve la imagen vieja de caché
+  const path = `${venueId}/${kind}-${Date.now()}.${type.ext}`;
   const { error: upErr } = await supabase.storage
     .from(LOGO_BUCKET)
     .upload(path, bytes, { contentType: type.mime, upsert: false, cacheControl: "31536000" });
   if (upErr) {
-    console.error("[panel] logo upload failed:", upErr.message);
-    return { error: LOGO_ERRORS.upload };
+    console.error(`[panel] ${kind} upload failed:`, upErr.message);
+    return { error: cfg.errors.upload };
   }
 
   const { error } = await supabase
     .from("venues")
-    .update({ logo_path: path })
+    .update(cfg.column === "logo_path" ? { logo_path: path } : { cover_path: path })
     .eq("id", venueId)
     .eq("owner_id", user.id);
   if (error) {
@@ -337,9 +360,10 @@ export async function uploadVenueLogoAction(
     return dbError(error);
   }
 
-  if (venue.logo_path && venue.logo_path !== path) {
-    const { error: rmErr } = await supabase.storage.from(LOGO_BUCKET).remove([venue.logo_path]);
-    if (rmErr) console.error("[panel] old logo remove failed:", rmErr.message);
+  const old = venue[cfg.column];
+  if (old && old !== path) {
+    const { error: rmErr } = await supabase.storage.from(LOGO_BUCKET).remove([old]);
+    if (rmErr) console.error(`[panel] old ${kind} remove failed:`, rmErr.message);
   }
 
   const { error: auditErr } = await supabase.from("audit_log").insert({
@@ -348,7 +372,7 @@ export async function uploadVenueLogoAction(
     entity:     "venue",
     entity_id:  venueId,
     action:     "update",
-    new_data:   { logo_path: path },
+    new_data:   { [cfg.column]: path },
   });
   if (auditErr) return auditError(auditErr);
 
@@ -356,28 +380,26 @@ export async function uploadVenueLogoAction(
   return {};
 }
 
-export async function removeVenueLogoAction(
-  venueId: string,
-  _state: PanelActionState,
-  _formData: FormData
-): Promise<PanelActionState> {
+async function removeVenueImage(kind: VenueImageKind, venueId: string): Promise<PanelActionState> {
+  const cfg = IMAGE[kind];
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado" };
 
-  const venue = await ownedVenueLogo(supabase, venueId, user.id);
+  const venue = await ownedVenueImages(supabase, venueId, user.id);
   if (!venue) return { error: "No autorizado" };
-  if (!venue.logo_path) return {};
+  const old = venue[cfg.column];
+  if (!old) return {};
 
   const { error } = await supabase
     .from("venues")
-    .update({ logo_path: null })
+    .update(cfg.column === "logo_path" ? { logo_path: null } : { cover_path: null })
     .eq("id", venueId)
     .eq("owner_id", user.id);
   if (error) return dbError(error);
 
-  const { error: rmErr } = await supabase.storage.from(LOGO_BUCKET).remove([venue.logo_path]);
-  if (rmErr) console.error("[panel] logo remove failed:", rmErr.message);
+  const { error: rmErr } = await supabase.storage.from(LOGO_BUCKET).remove([old]);
+  if (rmErr) console.error(`[panel] ${kind} remove failed:`, rmErr.message);
 
   const { error: auditErr } = await supabase.from("audit_log").insert({
     profile_id: user.id,
@@ -385,7 +407,7 @@ export async function removeVenueLogoAction(
     entity:     "venue",
     entity_id:  venueId,
     action:     "update",
-    new_data:   { logo_path: null },
+    new_data:   { [cfg.column]: null },
   });
   if (auditErr) return auditError(auditErr);
 
@@ -393,6 +415,19 @@ export async function removeVenueLogoAction(
   return {};
 }
 
+export async function uploadVenueLogoAction(venueId: string, _state: PanelActionState, formData: FormData): Promise<PanelActionState> {
+  return uploadVenueImage("logo", venueId, formData);
+}
+export async function removeVenueLogoAction(venueId: string, _state: PanelActionState, _formData: FormData): Promise<PanelActionState> {
+  return removeVenueImage("logo", venueId);
+}
+/** Foto de portada (029): la página del complejo la muestra arriba, con un degradado para el nombre. */
+export async function uploadVenueCoverAction(venueId: string, _state: PanelActionState, formData: FormData): Promise<PanelActionState> {
+  return uploadVenueImage("cover", venueId, formData);
+}
+export async function removeVenueCoverAction(venueId: string, _state: PanelActionState, _formData: FormData): Promise<PanelActionState> {
+  return removeVenueImage("cover", venueId);
+}
 // ---------------------------------------------------------------------------
 // Venue payment settings (seña, pago total, pago en el lugar)
 // ---------------------------------------------------------------------------

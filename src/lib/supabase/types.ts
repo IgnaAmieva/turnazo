@@ -637,6 +637,7 @@ export type Database = {
           allow_full_payment: boolean
           allow_pay_at_venue: boolean
           cancel_limit_hours: number
+          cover_path: string | null
           created_at: string
           deposit_required: boolean
           deposit_type: Database["public"]["Enums"]["deposit_type"] | null
@@ -663,6 +664,7 @@ export type Database = {
           allow_full_payment?: boolean
           allow_pay_at_venue?: boolean
           cancel_limit_hours?: number
+          cover_path?: string | null
           created_at?: string
           deposit_required?: boolean
           deposit_type?: Database["public"]["Enums"]["deposit_type"] | null
@@ -689,6 +691,7 @@ export type Database = {
           allow_full_payment?: boolean
           allow_pay_at_venue?: boolean
           cancel_limit_hours?: number
+          cover_path?: string | null
           created_at?: string
           deposit_required?: boolean
           deposit_type?: Database["public"]["Enums"]["deposit_type"] | null

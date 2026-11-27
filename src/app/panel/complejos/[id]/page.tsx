@@ -2,13 +2,14 @@ import { notFound } from "next/navigation";
 import { getOwnerVenue, getMpConnectionStatus } from "@/lib/supabase/panel-queries";
 import {
   updateVenueAction, updatePaymentSettingsAction, updateCancellationPolicyAction,
-  uploadVenueLogoAction, removeVenueLogoAction,
+  uploadVenueLogoAction, removeVenueLogoAction, uploadVenueCoverAction, removeVenueCoverAction,
 } from "@/app/actions/panel";
 import { VenueForm } from "@/components/panel/venue-form";
 import { MpConnectSection } from "@/components/panel/mp-connect-section";
 import { PaymentSettingsSection } from "@/components/panel/payment-settings-section";
 import { CancellationPolicySection } from "@/components/panel/cancellation-policy-section";
 import { VenueLogoSection } from "@/components/panel/venue-logo-section";
+import { VenueCoverSection } from "@/components/panel/venue-cover-section";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -67,6 +68,17 @@ export default async function EditarComplejoPage({
           logoPath={venue.logo_path}
           upload={uploadVenueLogoAction.bind(null, id)}
           remove={removeVenueLogoAction.bind(null, id)}
+        />
+      </div>
+
+      {/* Foto de portada (029): arriba de todo en la página del complejo */}
+      <div className="mb-6">
+        <VenueCoverSection
+          key={venue.cover_path ?? "sin-portada"}
+          name={venue.name}
+          coverPath={venue.cover_path}
+          upload={uploadVenueCoverAction.bind(null, id)}
+          remove={removeVenueCoverAction.bind(null, id)}
         />
       </div>
 
