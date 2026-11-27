@@ -47,15 +47,14 @@ describe("fila de días y título", () => {
     expect(dayTitle("2026-11-28", T, false)).toBe("Sábado 28");
   });
 
-  it("frases del día: hoy / mañana / el sábado 28, también en las franjas", () => {
+  it("frases del día: hoy / mañana / el sábado 28, también con hora", () => {
     expect(dayWord(T, T)).toBe("hoy");
     expect(dayWord("2026-11-26", T)).toBe("mañana");
     expect(dayWord("2026-11-28", T)).toBe("el sábado 28");
-    expect(whenLabel({ kind: "franja", id: "ahora" })).toBe("hoy");
-    expect(whenLabel({ kind: "franja", id: "ahora" }, "mañana")).toBe("mañana");
-    expect(whenLabel({ kind: "franja", id: "20-22" }, "mañana")).toBe("de 20–22 mañana");
-    expect(whenLabel({ kind: "hora", h: 19 }, "el sábado 28")).toBe("cerca de las 19:00 el sábado 28");
-    expect(whenLabel({ kind: "hora", h: 19 })).toBe("cerca de las 19:00");
+    expect(whenLabel({ kind: "any" })).toBe("hoy");
+    expect(whenLabel({ kind: "any" }, "mañana")).toBe("mañana");
+    expect(whenLabel({ kind: "time", hhmm: "20:00" }, "mañana")).toBe("a las 20:00 mañana");
+    expect(whenLabel({ kind: "time", hhmm: "18:30" })).toBe("a las 18:30");
   });
 
   it("chips: 'Hoy' y después el día corto", () => {

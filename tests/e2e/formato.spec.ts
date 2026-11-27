@@ -1,5 +1,5 @@
 /**
- * Fútbol (027): formato de la cancha. Chips de formato en el inicio para
+ * Fútbol (027): formato de la cancha. "Tipo de cancha" (desplegable) en el inicio para
  * filtrar, formato en la tarjeta y en la portada del complejo, y en el panel
  * el formato se elige con botones (solo fútbol; si pasa a pádel, NULL).
  *
@@ -50,36 +50,37 @@ test.afterAll(async ({ request }) => cleanup(request));
 test.describe("público", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("fútbol: chips de formato (44 px) que filtran; el formato aparece en la tarjeta", async ({ page }) => {
+  test("fútbol: desplegable 'Tipo de cancha' (Todos por defecto, 44 px) que filtra; el formato aparece en la tarjeta", async ({ page }) => {
     await page.goto(FUTBOL);
-    const chips = page.getByRole("navigation", { name: "Formato" }).getByTestId("formato");
-    await expect(chips).toHaveText(["Todos", "5", "6", "7", "9", "11", "Futsal"]);
-    for (const c of await chips.all()) expect((await c.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    await expect(chips.first()).toHaveAttribute("aria-current", "true");
+    const tipo = page.getByLabel("Tipo de cancha");
+    await expect(tipo).toHaveValue("");
+    await expect(tipo.locator("option")).toHaveText(["Todos", "Fútbol 5", "Fútbol 6", "Fútbol 7", "Fútbol 9", "Fútbol 11", "Futsal"]);
+    expect((await tipo.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect(page.getByRole("navigation", { name: "Formato" })).toHaveCount(0); // ya no hay chips
 
     const card = page.getByTestId("complejo").filter({ hasText: "Complejo Padelero Tunuyán" });
     await expect(card.getByTestId("etiquetas")).toContainText("Fútbol 5");
 
-    await page.getByRole("link", { name: "Fútbol 5" }).click();
+    await tipo.selectOption("futbol_5");
     await expect(page).toHaveURL(/formato=futbol_5/);
     await expect(card).toBeVisible();
-    await expect(page.getByRole("link", { name: "Fútbol 5" })).toHaveAttribute("aria-current", "true");
-    // Cambiar la hora conserva el formato
-    await page.getByTestId("franja").filter({ hasText: "20–22" }).click();
+    await expect(tipo).toHaveValue("futbol_5");
+    // Cambiar la hora conserva el tipo de cancha (cancha de 60 min desde las 08:00 → 20:00 existe)
+    await page.getByTestId("hora").selectOption("20:00");
     await expect(page).toHaveURL(/formato=futbol_5/);
-    await expect(page).toHaveURL(/franja=20-22/);
+    await expect(page).toHaveURL(/hora=20%3A00/);
 
-    await page.getByRole("link", { name: "Fútbol 7" }).click();
+    await page.getByLabel("Tipo de cancha").selectOption("futbol_7");
     await expect(page).toHaveURL(/formato=futbol_7/);
+    await expect(page).toHaveURL(/hora=20%3A00/);
     await expect(card).toHaveCount(0);
   });
 
-  test("pádel no tiene chips de formato", async ({ page }) => {
+  test("pádel no tiene 'Tipo de cancha'", async ({ page }) => {
     await page.goto(`/?localidad=tunuyan&deporte=padel&_now=${NOW}`);
     await expect(page.getByTestId("complejo").first()).toBeVisible();
     await expect(page.getByTestId("formato")).toHaveCount(0);
   });
-
   test("portada del complejo: 'Fútbol 5' en el subtítulo y en la pestaña de la cancha", async ({ page }) => {
     await page.goto(`/tunuyan/futbol/${VENUE_ID}?_now=${NOW}`);
     await expect(page.getByTestId("portada-complejo").getByTestId("etiquetas")).toHaveText(/^Fútbol 5 · /);
@@ -87,7 +88,7 @@ test.describe("público", () => {
   });
 
   for (const scheme of ["light", "dark"] as const) {
-    test(`contraste AA en los chips de formato (${scheme})`, async ({ page }) => {
+    test(`contraste AA en "Tipo de cancha" (${scheme})`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme });
       await page.goto(`${FUTBOL}&formato=futbol_5`);
       for (const c of await page.getByTestId("formato").all()) expect(await contrastOf(c)).toBeGreaterThanOrEqual(4.5);

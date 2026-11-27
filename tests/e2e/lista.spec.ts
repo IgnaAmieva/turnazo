@@ -1,5 +1,5 @@
 /**
- * Rediseño V2b: lista de complejos con franjas, mapa chiquito esquemático,
+ * Rediseño V2b: lista de complejos con horarios reales, mapa chiquito esquemático,
  * distancia (solo con permiso) y próximos turnos con precio.
  * Solo se mira el complejo de prueba; tocar un turno abre su hoja, sin reservar.
  * ?_now= fija "hoy" en un día futuro a las 09:00 para que no dependa de la hora.
@@ -73,21 +73,19 @@ test("mapa chiquito: link a Google Maps con el pin real (44 px, pestaña nueva);
   await expect(page).toHaveURL(new RegExp(`${VENUE_PATH}$`));
 });
 
-test("franjas Ahora · 18–20 · 20–22 · 22+: filtran los turnos del día", async ({ page }) => {
+test("'¿A qué hora querés jugar?': los horarios reales del día; con turnos de 90 min, 18:30 · 20:00 · 21:30", async ({ page }) => {
   await page.goto(`${LIST}?_now=${NOW}`);
-  const franjas = page.getByTestId("franja");
-  await expect(franjas).toHaveText(["Ahora", "18–20", "20–22", "22+"]);
-  await expect(franjas.first()).toHaveAttribute("aria-current", "true");
+  const hour = page.getByTestId("hora");
+  await expect(hour).toHaveValue("");
+  const options = await hour.locator("option").allInnerTexts();
+  expect(options).toEqual(expect.arrayContaining(["Cualquier hora", "18:30", "20:00", "21:30"]));
+  expect(options).not.toContain("18:00");
 
-  await franjas.filter({ hasText: "18–20" }).click();
-  await expect(page).toHaveURL(/franja=18-20/);
-  await expect(franjas.filter({ hasText: "18–20" })).toHaveAttribute("aria-current", "true");
-  // 90 min desde 08:00 → en 18–20 solo puede estar 18:30
-  for (const chip of await card(page).getByTestId("turno-chip").all()) {
-    await expect(chip).toContainText(/^(18|19):\d{2}/);
-  }
+  await hour.selectOption("20:00");
+  await expect(page).toHaveURL(/hora=20%3A00/);
+  await expect(hour).toHaveValue("20:00");
+  await expect(card(page).getByTestId("turno-chip")).toHaveText([/^20:00/, /^21:30/]);
 });
-
 test("distancia solo si el jugador ya dio permiso de ubicación", async ({ browser }) => {
   const ctx = await browser.newContext({
     viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
@@ -110,12 +108,10 @@ test("'Ver todos en el mapa': el mapa grande no está arriba y aparece al tocarl
 });
 
 for (const scheme of ["light", "dark"] as const) {
-  test(`contraste AA en franjas, tarjetas y turnos (${scheme})`, async ({ page }) => {
+  test(`contraste AA en la hora, tarjetas y turnos (${scheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto(`${LIST}?_now=${NOW}`);
-    for (const f of await page.getByTestId("franja").all()) {
-      expect(await contrastOf(f)).toBeGreaterThanOrEqual(4.5);
-    }
+    expect(await contrastOf(page.getByTestId("hora"))).toBeGreaterThanOrEqual(4.5);
     const c = card(page);
     for (const el of [c.getByRole("link").first(), c.getByTestId("etiquetas"), c.locator("p").first()]) {
       expect(await contrastOf(el)).toBeGreaterThanOrEqual(4.5);

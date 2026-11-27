@@ -40,7 +40,7 @@ test("23:10: el inicio, 'Lo antes posible' y la lista pasan solos a mañana", as
     expect(box.height).toBeGreaterThanOrEqual(44);
     expect(box.width).toBeGreaterThanOrEqual(44);
   }
-  await expect(list.getByTestId("franja").first()).toHaveText("Todo el día");
+  await expect(list.getByTestId("hora")).toHaveValue("");   // "Cualquier hora"
   await expect(list.getByTestId("con-lugar")).toContainText(/complejos? con lugar mañana/);
 
   // Los turnos y la tarjeta abren el complejo en el martes
@@ -52,18 +52,18 @@ test("23:10: el inicio, 'Lo antes posible' y la lista pasan solos a mañana", as
 });
 
 test("con la fila de días se vuelve a hoy, aunque esté vacío", async ({ page }) => {
-  await page.goto(`${LIST}?_now=${lunesA(23, 10)}&franja=20-22`);
+  await page.goto(`${LIST}?_now=${lunesA(23, 10)}&hora=20:00`);
   await expect(page.getByTestId("dia-titulo")).toHaveText(TITLE);
 
   await page.getByTestId("dia").first().click();
   await expect(page).toHaveURL(new RegExp(`fecha=${LUNES}`));
-  await expect(page).toHaveURL(/franja=20-22/);            // la franja elegida se mantiene
+  await expect(page).toHaveURL(/hora=20%3A00|hora=20:00/);   // la hora elegida se mantiene
   await expect(page.getByTestId("dia-titulo")).toHaveText(new RegExp(`^Hoy, lunes ${Number(LUNES.slice(8))}$`));
   await expect(page.getByTestId("dia").first()).toHaveAttribute("aria-current", "date");
-  await expect(page.getByTestId("con-lugar")).toHaveText("Ningún complejo tiene lugar de 20–22. Probá otra hora u otro día.");
+  await expect(page.getByTestId("con-lugar")).toHaveText("Ningún complejo tiene lugar a las 20:00. Probá otra hora u otro día.");
 
-  // Cambiar la franja con hoy elegido no vuelve a pasar a mañana
-  await page.getByTestId("franja").first().click();
+  // Cambiar la hora con hoy elegido no vuelve a pasar a mañana
+  await page.getByTestId("hora").selectOption("");
   await expect(page).toHaveURL(new RegExp(`fecha=${LUNES}`));
   await expect(page.getByTestId("dia-titulo")).toHaveText(/^Hoy, /);
 });
@@ -80,7 +80,7 @@ test("21:00: todavía hay turnos que llegás a jugar → hoy, sin aviso", async 
   await page.goto(`${HOME}&_now=${lunesA(21, 0)}`);
   await expect(page.getByTestId("portada").getByRole("heading", { level: 1 })).toHaveText("¿Jugamos hoy?");
   await expect(page.getByTestId("dia-titulo")).toHaveText(/^Hoy, lunes /);
-  await expect(page.getByTestId("franja").first()).toHaveText("Ahora");
+  await expect(page.getByTestId("hora")).toHaveValue("");
   await expect(page.getByTestId("lo-antes-posible")).not.toContainText("Mañana");
 });
 

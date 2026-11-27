@@ -16,7 +16,7 @@ import { VenueResults } from "@/components/venue-results";
 
 type Props = {
   params: Promise<{ locality: string; sport: string }>;
-  searchParams: Promise<{ franja?: string; hora?: string; formato?: string; fecha?: string; _now?: string }>;
+  searchParams: Promise<{ hora?: string; formato?: string; fecha?: string; _now?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -34,8 +34,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  */
 export default async function VenuesPage({ params, searchParams }: Props) {
   const { locality: lSlug, sport: sSlug } = await params;
-  const { franja, hora, formato: formatoParam, fecha, _now } = await searchParams;
-  const when = parseWhen(franja, hora);
+  const { hora, formato: formatoParam, fecha, _now } = await searchParams;
+  const when = parseWhen(hora);
 
   const [locality, sport] = await Promise.all([getLocalityBySlug(lSlug), getSportBySlug(sSlug)]);
   if (!locality || !sport) notFound();

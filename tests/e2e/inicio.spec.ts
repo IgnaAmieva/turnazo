@@ -100,29 +100,37 @@ test("complejos ordenados por más turnos libres; solo los que tienen lugar", as
   for (const c of await cards.all()) await expect(c.getByTestId("libres")).toContainText(/\d+ turnos? libres? hoy/);
 });
 
-test("'¿A qué hora querés jugar?': franja y hora exacta filtran los complejos y sus horarios", async ({ page }) => {
+test("'¿A qué hora querés jugar?': desplegable con los horarios reales libres; al elegir uno quedan los que empiezan a esa hora", async ({ page }) => {
   await page.goto(`${HOME}&_now=${NOW}`);
   const section = page.getByTestId("complejos-inicio");
-  await expect(section.getByRole("heading", { name: "¿A qué hora querés jugar?" })).toBeVisible();
-  await expect(section.getByTestId("franja")).toHaveText(["Ahora", "18–20", "20–22", "22+"]);
-
-  await section.getByTestId("franja").filter({ hasText: "20–22" }).click();
-  await expect(page).toHaveURL(/franja=20-22/);
-  await expect(page).toHaveURL(/localidad=tunuyan&deporte=padel/);
-  for (const chip of await section.getByTestId("turno-chip").all()) await expect(chip).toContainText(/^(20|21):\d{2}/);
-
-  // Hora exacta = "cerca de": a las 19 (90 min desde 08:00) aparece el de 18:30
-  const hour = section.getByTestId("hora-exacta");
+  const hour = section.getByLabel("¿A qué hora querés jugar?");
+  await expect(hour).toHaveValue("");
   expect((await hour.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  await hour.selectOption("19");
-  await expect(page).toHaveURL(/hora=19/);
-  await expect(page).not.toHaveURL(/franja=/);
-  const card = section.getByTestId("complejo").filter({ hasText: "Complejo Padelero Tunuyán" });
-  await expect(card.getByTestId("turno-chip")).toHaveText([/^18:30/]);
-  await expect(card.getByTestId("libres")).toContainText("cerca de las 19:00");
-  for (const f of await section.getByTestId("franja").all()) await expect(f).not.toHaveAttribute("aria-current", "true");
-});
+  const options = await hour.locator("option").allInnerTexts();
+  expect(options[0]).toBe("Cualquier hora");
+  // Turnos de 90 min desde las 08:00: 18:30, 20:00, 21:30 (no hay 18:00 ni 20:30); ya pasó el de 08:00 (son las 09:00)
+  expect(options).toEqual(expect.arrayContaining(["09:30", "18:30", "20:00", "21:30"]));
+  expect(options).not.toContain("18:00");
+  expect(options).not.toContain("08:00");
+  expect(options.slice(1)).toEqual([...options.slice(1)].sort((a, b) => (a < "06:00" ? "3" + a : a).localeCompare(b < "06:00" ? "3" + b : b)));
 
+  await hour.selectOption("18:30");
+  await expect(page).toHaveURL(/hora=18%3A30/);
+  await expect(page).toHaveURL(/localidad=tunuyan&deporte=padel/);
+  const cards = section.getByTestId("complejo");
+  expect(await cards.count()).toBeGreaterThan(0);
+  for (const c of await cards.all()) {
+    await expect(c.getByTestId("turno-chip").first()).toContainText(/^18:30/);
+    await expect(c.getByTestId("libres")).toContainText("a las 18:30");
+  }
+  const card = cards.filter({ hasText: "Complejo Padelero Tunuyán" });
+  await expect(card.getByTestId("turno-chip")).toHaveText([/^18:30/, /^20:00/, /^21:30/]);
+  await expect(section.getByTestId("con-lugar")).toContainText("con lugar a las 18:30");
+
+  // Volver a "Cualquier hora"
+  await hour.selectOption("");
+  await expect(page).not.toHaveURL(/hora=/);
+});
 test("con permiso de ubicación: sin elegir nada, la localidad más cercana y la distancia en la barra", async ({ browser }) => {
   const ctx = await browser.newContext({
     viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
@@ -184,10 +192,7 @@ for (const scheme of ["light", "dark"] as const) {
       }
     }
     expect(await contrastOf(page.getByTestId("donde"))).toBeGreaterThanOrEqual(4.5);
-    for (const f of await page.getByTestId("franja").all()) {
-      expect(await contrastOf(f)).toBeGreaterThanOrEqual(4.5);
-    }
-    expect(await contrastOf(page.getByTestId("hora-exacta"))).toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page.getByTestId("hora"))).toBeGreaterThanOrEqual(4.5);
     for (const t of await page.getByTestId("libres").all()) {
       expect(await contrastOf(t)).toBeGreaterThanOrEqual(4.5);
     }

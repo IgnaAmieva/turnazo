@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "¿Jugamos hoy?" };
 
 type Props = {
-  searchParams: Promise<{ localidad?: string; deporte?: string; franja?: string; hora?: string; formato?: string; fecha?: string; _now?: string }>;
+  searchParams: Promise<{ localidad?: string; deporte?: string; hora?: string; formato?: string; fecha?: string; _now?: string }>;
 };
 
 const plural = (n: number) => `${n} complejo${n !== 1 ? "s" : ""}`;
@@ -26,7 +26,7 @@ const plural = (n: number) => `${n} complejo${n !== 1 ? "s" : ""}`;
  * Inicio: deporte, "¿Dónde?" (una barra desplegable, la más cercana si el
  * jugador dio permiso de ubicación), "¿A qué hora querés jugar?" y, en la
  * MISMA pantalla, los complejos con lugar (primero el que tiene más turnos
- * libres). La elección va en la URL (?localidad=&deporte=&franja=|hora=); sin
+ * libres). La elección va en la URL (?localidad=&deporte=&hora=); sin
  * elección, la más cercana, la recordada o la primera con complejos.
  */
 export default async function HomePage({ searchParams }: Props) {
@@ -50,7 +50,7 @@ export default async function HomePage({ searchParams }: Props) {
     ? params._now : null;
   const now = fixedNow ? new Date(fixedNow) : new Date();
   const today = todayInMendoza(now);
-  const when = parseWhen(params.franja, params.hora);
+  const when = parseWhen(params.hora);
 
   const sports = sportsFor(locality.id);
   const sport =

@@ -8,14 +8,14 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { slotHref, type FreeSlot, type VenueForList } from '@/lib/free-slots';
-import { FRANJAS, whenLabel, whenParams, type When } from '@/lib/franjas';
+import { startTimes, whenLabel, whenParams, type When } from '@/lib/franjas';
 import { rankVenues } from '@/lib/rank-venues';
 import { formatTimeMendoza } from '@/lib/slots';
 import { venueTagsLine } from '@/lib/court-tags';
 import { dayChip, dayTitle, dayWord, listDays } from '@/lib/list-day';
 import { MiniMapLink } from '@/components/mini-map';
 import { VenueDistance } from '@/components/venue-distance';
-import { HourSelect } from '@/components/hour-select';
+import { FilterSelect } from '@/components/filter-select';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -31,17 +31,20 @@ type Props = {
   rolled: boolean;
   localitySlug: string;
   sportSlug: string;
-  /** Adónde apuntan las franjas: el inicio ("/" + localidad y deporte) o la lista */
+  /** Adónde apuntan los filtros: el inicio ("/" + localidad y deporte) o la lista */
   basePath: string;
   baseParams: Record<string, string>;
-  /** Filtros extra entre la hora y la lista (formato de fútbol) */
+  /** Filtros extra antes de la hora (tipo de cancha en fútbol) */
   filters?: ReactNode;
   /** Texto si no hay ningún complejo (por ejemplo, ninguno con canchas de ese formato) */
   noVenuesText?: string;
 };
 
 export function VenueResults({ venues, slots, when, today, date, rolled, localitySlug, sportSlug, basePath, baseParams, filters, noVenuesText }: Props) {
-  const rows = rankVenues(venues, slots, when, date);
+  const rows = rankVenues(venues, slots, when);
+  // Opciones de hora: los horarios de inicio que existen libres ese día (y el elegido, aunque ya no esté)
+  const times = startTimes(slots);
+  if (when.kind === 'time' && !times.includes(when.hhmm)) times.push(when.hhmm);
   const without = venues.length - rows.length;
   const day = dayWord(date, today);
   const href = (params: Record<string, string>) => {
@@ -80,28 +83,19 @@ export function VenueResults({ venues, slots, when, today, date, rolled, localit
         </ul>
       </nav>
 
-      <h2 id="a-que-hora" className="mt-5 mb-3 text-lg text-ink">¿A qué hora querés jugar?</h2>
-      <nav aria-label="Franja horaria" className="flex flex-wrap gap-2">
-        {FRANJAS.map((f) => {
-          const selected = when.kind === 'franja' && when.id === f.id;
-          return (
-            <Link
-              key={f.id}
-              href={href(whenParams({ kind: 'franja', id: f.id }))}
-              scroll={false}
-              aria-current={selected ? 'true' : undefined}
-              data-testid="franja"
-              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border px-4 text-sm font-extrabold
-                ${selected ? 'border-primary bg-primary text-on-primary' : 'border-line bg-surface text-ink hover:border-primary'}`}
-            >
-              {f.id === 'ahora' && date !== today ? 'Todo el día' : f.label}
-            </Link>
-          );
-        })}
-        <HourSelect basePath={basePath} baseParams={baseParams} value={when.kind === 'hora' ? when.h : null} />
-      </nav>
-
       {filters}
+
+      <FilterSelect
+        id="hora"
+        name="hora"
+        label="¿A qué hora querés jugar?"
+        allLabel="Cualquier hora"
+        options={times.map((t) => ({ value: t, label: t }))}
+        value={when.kind === 'time' ? when.hhmm : null}
+        basePath={basePath}
+        baseParams={baseParams}
+        testId="hora"
+      />
 
       <p className="mt-4 mb-3 text-sm text-ink-muted" data-testid="con-lugar">
         {venues.length === 0
