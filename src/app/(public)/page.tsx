@@ -10,7 +10,7 @@ import { CourtLines, SportIcon } from "@/components/sport-art";
 import { WhereBar } from "@/components/where-bar";
 import { VenueResults } from "@/components/venue-results";
 import { VenuesMapToggle } from "@/components/venues-map-toggle";
-import { FormatChips } from "@/components/format-chips";
+import { FormatSelect } from "@/components/format-select";
 import { filterByFormat, formatLabel, isFormat } from "@/lib/court-format";
 
 export const dynamic = "force-dynamic";
@@ -191,7 +191,7 @@ export default async function HomePage({ searchParams }: Props) {
             }}
             noVenuesText={formato ? `Ningún complejo de ${locality.name} cargó canchas de ${formatLabel(formato)} todavía.` : undefined}
             filters={sport.slug === "futbol" ? (
-              <FormatChips basePath="/" current={formato} params={{ localidad: locality.slug, deporte: sport.slug, ...keep }} />
+              <FormatSelect basePath="/" current={formato} params={{ localidad: locality.slug, deporte: sport.slug, ...keep }} />
             ) : undefined}
           />
           {venues.length > 0 && (

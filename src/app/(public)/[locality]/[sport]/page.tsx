@@ -7,7 +7,7 @@ import { getVenuesForList, listDaySlots } from "@/lib/free-slots";
 import { parseListDate } from "@/lib/list-day";
 import { parseWhen, whenParams } from "@/lib/franjas";
 import { filterByFormat, formatLabel, isFormat } from "@/lib/court-format";
-import { FormatChips } from "@/components/format-chips";
+import { FormatSelect } from "@/components/format-select";
 import { todayInMendoza } from "@/lib/slots";
 import Breadcrumbs from "@/components/breadcrumbs";
 import { RememberSearch } from "@/components/player-memory-ui";
@@ -78,7 +78,7 @@ export default async function VenuesPage({ params, searchParams }: Props) {
         baseParams={{ ...keep, ...(formato ? { formato } : {}) }}
         noVenuesText={formato ? `Ningún complejo de ${locality.name} cargó canchas de ${formatLabel(formato)} todavía.` : undefined}
         filters={sport.slug === "futbol" ? (
-          <FormatChips basePath={`/${lSlug}/${sSlug}`} current={formato}
+          <FormatSelect basePath={`/${lSlug}/${sSlug}`} current={formato}
             params={{ ...keep, ...whenParams(when) }} />
         ) : undefined}
       />
