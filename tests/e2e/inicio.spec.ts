@@ -199,3 +199,14 @@ for (const scheme of ["light", "dark"] as const) {
     }
   });
 }
+
+test("líneas de la cancha en las portadas: en oscuro blanco crema al 13% (no verde); en claro como estaban", async ({ page }) => {
+  const lines = async (url: string, testId: string) => page.goto(url).then(() =>
+    page.getByTestId(testId).locator("svg.court-lines").evaluate((s) => [getComputedStyle(s).color, getComputedStyle(s).opacity]));
+  await page.emulateMedia({ colorScheme: "dark" });
+  expect(await lines(`${HOME}&_now=${NOW}`, "portada")).toEqual(["rgb(246, 243, 234)", "0.13"]);
+  expect(await lines(`${VENUE_PATH}?_now=${NOW}`, "portada-complejo")).toEqual(["rgb(246, 243, 234)", "0.13"]);
+  await page.emulateMedia({ colorScheme: "light" });
+  expect(await lines(`${HOME}&_now=${NOW}`, "portada")).toEqual(["rgb(246, 243, 234)", "0.14"]);
+  expect(await lines(`${VENUE_PATH}?_now=${NOW}`, "portada-complejo")).toEqual(["rgb(246, 243, 234)", "0.16"]);
+});

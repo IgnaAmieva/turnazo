@@ -196,7 +196,7 @@ export function StoryArt({ data, style, link }: { data: StoryData; style: StoryS
   // Pizarra
   return (
     <div style={{ ...base, background: C.green, color: C.cream }}>
-      <FieldLines color={C.green2} />
+      <FieldLines color={C.cream} opacity={0.13} />
       <Header data={data} logoBg={C.cream} logoFg={C.green} color={C.cream} muted={C.creamMuted} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 32, marginTop: 50 }}>
         <SportBadge name={data.sport.name} bg={C.lime} fg={C.green} />

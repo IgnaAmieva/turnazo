@@ -49,13 +49,15 @@ export function SportIcon({ slug, className = 'h-7 w-7' }: IconProps) {
 
 /**
  * Líneas de cancha para el fondo de una portada (horizontal, se recorta
- * para cubrir). Sutiles: el contenedor decide el color y la opacidad.
+ * para cubrir). En claro: el color del contenedor con la opacidad que pase
+ * quien la usa. En oscuro (.court-lines en globals.css): blanco crema #F6F3EA
+ * al 13%, para que la portada no se vea toda verde.
  */
 export function CourtLines({ slug, className = '' }: IconProps) {
   const common = {
     viewBox: '0 0 400 200', preserveAspectRatio: 'xMidYMid slice', fill: 'none',
     stroke: 'currentColor', strokeWidth: 2, 'aria-hidden': true,
-    className: `pointer-events-none absolute inset-0 h-full w-full ${className}`,
+    className: `court-lines pointer-events-none absolute inset-0 h-full w-full ${className}`,
   };
   if (slug === 'futbol') {
     return (
