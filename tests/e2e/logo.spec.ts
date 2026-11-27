@@ -97,6 +97,38 @@ test("sin logo: iniciales en la portada; con logo: la imagen, en la portada y en
   await expect(logo).toHaveText(/^[A-Z0-9]{2}$/);
 });
 
+test("tarjeta de la lista y 'Lo antes posible': logo redondo al lado del nombre (o las iniciales); el mapa chiquito sigue igual", async ({ page, request }) => {
+  const NOW = `${nextWeekday(1, 12)}T12:00:00.000Z`;
+  const home = `/?localidad=tunuyan&deporte=${SPORT}&_now=${NOW}`;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(home);
+  const card = page.getByTestId("complejo").filter({ hasText: "Complejo Padelero Tunuyán" });
+  await expect(card.getByTestId("logo-club")).toHaveText(/^[A-Z0-9]{2}$/);
+  const soon = page.getByTestId("lo-antes-posible");
+  await expect(soon.getByTestId("logo-club")).toBeVisible();
+  // El mapa chiquito no se achica por el logo
+  expect((await card.getByTestId("mapa-mini").boundingBox())!.width).toBe(76);
+
+  const path = `${VENUE_ID}/logo-e2e-${Date.now()}.png`;
+  const png = await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 30, g: 120, b: 200, alpha: 1 } } }).png().toBuffer();
+  expect((await request.post(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
+    headers: { ...serviceHeaders(), "Content-Type": "image/png" }, data: png,
+  })).ok()).toBe(true);
+  await setLogoPath(request, path);
+
+  await page.reload();
+  const img = card.getByRole("img", { name: "Logo de Complejo Padelero Tunuyán" });
+  await expect(img).toHaveAttribute("src", new RegExp(`${path}$`));
+  const box = (await card.getByTestId("logo-club").boundingBox())!;
+  expect(box.width).toBe(36);
+  expect(await card.getByTestId("logo-club").evaluate((el) => getComputedStyle(el).borderRadius)).not.toBe("0px");
+  if ((await soon.innerText()).includes("Complejo Padelero Tunuyán")) {
+    await expect(soon.getByRole("img", { name: "Logo de Complejo Padelero Tunuyán" })).toBeVisible();
+  }
+  expect((await card.getByTestId("mapa-mini").boundingBox())!.width).toBe(76);
+  await cleanup(request);
+});
+
 test.describe("celular", () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 

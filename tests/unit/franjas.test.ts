@@ -40,7 +40,7 @@ describe("¿A qué hora querés jugar? — horarios reales", () => {
 });
 
 describe("orden de los complejos", () => {
-  const venue = (id: string, name: string) => ({ id, name, address: "", lat: 0, lng: 0, courts: [] });
+  const venue = (id: string, name: string) => ({ id, name, address: "", lat: 0, lng: 0, logo_path: null, courts: [] });
   const slot = (venueId: string, hhmm: string, courtId = "c1") =>
     ({ venueId, venueName: venueId, courtId, courtName: "", date: D, start: at(hhmm), end: at(hhmm), price: 1000 });
 

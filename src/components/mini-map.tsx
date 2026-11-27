@@ -73,7 +73,7 @@ export function MiniMapLink({ id, name, lat, lng, size = 76 }: {
     >
       <MiniMap id={id} size={size} className="block shadow-sm ring-1 ring-line" />
       <span className="text-[11px] font-extrabold leading-none text-ink" data-testid="mapa-etiqueta" aria-hidden="true">
-        Ver en el mapa ↗
+        {'Ver en el mapa ↗︎'}
       </span>
     </a>
   );

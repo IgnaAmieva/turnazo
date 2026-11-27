@@ -25,6 +25,8 @@ export type VenueForList = {
   address: string;
   lat: number;
   lng: number;
+  /** Logo del club (024): círculo en la tarjeta y en "Lo antes posible" */
+  logo_path: string | null;
   courts: CourtWithSchedule[];
 };
 
@@ -44,7 +46,7 @@ export const getVenuesForList = cache(async (localityId: string, sportId: string
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('venues')
-    .select(`id, name, address, lat, lng,
+    .select(`id, name, address, lat, lng, logo_path,
       courts!inner(id, name, slot_minutes, sport_id, active, surface, covered, lit, has_locker_room, format,
         court_hours(weekday, open_time, close_time),
         court_prices(weekday, from_time, to_time, price))`)
@@ -56,7 +58,7 @@ export const getVenuesForList = cache(async (localityId: string, sportId: string
   if (error) throw error;
 
   return (data ?? []).map((v) => ({
-    id: v.id, name: v.name, address: v.address, lat: v.lat, lng: v.lng,
+    id: v.id, name: v.name, address: v.address, lat: v.lat, lng: v.lng, logo_path: v.logo_path,
     courts: ((v.courts ?? []) as unknown as {
       id: string; name: string; slot_minutes: number; sport_id: string;
       surface: string | null; covered: boolean; lit: boolean; has_locker_room: boolean; format: string | null;

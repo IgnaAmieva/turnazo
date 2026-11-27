@@ -54,7 +54,8 @@ test("deportes con íconos de línea (sin emojis); el elegido en primary; sin co
   expect(await padel.locator("svg").count()).toBe(1);
 
   const all = await page.locator("main").innerText();
-  expect(all).not.toMatch(/\p{Extended_Pictographic}/u);
+  // Sin emojis: nada que se dibuje como emoji (las flechas de texto como "↗︎" sí van)
+  expect(all).not.toMatch(/\p{Emoji_Presentation}|️/u);
 
   for (const soon of await page.getByTestId("deporte-pronto").all()) {
     await expect(soon).toContainText("Pronto");

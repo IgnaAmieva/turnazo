@@ -14,6 +14,7 @@ import { formatTimeMendoza } from '@/lib/slots';
 import { venueTagsLine } from '@/lib/court-tags';
 import { dayChip, dayTitle, dayWord, listDays } from '@/lib/list-day';
 import { MiniMapLink } from '@/components/mini-map';
+import { ClubLogo } from '@/components/club-logo';
 import { VenueDistance } from '@/components/venue-distance';
 import { FilterSelect } from '@/components/filter-select';
 
@@ -113,11 +114,15 @@ export function VenueResults({ venues, slots, when, today, date, rolled, localit
               {/* El mapa chiquito abre Google Maps; el resto de la tarjeta, el complejo */}
               <MiniMapLink id={v.id} name={v.name} lat={v.lat} lng={v.lng} />
               <div className="min-w-0 flex-1">
-                <Link href={venueHref(v.id)} data-testid="complejo-link"
-                  className="inline-flex min-h-11 items-center text-lg font-extrabold text-ink hover:underline
-                    after:absolute after:inset-0 after:rounded-3xl after:content-['']">
-                  {v.name}
-                </Link>
+                {/* Logo redondo del club (o sus iniciales) al lado del nombre */}
+                <div className="flex items-center gap-2">
+                  <ClubLogo name={v.name} logoPath={v.logo_path} size={36} round />
+                  <Link href={venueHref(v.id)} data-testid="complejo-link"
+                    className="inline-flex min-h-11 min-w-0 items-center text-lg font-extrabold leading-tight text-ink hover:underline
+                      after:absolute after:inset-0 after:rounded-3xl after:content-['']">
+                    {v.name}
+                  </Link>
+                </div>
                 <p className="text-sm text-ink-muted">
                   {v.address}<VenueDistance lat={v.lat} lng={v.lng} />
                 </p>

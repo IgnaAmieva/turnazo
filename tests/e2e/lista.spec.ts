@@ -57,7 +57,7 @@ test("mapa chiquito: link a Google Maps con el pin real (44 px, pestaña nueva);
   const map = c.getByTestId("mapa-link");
   await expect(map).toHaveAttribute("aria-label", "Ver ubicación de Complejo Padelero Tunuyán en el mapa");
   // Look de mapa: pin rojo y la etiqueta que invita a tocarlo
-  await expect(map.getByTestId("mapa-etiqueta")).toHaveText("Ver en el mapa ↗");
+  await expect(map.getByTestId("mapa-etiqueta")).toHaveText("Ver en el mapa ↗︎");
   expect(await map.locator('svg path[fill="var(--map-pin)"]').evaluate((p) => getComputedStyle(p).fill)).toBe("rgb(234, 67, 53)");
   await expect(map).toHaveAttribute("target", "_blank");
   await expect(map).toHaveAttribute("rel", /noopener/);

@@ -83,7 +83,7 @@ export async function getStoryData(
   const date = opts.date && /^\d{4}-\d{2}-\d{2}$/.test(opts.date) && opts.date >= today ? opts.date : today;
 
   const forList: VenueForList = {
-    id: venue.id, name: venue.name, address: '', lat: 0, lng: 0,
+    id: venue.id, name: venue.name, address: '', lat: 0, lng: 0, logo_path: null,
     courts: courts.filter((c) => c.sports?.slug === sport.slug).map((c) => ({
       id: c.id, name: c.name, slot_minutes: c.slot_minutes, sport_id: c.sport_id,
       surface: c.surface, covered: c.covered, lit: c.lit, has_locker_room: c.has_locker_room,

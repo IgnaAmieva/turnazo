@@ -7,6 +7,7 @@ import { parseWhen, whenParams } from "@/lib/franjas";
 import { formatTimeMendoza, todayInMendoza } from "@/lib/slots";
 import { CoverGreeting, RememberSearch } from "@/components/player-memory-ui";
 import { CourtLines, SportIcon } from "@/components/sport-art";
+import { ClubLogo } from "@/components/club-logo";
 import { WhereBar } from "@/components/where-bar";
 import { VenueResults } from "@/components/venue-results";
 import { VenuesMapToggle } from "@/components/venues-map-toggle";
@@ -95,7 +96,9 @@ export default async function HomePage({ searchParams }: Props) {
               className="mt-4 flex min-h-11 items-center justify-between gap-3 rounded-2xl bg-accent px-4 py-3 text-on-accent
                 shadow-sm hover:opacity-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
             >
-              <span className="min-w-0">
+              {/* Logo redondo del club (o sus iniciales, lima sobre verde encima del lima) */}
+              <ClubLogo name={earliest.venueName} logoPath={venues.find((v) => v.id === earliest.venueId)?.logo_path} size={40} round inverse />
+              <span className="min-w-0 flex-1">
                 <span className="block text-sm">Lo antes posible</span>
                 <span className="block text-lg font-extrabold leading-tight">
                   {earliest.date === today ? "" : "Mañana "}
