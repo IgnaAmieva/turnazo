@@ -92,9 +92,10 @@ function Brand({ dark }: { dark: boolean }) {
   );
 }
 
-function FieldLines({ color }: { color: string }) {
+/** Líneas de la cancha de fondo (historia oscura): blanco crema con baja opacidad, no verde. */
+function FieldLines({ color, opacity = 1 }: { color: string; opacity?: number }) {
   return (
-    <svg width="1080" height="1920" viewBox="0 0 1080 1920" style={{ position: 'absolute', top: 0, left: 0 }}>
+    <svg width="1080" height="1920" viewBox="0 0 1080 1920" style={{ position: 'absolute', top: 0, left: 0, opacity }}>
       <g fill="none" stroke={color} strokeWidth="6">
         <rect x="60" y="60" width="960" height="1800" />
         <path d="M60 960H1020" />
